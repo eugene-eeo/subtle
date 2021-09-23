@@ -1,4 +1,5 @@
 #include "compiler.h"
+#include "memory.h"
 #include "vm.h"
 
 #include <stdarg.h>
@@ -187,6 +188,12 @@ static InterpretResult run(VM* vm) {
                 vm_pop(vm);
                 break;
             }
+            case OP_GET_LOCAL: vm_push(vm, vm->stack[READ_BYTE()]); break;
+            case OP_SET_LOCAL: {
+                vm->stack[READ_BYTE()] = vm_peek(vm, 0);
+                vm_pop(vm);
+                break;
+            }
             default: UNREACHABLE();
         }
     }
@@ -202,18 +209,19 @@ InterpretResult vm_interpret(VM* vm, const char* source) {
     Chunk chunk;
     chunk_init(&chunk);
 
-    Compiler compiler;
-    compiler_init(&compiler, vm, &chunk, source);
+    Compiler* compiler = ALLOCATE(Compiler, 1);
+    compiler_init(compiler, vm, &chunk, source);
 
-    if (compiler_compile(&compiler)) {
+    if (compiler_compile(compiler)) {
         vm->chunk = &chunk;
         vm->ip = chunk.code;
         result = run(vm);
+        vm_reset_stack(vm);
     } else {
         result = INTERPRET_COMPILE_ERROR;
     }
 
-    vm_reset_stack(vm);
+    FREE(Compiler, compiler);
     chunk_free(&chunk);
     return result;
 }

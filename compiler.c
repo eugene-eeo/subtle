@@ -2,6 +2,7 @@
 #include "lexer.h"
 #include <stdio.h>  // fprintf
 #include <stdlib.h>  // strtod
+#include <string.h>
 
 #ifdef SUBTLE_DEBUG_PRINT_CODE
 #include "debug.h"
@@ -34,6 +35,8 @@ void compiler_init(Compiler* compiler, VM* vm, Chunk* chunk, const char* source)
     compiler->had_error = false;
     compiler->panic_mode = false;
     compiler->vm = vm;
+    compiler->local_count = 0;
+    compiler->scope_depth = 0;
     lexer_init(&compiler->lexer, source);
 }
 
@@ -124,6 +127,64 @@ static void emit_return(Compiler* compiler) {
     emit_byte(compiler, OP_RETURN);
 }
 
+// Scoping helpers
+// ===============
+
+static void begin_block(Compiler* compiler) {
+    compiler->scope_depth++;
+}
+
+// Emits pop instructions to pop the current scope's locals off the stack.
+static void end_block(Compiler* compiler) {
+    compiler->scope_depth--;
+    while (compiler->local_count > 0
+           && compiler->locals[compiler->local_count - 1].depth
+                > compiler->scope_depth) {
+        emit_byte(compiler, OP_POP);
+        compiler->local_count--;
+    }
+}
+
+static void add_local(Compiler* compiler, Token name) {
+    if (compiler->local_count == MAX_LOCALS) {
+        error_at(compiler, &name, "Too many locals in one chunk.");
+        return;
+    }
+
+    Local* local = &compiler->locals[compiler->local_count];
+    local->name = name;
+    local->depth = -1;
+    compiler->local_count++;
+}
+
+static void mark_local_initialized(Compiler* compiler) {
+    compiler->locals[compiler->local_count - 1].depth = compiler->scope_depth;
+}
+
+static bool
+identifiers_equal(Token* a, Token* b)
+{
+    return a->length == b->length
+        && memcmp(a->start, b->start, a->length) == 0;
+}
+
+// Is there a local with the given name?
+// Returns -1 if there is no local, or the distance from the _top_ of
+// the stack instead.
+static int
+resolve_local(Compiler* compiler, Token* token)
+{
+    for (int i = compiler->local_count - 1; i >= 0; i--) {
+        Local* local = &compiler->locals[i];
+        if (identifiers_equal(&local->name, token)) {
+            if (local->depth == -1)
+                error_at(compiler, token, "Cannot read local variable in own initializer.");
+            return i;
+        }
+    }
+    return -1;
+}
+
 // Expression parsing
 // ==================
 
@@ -156,8 +217,22 @@ static void literal(Compiler* compiler, bool can_assign) {
 }
 
 static void named_variable(Compiler* compiler, Token* name, bool can_assign) {
-    uint16_t global = identifier_constant(compiler, name);
+    // Check if we can resolve to a local variable.
+    int local = resolve_local(compiler, name);
+    if (local != -1) {
+        if (can_assign && match(compiler, TOKEN_EQ)) {
+            expression(compiler);
+            emit_byte(compiler, OP_SET_LOCAL);
+            emit_byte(compiler, (uint8_t) local);
+        } else {
+            emit_byte(compiler, OP_GET_LOCAL);
+            emit_byte(compiler, (uint8_t) local);
+        }
+        return;
+    }
 
+    // Otherwise, it's a global.
+    uint16_t global = identifier_constant(compiler, name);
     if (can_assign && match(compiler, TOKEN_EQ)) {
         expression(compiler);
         emit_byte(compiler, OP_SET_GLOBAL);
@@ -285,17 +360,55 @@ static ParseRule* get_rule(TokenType type) {
 //
 //     if (x) let u = 1; <--- why?
 
+static void block(Compiler*);
 static void declaration(Compiler*);
 static void statement(Compiler*);
 
-static uint16_t parse_variable(Compiler* compiler, const char* msg) {
-    consume(compiler, TOKEN_VARIABLE, msg);
-    return identifier_constant(compiler, &compiler->previous);
+//
+// Variable declaration is split into two stages: _declaring_, which
+// marks its place in the stack (if it's a local variable), and _defining_,
+// which emits bytecode that gives it a value.
+//
+
+static void declare_variable(Compiler* compiler) {
+    int scope_depth = compiler->scope_depth;
+    if (scope_depth == 0) return; // Nothing to do in global scope.
+
+    Token* name = &compiler->previous;
+    // Disallow the following in the same block:
+    //    let a = 1;
+    //    let a = 2;
+    for (int i = compiler->local_count - 1; i >= 0; i--) {
+        Local* local = &compiler->locals[i];
+        if (local->depth != -1 && local->depth < scope_depth) break;
+        if (identifiers_equal(&local->name, name)) {
+            error_at(compiler, name, "Already a variable with this name in this scope.");
+            break;
+        }
+    }
+    add_local(compiler, *name);
 }
 
 static void define_variable(Compiler* compiler, uint16_t global) {
+    // If there is no local scope at the moment, then there is
+    // nothing to do: the local will be on the stack.
+    if (compiler->scope_depth > 0) {
+        mark_local_initialized(compiler);
+        return;
+    }
+
     emit_byte(compiler, OP_DEF_GLOBAL);
     emit_offset(compiler, global);
+}
+
+static uint16_t parse_variable(Compiler* compiler, const char* msg) {
+    consume(compiler, TOKEN_VARIABLE, msg);
+
+    declare_variable(compiler);
+    if (compiler->scope_depth > 0)
+        return 0;
+
+    return identifier_constant(compiler, &compiler->previous);
 }
 
 static void let_decl(Compiler* compiler) {
@@ -314,6 +427,22 @@ static void assert_stmt(Compiler* compiler) {
     emit_byte(compiler, OP_ASSERT);
 }
 
+static void block(Compiler* compiler) {
+    begin_block(compiler);
+    while (!check(compiler, TOKEN_EOF) && !check(compiler, TOKEN_RBRACE))
+        declaration(compiler);
+    end_block(compiler);
+    consume(compiler, TOKEN_RBRACE, "Expect '}' after block.");
+}
+
+static void do_stmt(Compiler* compiler) {
+    if (!match(compiler, TOKEN_LBRACE)) {
+        error_at_current(compiler, "Expect '{' after do.");
+        return;
+    }
+    block(compiler);
+}
+
 static void synchronize(Compiler* compiler) {
     compiler->panic_mode = false;
     while (compiler->current.type != TOKEN_EOF) {
@@ -322,6 +451,9 @@ static void synchronize(Compiler* compiler) {
             case TOKEN_LET:
             case TOKEN_WHILE:
             case TOKEN_RETURN:
+            case TOKEN_ASSERT:
+            case TOKEN_IF:
+            case TOKEN_DO:
                 return;
             default:
                 advance(compiler);
@@ -342,6 +474,8 @@ static void declaration(Compiler* compiler) {
 static void statement(Compiler* compiler) {
     if (match(compiler, TOKEN_ASSERT)) {
         assert_stmt(compiler);
+    } else if (match(compiler, TOKEN_DO)) {
+        do_stmt(compiler);
     } else {
         // Expression statement
         expression(compiler);

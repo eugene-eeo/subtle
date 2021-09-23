@@ -39,6 +39,12 @@ static int constant_instruction(Chunk* chunk, int index, const char* name) {
     return index + 3;
 }
 
+static int byte_instruction(Chunk* chunk, int index, const char* name) {
+    uint8_t byte = (uint8_t)(chunk->code[index + 1]);
+    printf("%16s %4d\n", name, byte);
+    return index + 2;
+}
+
 int debug_print_instruction(Chunk* chunk, int index) {
     if (index > 0 && chunk_get_line(chunk, index-1) == chunk_get_line(chunk, index)) {
         printf("   |");
@@ -69,6 +75,8 @@ int debug_print_instruction(Chunk* chunk, int index) {
         case OP_GET_GLOBAL: return constant_instruction(chunk, index, "OP_GET_GLOBAL");
         case OP_SET_GLOBAL: return constant_instruction(chunk, index, "OP_SET_GLOBAL");
         case OP_ASSERT: return simple_instruction(index, "OP_ASSERT");
+        case OP_GET_LOCAL:  return byte_instruction(chunk, index, "OP_GET_LOCAL");
+        case OP_SET_LOCAL:  return byte_instruction(chunk, index, "OP_SET_LOCAL");
         default:
             printf("Unknown instruction.\n");
             return index + 1;

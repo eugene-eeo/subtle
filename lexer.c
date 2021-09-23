@@ -145,6 +145,7 @@ static TokenType variable_type(Lexer* lexer) {
                 }
             }
             break;
+        case 'd': return match_rest(lexer, TOKEN_DO, 1, "o", 1);
         case 'e': return match_rest(lexer, TOKEN_ELSE, 1, "lse", 3);
         case 'f':
             if (lexer->current - lexer->start >= 2) {
