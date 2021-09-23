@@ -1,0 +1,57 @@
+#ifndef SUBTLE_LEXER_H
+#define SUBTLE_LEXER_H
+
+#include "common.h"
+
+typedef struct {
+    const char* start;
+    const char* current;
+    size_t line; // current line number
+} Lexer;
+
+typedef enum {
+    // Single character tokens
+    TOKEN_PLUS, TOKEN_MINUS, TOKEN_TIMES, TOKEN_SLASH,
+    TOKEN_SEMICOLON,
+    TOKEN_COMMA,
+    TOKEN_DOT,
+    TOKEN_LPAREN, TOKEN_RPAREN,
+    TOKEN_LBRACE, TOKEN_RBRACE,
+    // One-or-two characters
+    TOKEN_EQ, TOKEN_EQ_EQ,     // =, ==
+    TOKEN_BANG, TOKEN_BANG_EQ, // !, !=
+    TOKEN_LT, TOKEN_LEQ,       // <, <=
+    TOKEN_GT, TOKEN_GEQ,       // >, >=
+    // Literals
+    TOKEN_NUMBER,
+    TOKEN_STRING,
+    TOKEN_VARIABLE,
+    // Keywords
+    TOKEN_NIL,
+    TOKEN_TRUE, TOKEN_FALSE,
+    TOKEN_FN,
+    TOKEN_WHILE,
+    TOKEN_THIS,
+    TOKEN_SUPER,
+    TOKEN_IF,
+    TOKEN_ELSE,
+    TOKEN_AND,
+    TOKEN_OR,
+    TOKEN_LET,
+    TOKEN_RETURN,
+
+    TOKEN_ERROR,
+    TOKEN_EOF,
+} TokenType;
+
+typedef struct {
+    TokenType type;
+    const char* start;
+    size_t length;
+    size_t line;
+} Token;
+
+void lexer_init(Lexer* lexer, const char* source);
+Token lexer_next(Lexer* lexer);
+
+#endif
