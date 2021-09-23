@@ -23,8 +23,8 @@ typedef struct VM {
     // GC
     Object* objects;
 
-    // String interning
-    Table strings;
+    Table strings; // String interning
+    Table globals; // Globals
 } VM;
 
 void vm_init(VM* vm);

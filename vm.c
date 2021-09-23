@@ -14,6 +14,7 @@ void vm_init(VM* vm) {
     vm->chunk = NULL;
     vm->ip = NULL;
     table_init(&vm->strings, vm);
+    table_init(&vm->globals, vm);
 }
 
 void vm_free(VM* vm) {
@@ -24,6 +25,7 @@ void vm_free(VM* vm) {
         obj = next;
     }
     table_free(&vm->strings);
+    table_free(&vm->globals);
     vm_init(vm);
 }
 
@@ -142,9 +144,36 @@ static InterpretResult run(VM* vm) {
             case OP_GT:  BINARY_OP(BOOL_TO_VAL, >); break;
             case OP_LEQ: BINARY_OP(BOOL_TO_VAL, <=); break;
             case OP_GEQ: BINARY_OP(BOOL_TO_VAL, >=); break;
-            case OP_TRUE:  vm_push(vm, BOOL_TO_VAL(true));  break;
+            case OP_TRUE:  vm_push(vm, BOOL_TO_VAL(true)); break;
             case OP_FALSE: vm_push(vm, BOOL_TO_VAL(false)); break;
-            case OP_NIL:   vm_push(vm, NIL_VAL);            break;
+            case OP_NIL:   vm_push(vm, NIL_VAL); break;
+            case OP_DEF_GLOBAL: {
+                Value name = READ_CONSTANT();
+                table_set(&vm->globals, name, vm_peek(vm, 0));
+                vm_pop(vm);
+                break;
+            }
+            case OP_GET_GLOBAL: {
+                Value name = READ_CONSTANT();
+                Value value;
+                if (!table_get(&vm->globals, name, &value)) {
+                    runtime_error(vm, "Undefined variable '%s'.",
+                                  VAL_TO_STRING(name)->chars);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                vm_push(vm, value);
+                break;
+            }
+            case OP_SET_GLOBAL: {
+                Value name = READ_CONSTANT();
+                if (table_set(&vm->globals, name, vm_peek(vm, 0))) {
+                    table_delete(&vm->globals, name);
+                    runtime_error(vm, "Undefined variable '%s'.",
+                                  VAL_TO_STRING(name)->chars);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                break;
+            }
         }
     }
 
@@ -156,19 +185,20 @@ static InterpretResult run(VM* vm) {
 
 
 InterpretResult vm_interpret(VM* vm, const char* source) {
+    InterpretResult result;
     Chunk chunk;
     chunk_init(&chunk);
 
     Compiler compiler;
     compiler_init(&compiler, vm, &chunk, source);
-    if (!compiler_compile(&compiler)) {
-        return INTERPRET_COMPILE_ERROR;
+
+    if (compiler_compile(&compiler)) {
+        vm->chunk = &chunk;
+        vm->ip = chunk.code;
+        result = run(vm);
+    } else {
+        result = INTERPRET_COMPILE_ERROR;
     }
-
-    vm->chunk = &chunk;
-    vm->ip = chunk.code;
-
-    InterpretResult result = run(vm);
 
     chunk_free(&chunk);
     return result;

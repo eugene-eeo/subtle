@@ -33,13 +33,14 @@ static Entry* table_find_entry(Entry* entries, size_t capacity, Value key) {
                     tombstone = entry;
             }
         } else if (value_equal(entry->key, key)) {
+            // Found the key.
             return entry;
         }
         index = (index + 1) & (capacity - 1);
     }
 }
 
-static void table_adjutable_capacity(Table* table, size_t capacity) {
+static void table_adjust_capacity(Table* table, size_t capacity) {
     Entry* entries = ALLOCATE(Entry, capacity);
     for (size_t i = 0; i < capacity; i++) {
         entries[i].key = UNDEFINED_VAL;
@@ -76,7 +77,7 @@ bool table_get(Table* table, Value key, Value* value) {
 bool table_set(Table* table, Value key, Value value) {
     if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
         size_t new_capacity = GROW_CAPACITY(table->capacity);
-        table_adjutable_capacity(table, new_capacity);
+        table_adjust_capacity(table, new_capacity);
     }
 
     Entry* entry = table_find_entry(table->entries, table->capacity, key);

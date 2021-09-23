@@ -139,13 +139,13 @@ ObjString*
 objstring_copy(VM* vm, const char* src, size_t length)
 {
     uint32_t hash = hash_string(src, length);
+    ObjString* interned = table_find_string(&vm->strings, src, length, hash);
+    if (interned != NULL)
+        return interned;
+
     char* chars = ALLOCATE(char, length + 1);
     memcpy(chars, src, length);
     chars[length] = '\0';
-
-    ObjString* interned = table_find_string(&vm->strings, chars, length, hash);
-    if (interned != NULL)
-        return interned;
 
     return objstring_new(vm, chars, length, hash);
 }

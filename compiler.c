@@ -21,7 +21,7 @@ typedef enum {
     PREC_LITERAL,    // literals
 } Precedence;
 
-typedef void (*ParseFn)(Compiler*);
+typedef void (*ParseFn)(Compiler* compiler, bool can_assign);
 
 typedef struct {
     ParseFn prefix;
@@ -50,7 +50,7 @@ static void error_at(Compiler* compiler, Token* token, const char* message) {
         fprintf(stderr, "\"%.*s\"", (int)token->length, token->start);
     }
 
-    fprintf(stderr, ": %s", message);
+    fprintf(stderr, ": %s\n", message);
     compiler->had_error = true;
 }
 
@@ -67,16 +67,21 @@ static void advance(Compiler* compiler) {
     }
 }
 
-static void consume(Compiler* compiler, TokenType type, const char* message) {
-    if (compiler->current.type == type) {
-        advance(compiler);
-        return;
-    }
-
-    error_at_current(compiler, message);
+static bool check(Compiler* compiler, TokenType type) {
+    return compiler->current.type == type;
 }
 
-// ==================
+static bool match(Compiler* compiler, TokenType type) {
+    if (!check(compiler, type)) return false;
+    advance(compiler);
+    return true;
+}
+
+static void consume(Compiler* compiler, TokenType type, const char* message) {
+    if (!match(compiler, type))
+        error_at_current(compiler, message);
+}
+
 // Bytecode utilities
 // ==================
 
@@ -101,6 +106,15 @@ static uint16_t make_constant(Compiler* compiler, Value v) {
     return offset;
 }
 
+static uint16_t identifier_constant(Compiler* compiler, Token* token) {
+    return make_constant(compiler,
+        OBJECT_TO_VAL(objstring_copy(
+            compiler->vm,
+            token->start,
+            token->length
+        )));
+}
+
 static void emit_constant(Compiler* compiler, Value v) {
     emit_byte(compiler, OP_CONSTANT);
     emit_offset(compiler, make_constant(compiler, v));
@@ -110,7 +124,6 @@ static void emit_return(Compiler* compiler) {
     emit_byte(compiler, OP_RETURN);
 }
 
-// ==================
 // Expression parsing
 // ==================
 
@@ -119,7 +132,7 @@ static void parse_precedence(Compiler*, Precedence);
 static ParseRule* get_rule(TokenType);
 
 
-static void string(Compiler* compiler) {
+static void string(Compiler* compiler, bool can_assign) {
     ObjString* str = objstring_copy(
         compiler->vm,
         compiler->previous.start + 1,
@@ -128,12 +141,12 @@ static void string(Compiler* compiler) {
     emit_constant(compiler, OBJECT_TO_VAL(str));
 }
 
-static void number(Compiler* compiler) {
+static void number(Compiler* compiler, bool can_assign) {
     double value = strtod(compiler->previous.start, NULL);
     emit_constant(compiler, NUMBER_TO_VAL(value));
 }
 
-static void literal(Compiler* compiler) {
+static void literal(Compiler* compiler, bool can_assign) {
     switch (compiler->previous.type) {
         case TOKEN_TRUE:  emit_byte(compiler, OP_TRUE); break;
         case TOKEN_FALSE: emit_byte(compiler, OP_FALSE); break;
@@ -142,27 +155,40 @@ static void literal(Compiler* compiler) {
     }
 }
 
-static void grouping(Compiler* compiler) {
+static void named_variable(Compiler* compiler, Token* name, bool can_assign) {
+    uint16_t global = identifier_constant(compiler, name);
+
+    if (can_assign && match(compiler, TOKEN_EQ)) {
+        expression(compiler);
+        emit_byte(compiler, OP_SET_GLOBAL);
+        emit_offset(compiler, global);
+    } else {
+        emit_byte(compiler, OP_GET_GLOBAL);
+        emit_offset(compiler, global);
+    }
+}
+
+static void variable(Compiler* compiler, bool can_assign) {
+    named_variable(compiler, &compiler->previous, can_assign);
+}
+
+static void grouping(Compiler* compiler, bool can_assign) {
     expression(compiler);
     consume(compiler, TOKEN_RPAREN, "Expect ')' after expression.");
 }
 
-static void unary(Compiler* compiler) {
+static void unary(Compiler* compiler, bool can_assign) {
     TokenType operator = compiler->previous.type;
     // Compile the operand.
     parse_precedence(compiler, PREC_UNARY);
     switch (operator) {
-        case TOKEN_MINUS:
-            emit_byte(compiler, OP_NEGATE);
-            break;
-        case TOKEN_BANG:
-            emit_byte(compiler, OP_NOT);
-            break;
+        case TOKEN_MINUS: emit_byte(compiler, OP_NEGATE); break;
+        case TOKEN_BANG:  emit_byte(compiler, OP_NOT); break;
         default: return; // Unreachable.
     }
 }
 
-static void binary(Compiler* compiler) {
+static void binary(Compiler* compiler, bool can_assign) {
     TokenType operator = compiler->previous.type;
     ParseRule* rule = get_rule(operator);
     parse_precedence(compiler, (Precedence)(rule->precedence + 1));
@@ -207,7 +233,7 @@ static ParseRule rules[] = {
     [TOKEN_GEQ]       = {NULL,     binary, PREC_CMP},
     [TOKEN_NUMBER]    = {number,   NULL,   PREC_NONE},
     [TOKEN_STRING]    = {string,   NULL,   PREC_NONE},
-    [TOKEN_VARIABLE]  = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_VARIABLE]  = {variable, NULL,   PREC_NONE},
     [TOKEN_NIL]       = {literal,  NULL,   PREC_NONE},
     [TOKEN_TRUE]      = {literal,  NULL,   PREC_NONE},
     [TOKEN_FALSE]     = {literal,  NULL,   PREC_NONE},
@@ -237,12 +263,13 @@ static void parse_precedence(Compiler* compiler, Precedence prec) {
         return;
     }
 
-    prefix_rule(compiler);
+    bool can_assign = prec <= PREC_ASSIGNMENT;
+    prefix_rule(compiler, can_assign);
 
     while (prec <= get_rule(compiler->current.type)->precedence) {
         advance(compiler);
         ParseFn infix_rule = get_rule(compiler->previous.type)->infix;
-        infix_rule(compiler);
+        infix_rule(compiler, can_assign);
     }
 }
 
@@ -250,9 +277,74 @@ static ParseRule* get_rule(TokenType type) {
     return &rules[type];
 }
 
+// Statement parsing
+// =================
+// There are two kinds of statements: declarations and `statements'.
+// Declarations include the let statement; this allows us to make
+// things like the following a syntactic error:
+//
+//     if (x) let u = 1; <--- why?
+
+static void declaration(Compiler*);
+static void statement(Compiler*);
+
+static uint16_t parse_variable(Compiler* compiler, const char* msg) {
+    consume(compiler, TOKEN_VARIABLE, msg);
+    return identifier_constant(compiler, &compiler->previous);
+}
+
+static void define_variable(Compiler* compiler, uint16_t global) {
+    emit_byte(compiler, OP_DEF_GLOBAL);
+    emit_offset(compiler, global);
+}
+
+static void let_decl(Compiler* compiler) {
+    uint16_t global = parse_variable(compiler, "Expect variable name.");
+
+    consume(compiler, TOKEN_EQ, "Expect '=' after variable name.");
+    expression(compiler);
+    consume(compiler, TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
+
+    define_variable(compiler, global);
+}
+
+static void synchronize(Compiler* compiler) {
+    compiler->panic_mode = false;
+    while (compiler->current.type != TOKEN_EOF) {
+        if (compiler->previous.type == TOKEN_SEMICOLON) return;
+        switch (compiler->current.type) {
+            case TOKEN_LET:
+            case TOKEN_WHILE:
+            case TOKEN_RETURN:
+                return;
+            default:
+                advance(compiler);
+        }
+    }
+}
+
+static void declaration(Compiler* compiler) {
+    if (match(compiler, TOKEN_LET)) {
+        let_decl(compiler);
+    } else {
+        statement(compiler);
+    }
+
+    if (compiler->panic_mode) synchronize(compiler);
+}
+
+static void statement(Compiler* compiler) {
+    // Expression statement
+    expression(compiler);
+    consume(compiler, TOKEN_SEMICOLON, "Expect ';' after expression.");
+    emit_byte(compiler, OP_POP);
+}
+
 bool compiler_compile(Compiler* compiler) {
     advance(compiler);
-    expression(compiler);
+    while (!match(compiler, TOKEN_EOF))
+        declaration(compiler);
+
     consume(compiler, TOKEN_EOF, "Expect end of expression.");
     emit_return(compiler);
 
