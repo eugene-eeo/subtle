@@ -25,6 +25,7 @@ enum OpCode {
     OP_DEF_GLOBAL,
     OP_GET_GLOBAL,
     OP_SET_GLOBAL,
+    OP_ASSERT,
 };
 
 typedef struct {

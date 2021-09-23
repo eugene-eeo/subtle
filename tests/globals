@@ -1,0 +1,12 @@
+let a = 1;
+
+assert a == 1;
+
+let b = 2;
+
+assert b == 2;
+
+a = b;
+
+assert a == 2;
+assert a == b;

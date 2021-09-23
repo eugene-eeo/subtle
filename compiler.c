@@ -308,6 +308,12 @@ static void let_decl(Compiler* compiler) {
     define_variable(compiler, global);
 }
 
+static void assert_stmt(Compiler* compiler) {
+    expression(compiler);
+    consume(compiler, TOKEN_SEMICOLON, "Expect ';' after expression.");
+    emit_byte(compiler, OP_ASSERT);
+}
+
 static void synchronize(Compiler* compiler) {
     compiler->panic_mode = false;
     while (compiler->current.type != TOKEN_EOF) {
@@ -334,10 +340,14 @@ static void declaration(Compiler* compiler) {
 }
 
 static void statement(Compiler* compiler) {
-    // Expression statement
-    expression(compiler);
-    consume(compiler, TOKEN_SEMICOLON, "Expect ';' after expression.");
-    emit_byte(compiler, OP_POP);
+    if (match(compiler, TOKEN_ASSERT)) {
+        assert_stmt(compiler);
+    } else {
+        // Expression statement
+        expression(compiler);
+        consume(compiler, TOKEN_SEMICOLON, "Expect ';' after expression.");
+        emit_byte(compiler, OP_POP);
+    }
 }
 
 bool compiler_compile(Compiler* compiler) {

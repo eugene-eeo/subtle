@@ -123,23 +123,28 @@ static Token number(Lexer* lexer) {
     return make_token(lexer, TOKEN_NUMBER);
 }
 
-static Token match_rest(Lexer* lexer, TokenType type,
-                        size_t start, const char* rest,
-                        size_t length) {
+static TokenType
+match_rest(Lexer* lexer, TokenType type,
+           size_t start, const char* rest,
+           size_t length)
+{
     if (lexer->current - lexer->start == start + length
             && memcmp(lexer->start + start, rest, length) == 0) {
-        return make_token(lexer, type);
+        return type;
     }
-    return make_token(lexer, TOKEN_VARIABLE);
+    return TOKEN_VARIABLE;
 }
 
-static Token variable(Lexer* lexer) {
-    while (is_alphanumeric(peek(lexer)))
-        advance(lexer);
-
-    // see if it's a keyword.
+static TokenType variable_type(Lexer* lexer) {
     switch (lexer->start[0]) {
-        case 'a': return match_rest(lexer, TOKEN_AND, 1, "nd", 2);
+        case 'a':
+            if (lexer->current - lexer->start >= 2) {
+                switch (lexer->start[1]) {
+                    case 'n': return match_rest(lexer, TOKEN_AND, 2, "d", 1);
+                    case 's': return match_rest(lexer, TOKEN_ASSERT, 2, "sert", 4);
+                }
+            }
+            break;
         case 'e': return match_rest(lexer, TOKEN_ELSE, 1, "lse", 3);
         case 'f':
             if (lexer->current - lexer->start >= 2) {
@@ -165,7 +170,14 @@ static Token variable(Lexer* lexer) {
             break;
         case 'w': return match_rest(lexer, TOKEN_WHILE, 1, "hile", 4);
     }
-    return make_token(lexer, TOKEN_VARIABLE);
+    return TOKEN_VARIABLE;
+}
+
+static Token variable(Lexer* lexer) {
+    while (is_alphanumeric(peek(lexer)))
+        advance(lexer);
+    TokenType type = variable_type(lexer);
+    return make_token(lexer, type);
 }
 
 Token lexer_next(Lexer* lexer) {

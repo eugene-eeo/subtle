@@ -68,6 +68,7 @@ int debug_print_instruction(Chunk* chunk, int index) {
         case OP_DEF_GLOBAL: return constant_instruction(chunk, index, "OP_DEF_GLOBAL");
         case OP_GET_GLOBAL: return constant_instruction(chunk, index, "OP_GET_GLOBAL");
         case OP_SET_GLOBAL: return constant_instruction(chunk, index, "OP_SET_GLOBAL");
+        case OP_ASSERT: return simple_instruction(index, "OP_ASSERT");
         default:
             printf("Unknown instruction.\n");
             return index + 1;

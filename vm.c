@@ -43,6 +43,11 @@ Value vm_peek(VM* vm, int distance) {
     return vm->stack_top[-1 - distance];
 }
 
+// Resets the VM's stack pointer
+static void vm_reset_stack(VM* vm) {
+    vm->stack_top = vm->stack;
+}
+
 static void runtime_error(VM* vm, const char* format, ...) {
     va_list args;
     va_start(args, format);
@@ -78,9 +83,9 @@ static InterpretResult run(VM* vm) {
 #ifdef SUBTLE_DEBUG_TRACE_EXECUTION
         // Trace the stack.
         for (Value* vptr = vm->stack; vptr != vm->stack_top; vptr++) {
-            printf("[");
+            printf("[ ");
             debug_print_value(*vptr);
-            printf("]");
+            printf(" ]");
         }
         printf("\n");
         // Trace the about-to-be-executed instruction.
@@ -174,6 +179,15 @@ static InterpretResult run(VM* vm) {
                 }
                 break;
             }
+            case OP_ASSERT: {
+                if (!value_truthy(vm_peek(vm, 0))) {
+                    runtime_error(vm, "Assertion failed.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                vm_pop(vm);
+                break;
+            }
+            default: UNREACHABLE();
         }
     }
 
@@ -182,7 +196,6 @@ static InterpretResult run(VM* vm) {
 #undef READ_CONSTANT
 #undef BINARY_OP
 }
-
 
 InterpretResult vm_interpret(VM* vm, const char* source) {
     InterpretResult result;
@@ -200,6 +213,7 @@ InterpretResult vm_interpret(VM* vm, const char* source) {
         result = INTERPRET_COMPILE_ERROR;
     }
 
+    vm_reset_stack(vm);
     chunk_free(&chunk);
     return result;
 }

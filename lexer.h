@@ -39,6 +39,7 @@ typedef enum {
     TOKEN_OR,
     TOKEN_LET,
     TOKEN_RETURN,
+    TOKEN_ASSERT,
 
     TOKEN_ERROR,
     TOKEN_EOF,
