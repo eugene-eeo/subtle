@@ -14,7 +14,7 @@ void table_init(Table* table, VM* vm) {
 
 void table_free(Table* table) {
     FREE_ARRAY(table->entries, Entry, table->count);
-    table_init(table, table->vm);
+    table_init(table, NULL);
 }
 
 static Entry* table_find_entry(Entry* entries, size_t capacity, Value key) {

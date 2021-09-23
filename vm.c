@@ -188,10 +188,14 @@ static InterpretResult run(VM* vm) {
                 vm_pop(vm);
                 break;
             }
-            case OP_GET_LOCAL: vm_push(vm, vm->stack[READ_BYTE()]); break;
+            case OP_GET_LOCAL: {
+                uint8_t slot = READ_BYTE();
+                vm_push(vm, vm->stack[slot]);
+                break;
+            }
             case OP_SET_LOCAL: {
-                vm->stack[READ_BYTE()] = vm_peek(vm, 0);
-                vm_pop(vm);
+                uint8_t slot = READ_BYTE();
+                vm->stack[slot] = vm_peek(vm, 0);
                 break;
             }
             default: UNREACHABLE();
@@ -207,7 +211,7 @@ static InterpretResult run(VM* vm) {
 InterpretResult vm_interpret(VM* vm, const char* source) {
     InterpretResult result;
     Chunk chunk;
-    chunk_init(&chunk);
+    chunk_init(&chunk, vm);
 
     Compiler* compiler = ALLOCATE(Compiler, 1);
     compiler_init(compiler, vm, &chunk, source);

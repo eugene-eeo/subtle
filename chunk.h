@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "object.h"
+#include "table.h"
 
 enum OpCode {
     OP_RETURN,
@@ -36,9 +37,12 @@ typedef struct {
     size_t     length;
     size_t     capacity;
     ValueArray constants;
+    Table      constants_index;
 } Chunk;
 
-void chunk_init(Chunk* chunk);
+typedef struct VM VM;
+
+void chunk_init(Chunk* chunk, VM* vm);
 void chunk_free(Chunk* chunk);
 void chunk_write_byte(Chunk* chunk, uint8_t byte, size_t line);
 void chunk_write_offset(Chunk* chunk, uint16_t offset, size_t line);

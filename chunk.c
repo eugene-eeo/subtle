@@ -1,19 +1,21 @@
 #include "chunk.h"
 #include "memory.h"
 
-void chunk_init(Chunk* chunk) {
+void chunk_init(Chunk* chunk, VM* vm) {
     chunk->code = NULL;
     chunk->lines = NULL;
     chunk->length = 0;
     chunk->capacity = 0;
     valuearray_init(&chunk->constants);
+    table_init(&chunk->constants_index, vm);
 }
 
 void chunk_free(Chunk* chunk) {
     FREE_ARRAY(chunk->code, uint8_t, chunk->capacity);
     FREE_ARRAY(chunk->lines, size_t, chunk->capacity);
     valuearray_free(&chunk->constants);
-    chunk_init(chunk);
+    table_free(&chunk->constants_index);
+    chunk_init(chunk, NULL);
 }
 
 void chunk_write_byte(Chunk* chunk, uint8_t byte, size_t line) {
@@ -39,6 +41,14 @@ size_t chunk_get_line(Chunk* chunk, int offset) {
 }
 
 size_t chunk_write_constant(Chunk* chunk, Value value) {
+    // Check if it already exists.
+    Value offset;
+    if (table_get(&chunk->constants_index, value, &offset))
+        return (size_t)VAL_TO_NUMBER(offset);
+
     valuearray_write(&chunk->constants, value);
-    return chunk->constants.length - 1;
+    size_t rv = chunk->constants.length - 1;
+    offset = NUMBER_TO_VAL(rv);
+    table_set(&chunk->constants_index, value, offset);
+    return rv;
 }
