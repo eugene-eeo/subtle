@@ -137,14 +137,7 @@ match_rest(Lexer* lexer, TokenType type,
 
 static TokenType variable_type(Lexer* lexer) {
     switch (lexer->start[0]) {
-        case 'a':
-            if (lexer->current - lexer->start >= 2) {
-                switch (lexer->start[1]) {
-                    case 'n': return match_rest(lexer, TOKEN_AND, 2, "d", 1);
-                    case 's': return match_rest(lexer, TOKEN_ASSERT, 2, "sert", 4);
-                }
-            }
-            break;
+        case 'a': return match_rest(lexer, TOKEN_ASSERT, 1, "ssert", 5);
         case 'd': return match_rest(lexer, TOKEN_DO, 1, "o", 1);
         case 'e': return match_rest(lexer, TOKEN_ELSE, 1, "lse", 3);
         case 'f':
@@ -158,7 +151,6 @@ static TokenType variable_type(Lexer* lexer) {
         case 'i': return match_rest(lexer, TOKEN_IF, 1, "f", 1);
         case 'l': return match_rest(lexer, TOKEN_LET, 1, "et", 2);
         case 'n': return match_rest(lexer, TOKEN_NIL, 1, "il", 2);
-        case 'o': return match_rest(lexer, TOKEN_OR, 1, "r", 1);
         case 'r': return match_rest(lexer, TOKEN_RETURN, 1, "eturn", 5);
         case 's': return match_rest(lexer, TOKEN_SUPER, 1, "uper", 4);
         case 't':
@@ -207,6 +199,8 @@ Token lexer_next(Lexer* lexer) {
         case '!': return make_token(lexer, match(lexer, '=') ? TOKEN_BANG_EQ : TOKEN_BANG);
         case '<': return make_token(lexer, match(lexer, '=') ? TOKEN_LEQ : TOKEN_LT);
         case '>': return make_token(lexer, match(lexer, '=') ? TOKEN_GEQ : TOKEN_GT);
+        case '&': return make_token(lexer, match(lexer, '&') ? TOKEN_AMP_AMP : TOKEN_AMP);
+        case '|': return make_token(lexer, match(lexer, '|') ? TOKEN_PIPE_PIPE : TOKEN_PIPE);
         case '"': return string(lexer);
     }
 

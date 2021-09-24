@@ -26,14 +26,14 @@ void debug_print_chunk(Chunk* chunk, const char* name) {
 }
 
 static int simple_instruction(int index, const char* name) {
-    printf("%16s\n", name);
+    printf("%-16s\n", name);
     return index + 1;
 }
 
 static int constant_instruction(Chunk* chunk, int index, const char* name) {
     uint16_t offset = (uint16_t)(chunk->code[index + 1] << 8);
     offset |= chunk->code[index + 2];
-    printf("%16s %4d ", name, offset);
+    printf("%-16s %4d ", name, offset);
     debug_print_value(chunk->constants.values[offset]);
     printf("\n");
     return index + 3;
@@ -41,15 +41,26 @@ static int constant_instruction(Chunk* chunk, int index, const char* name) {
 
 static int byte_instruction(Chunk* chunk, int index, const char* name) {
     uint8_t byte = (uint8_t)(chunk->code[index + 1]);
-    printf("%16s %4d\n", name, byte);
+    printf("%-16s %4d\n", name, byte);
     return index + 2;
 }
 
+static int
+jump_instruction(Chunk* chunk, int index, int direction, const char* name)
+{
+    uint16_t jump = (uint16_t)(chunk->code[index + 1] << 8);
+    jump |= chunk->code[index + 2];
+    printf("%-16s %4d -> %d\n", name, index,
+           index + 3 + direction * jump);
+    return index + 3;
+}
+
 int debug_print_instruction(Chunk* chunk, int index) {
+    printf("%04d ", index);
     if (index > 0 && chunk_get_line(chunk, index-1) == chunk_get_line(chunk, index)) {
-        printf("   |");
+        printf("   | ");
     } else {
-        printf("%4zu", chunk_get_line(chunk, index));
+        printf("%4zu ", chunk_get_line(chunk, index));
     }
     switch (chunk->code[index]) {
         case OP_RETURN:
@@ -77,6 +88,10 @@ int debug_print_instruction(Chunk* chunk, int index) {
         case OP_ASSERT: return simple_instruction(index, "OP_ASSERT");
         case OP_GET_LOCAL:  return byte_instruction(chunk, index, "OP_GET_LOCAL");
         case OP_SET_LOCAL:  return byte_instruction(chunk, index, "OP_SET_LOCAL");
+        case OP_LOOP:          return jump_instruction(chunk, index, -1, "OP_LOOP");
+        case OP_JUMP:          return jump_instruction(chunk, index, +1, "OP_JUMP");
+        case OP_JUMP_IF_FALSE: return jump_instruction(chunk, index, +1, "OP_JUMP_IF_FALSE");
+        case OP_JUMP_IF_TRUE:  return jump_instruction(chunk, index, +1, "OP_JUMP_IF_TRUE");
         default:
             printf("Unknown instruction.\n");
             return index + 1;

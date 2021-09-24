@@ -29,6 +29,10 @@ enum OpCode {
     OP_ASSERT,
     OP_GET_LOCAL,
     OP_SET_LOCAL,
+    OP_LOOP,
+    OP_JUMP,
+    OP_JUMP_IF_TRUE,
+    OP_JUMP_IF_FALSE,
 };
 
 typedef struct {

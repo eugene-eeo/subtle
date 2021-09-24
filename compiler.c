@@ -11,8 +11,8 @@
 typedef enum {
     PREC_NONE,
     PREC_ASSIGNMENT, // =
-    PREC_OR,         // or
-    PREC_AND,        // and
+    PREC_OR,         // ||
+    PREC_AND,        // &&
     PREC_EQ,         // ==, !=
     PREC_CMP,        // <, >, <=, >=
     PREC_TERM,       // + -
@@ -185,6 +185,47 @@ resolve_local(Compiler* compiler, Token* token)
     return -1;
 }
 
+// Jumping helpers
+// ===============
+
+static int
+emit_jump(Compiler* compiler, uint8_t op)
+{
+    emit_byte(compiler, op);
+    emit_offset(compiler, 0xFFFF);
+    // Return the index to the start of the offset.
+    return current_chunk(compiler)->length - 2;
+}
+
+static void
+patch_jump(Compiler* compiler, int offset)
+{
+    // Compute how many bytes we need to jump over -- accounting
+    // for the 2-byte offset after the jump instruction.
+    //
+    // | OP_JUMP | 0 | 0 | .... | OP_POP |  |
+    //             ^-- offset              ^-- chunk->length
+    int jump = current_chunk(compiler)->length - offset - 2;
+    if (jump > UINT16_MAX)
+        error(compiler, "Too much code to jump over.");
+
+    current_chunk(compiler)->code[offset    ] = (jump >> 8) & 0xFF;
+    current_chunk(compiler)->code[offset + 1] = (jump)      & 0xFF;
+}
+
+static void
+emit_loop(Compiler* compiler, int start)
+{
+    emit_byte(compiler, OP_LOOP);
+
+    // Have to +2 here to account for the VM reading the 2 byte argument.
+    int jump = current_chunk(compiler)->length - start + 2;
+    if (jump > UINT16_MAX)
+        error(compiler, "Too much code to jump over.");
+
+    emit_offset(compiler, (uint16_t)jump);
+}
+
 // Expression parsing
 // ==================
 
@@ -214,6 +255,24 @@ static void literal(Compiler* compiler, bool can_assign) {
         case TOKEN_NIL:   emit_byte(compiler, OP_NIL); break;
         default: return; // Unreachable
     }
+}
+
+static void and_(Compiler* compiler, bool can_assign) {
+    int else_jump = emit_jump(compiler, OP_JUMP_IF_FALSE);
+
+    emit_byte(compiler, OP_POP);
+    parse_precedence(compiler, PREC_AND);
+
+    patch_jump(compiler, else_jump);
+}
+
+static void or_(Compiler* compiler, bool can_assign) {
+    int else_jump = emit_jump(compiler, OP_JUMP_IF_TRUE);
+
+    emit_byte(compiler, OP_POP);
+    parse_precedence(compiler, PREC_OR);
+
+    patch_jump(compiler, else_jump);
 }
 
 static void named_variable(Compiler* compiler, Token* name, bool can_assign) {
@@ -306,6 +365,10 @@ static ParseRule rules[] = {
     [TOKEN_LEQ]       = {NULL,     binary, PREC_CMP},
     [TOKEN_GT]        = {NULL,     binary, PREC_CMP},
     [TOKEN_GEQ]       = {NULL,     binary, PREC_CMP},
+    [TOKEN_AMP]       = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_AMP_AMP]   = {NULL,     and_,   PREC_AND},
+    [TOKEN_PIPE]      = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_PIPE_PIPE] = {NULL,     or_,    PREC_OR},
     [TOKEN_NUMBER]    = {number,   NULL,   PREC_NONE},
     [TOKEN_STRING]    = {string,   NULL,   PREC_NONE},
     [TOKEN_VARIABLE]  = {variable, NULL,   PREC_NONE},
@@ -318,8 +381,6 @@ static ParseRule rules[] = {
     [TOKEN_SUPER]     = {NULL,     NULL,   PREC_NONE},
     [TOKEN_IF]        = {NULL,     NULL,   PREC_NONE},
     [TOKEN_ELSE]      = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_AND]       = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_OR]        = {NULL,     NULL,   PREC_NONE},
     [TOKEN_LET]       = {NULL,     NULL,   PREC_NONE},
     [TOKEN_RETURN]    = {NULL,     NULL,   PREC_NONE},
     [TOKEN_ERROR]     = {NULL,     NULL,   PREC_NONE},
@@ -375,7 +436,8 @@ static void declare_variable(Compiler* compiler) {
     if (scope_depth == 0) return; // Nothing to do in global scope.
 
     Token* name = &compiler->previous;
-    // Disallow the following in the same block:
+    // Disallow declaring another variable with the same name,
+    // within a local block.
     //    let a = 1;
     //    let a = 2;
     for (int i = compiler->local_count - 1; i >= 0; i--) {
@@ -435,6 +497,50 @@ static void block(Compiler* compiler) {
     consume(compiler, TOKEN_RBRACE, "Expect '}' after block.");
 }
 
+static void block_or_stmt(Compiler* compiler) {
+    if (match(compiler, TOKEN_LBRACE)) {
+        block(compiler);
+    } else {
+        statement(compiler);
+    }
+}
+
+static void if_stmt(Compiler* compiler) {
+    consume(compiler, TOKEN_LPAREN, "Expect '(' after if.");
+    expression(compiler);
+    consume(compiler, TOKEN_RPAREN, "Expect ')' after condition.");
+
+    int then_jump = emit_jump(compiler, OP_JUMP_IF_FALSE);
+    emit_byte(compiler, OP_POP); // Pop the condition off the stack.
+    block_or_stmt(compiler);
+
+    int else_jump = emit_jump(compiler, OP_JUMP);
+
+    patch_jump(compiler, then_jump);
+    emit_byte(compiler, OP_POP);
+
+    if (match(compiler, TOKEN_ELSE))
+        block_or_stmt(compiler);
+    patch_jump(compiler, else_jump);
+}
+
+static void while_stmt(Compiler* compiler) {
+    int loop_start = current_chunk(compiler)->length;
+    consume(compiler, TOKEN_LPAREN, "Expect '(' after while.");
+    expression(compiler);
+    consume(compiler, TOKEN_RPAREN, "Expect ')' after condition.");
+
+    int end_jump = emit_jump(compiler, OP_JUMP_IF_FALSE);
+    emit_byte(compiler, OP_POP);
+
+    // Compile the body of the while loop.
+    block_or_stmt(compiler);
+    emit_loop(compiler, loop_start);
+
+    patch_jump(compiler, end_jump);
+    emit_byte(compiler, OP_POP);
+}
+
 static void do_stmt(Compiler* compiler) {
     if (!match(compiler, TOKEN_LBRACE)) {
         error_at_current(compiler, "Expect '{' after do.");
@@ -476,6 +582,10 @@ static void statement(Compiler* compiler) {
         assert_stmt(compiler);
     } else if (match(compiler, TOKEN_DO)) {
         do_stmt(compiler);
+    } else if (match(compiler, TOKEN_IF)) {
+        if_stmt(compiler);
+    } else if (match(compiler, TOKEN_WHILE)) {
+        while_stmt(compiler);
     } else {
         // Expression statement
         expression(compiler);

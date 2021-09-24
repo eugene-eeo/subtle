@@ -18,10 +18,12 @@ typedef enum {
     TOKEN_LPAREN, TOKEN_RPAREN,
     TOKEN_LBRACE, TOKEN_RBRACE,
     // One-or-two characters
-    TOKEN_EQ, TOKEN_EQ_EQ,     // =, ==
-    TOKEN_BANG, TOKEN_BANG_EQ, // !, !=
-    TOKEN_LT, TOKEN_LEQ,       // <, <=
-    TOKEN_GT, TOKEN_GEQ,       // >, >=
+    TOKEN_EQ, TOKEN_EQ_EQ,       // =, ==
+    TOKEN_BANG, TOKEN_BANG_EQ,   // !, !=
+    TOKEN_LT, TOKEN_LEQ,         // <, <=
+    TOKEN_GT, TOKEN_GEQ,         // >, >=
+    TOKEN_AMP,  TOKEN_AMP_AMP,   // &, &&
+    TOKEN_PIPE, TOKEN_PIPE_PIPE, // |, ||
     // Literals
     TOKEN_NUMBER,
     TOKEN_STRING,
@@ -35,8 +37,6 @@ typedef enum {
     TOKEN_SUPER,
     TOKEN_IF,
     TOKEN_ELSE,
-    TOKEN_AND,
-    TOKEN_OR,
     TOKEN_LET,
     TOKEN_RETURN,
     TOKEN_ASSERT,
