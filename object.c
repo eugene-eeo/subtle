@@ -14,15 +14,15 @@ void valuearray_init(ValueArray* va) {
     va->capacity = 0;
 }
 
-void valuearray_free(ValueArray* va) {
-    FREE_ARRAY(va->values, Value, va->capacity);
+void valuearray_free(ValueArray* va, VM* vm) {
+    FREE_ARRAY(vm, va->values, Value, va->capacity);
     valuearray_init(va);
 }
 
-void valuearray_write(ValueArray* va, Value v) {
+void valuearray_write(ValueArray* va, VM* vm, Value v) {
     if (va->length + 1 > va->capacity) {
         size_t new_size = GROW_CAPACITY(va->capacity);
-        va->values = GROW_ARRAY(va->values, Value, va->capacity, new_size);
+        va->values = GROW_ARRAY(vm, va->values, Value, va->capacity, new_size);
         va->capacity = new_size;
     }
 
@@ -92,19 +92,19 @@ Object* object_allocate(VM* vm, ObjectType type, size_t sz) {
 #ifdef SUBTLE_DEBUG_TRACE_ALLOC
     printf("allocate %zu for type %d\n", sz, type);
 #endif
-    Object* object = memory_realloc(NULL, 0, sz);
+    Object* object = memory_realloc(vm, NULL, 0, sz);
     object->type = type;
     object->next = vm->objects;
     vm->objects = object;
     return object;
 }
 
-void object_free(Object* obj) {
+void object_free(Object* obj, VM* vm) {
     switch (obj->type) {
         case OBJECT_STRING: {
             ObjString* str = (ObjString*)obj;
-            FREE_ARRAY(str->chars, char, str->length + 1);
-            FREE(ObjString, str);
+            FREE_ARRAY(vm, str->chars, char, str->length + 1);
+            FREE(vm, ObjString, str);
             break;
         }
     }
@@ -131,7 +131,7 @@ objstring_new(VM* vm, char* chars, size_t length, uint32_t hash)
     str->hash = hash;
 
     // intern the string here.
-    table_set(&vm->strings, OBJECT_TO_VAL(str), NIL_VAL);
+    table_set(&vm->strings, vm, OBJECT_TO_VAL(str), NIL_VAL);
     return str;
 }
 
@@ -143,7 +143,7 @@ objstring_copy(VM* vm, const char* src, size_t length)
     if (interned != NULL)
         return interned;
 
-    char* chars = ALLOCATE(char, length + 1);
+    char* chars = ALLOCATE(vm, char, length + 1);
     memcpy(chars, src, length);
     chars[length] = '\0';
 
@@ -154,7 +154,7 @@ ObjString*
 objstring_concat(VM* vm, ObjString* a, ObjString* b)
 {
     size_t length = a->length + b->length;
-    char* chars = ALLOCATE(char, length + 1);
+    char* chars = ALLOCATE(vm, char, length + 1);
     memcpy(chars,             a->chars, a->length);
     memcpy(chars + a->length, b->chars, b->length);
     chars[length] = '\0';
@@ -163,7 +163,7 @@ objstring_concat(VM* vm, ObjString* a, ObjString* b)
 
     ObjString* interned = table_find_string(&vm->strings, chars, length, hash);
     if (interned != NULL) {
-        FREE_ARRAY(chars, char, length + 1);
+        FREE_ARRAY(vm, chars, char, length + 1);
         return interned;
     }
 

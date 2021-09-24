@@ -3,7 +3,8 @@
 #include <stdio.h>   // perror
 #include <stdlib.h>  // realloc, free
 
-void* memory_realloc(void* ptr, size_t old_size, size_t new_size) {
+void* memory_realloc(VM* vm, void* ptr, size_t old_size, size_t new_size) {
+    vm->bytes_allocated += new_size - old_size;
     if (new_size == 0) {
         // free() never fails
         free(ptr);

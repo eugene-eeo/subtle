@@ -65,6 +65,9 @@ static inline bool is_object_type(Value value, ObjectType type) {
     return IS_OBJECT(value) && VAL_TO_OBJECT(value)->type == type;
 }
 
+// We need the VM struct here, but vm.h needs object.h as well.
+typedef struct VM VM;
+
 typedef struct {
     Value* values;
     size_t length;
@@ -72,21 +75,18 @@ typedef struct {
 } ValueArray;
 
 void valuearray_init(ValueArray* va);
-void valuearray_free(ValueArray* va);
-void valuearray_write(ValueArray* va, Value v);
+void valuearray_free(ValueArray* va, VM* vm);
+void valuearray_write(ValueArray* va, VM* vm, Value v);
 
 uint32_t value_hash(Value v);
 bool value_equal(Value a, Value b);
 bool value_truthy(Value a);
 
-// We need the VM struct here, but vm.h needs object.h as well.
-typedef struct VM VM;
-
 // Object memory management
 // ========================
 
 Object* object_allocate(VM* vm, ObjectType type, size_t sz);
-void object_free(Object* obj);
+void object_free(Object* obj, VM* vm);
 
 #define ALLOCATE_OBJECT(vm, obj_type, type) \
     (type*)object_allocate(vm, obj_type, sizeof(type))

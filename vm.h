@@ -22,6 +22,7 @@ typedef struct VM {
 
     // GC
     Object* objects;
+    ssize_t bytes_allocated;
 
     Table strings; // String interning
     Table globals; // Globals

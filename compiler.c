@@ -93,15 +93,15 @@ static Chunk* current_chunk(Compiler* compiler) {
 }
 
 static void emit_byte(Compiler* compiler, uint8_t b) {
-    chunk_write_byte(current_chunk(compiler), b, compiler->previous.line);
+    chunk_write_byte(current_chunk(compiler), compiler->vm, b, compiler->previous.line);
 }
 
 static void emit_offset(Compiler* compiler, uint16_t offset) {
-    chunk_write_offset(current_chunk(compiler), offset, compiler->previous.line);
+    chunk_write_offset(current_chunk(compiler), compiler->vm, offset, compiler->previous.line);
 }
 
 static uint16_t make_constant(Compiler* compiler, Value v) {
-    size_t offset = chunk_write_constant(current_chunk(compiler), v);
+    size_t offset = chunk_write_constant(current_chunk(compiler), compiler->vm, v);
     if (offset > UINT16_MAX) {
         error(compiler, "Too many constants in one chunk.");
         return 0;

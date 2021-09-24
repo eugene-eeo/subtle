@@ -42,11 +42,11 @@ typedef struct {
 
 typedef struct VM VM;
 
-void chunk_init(Chunk* chunk, VM* vm);
-void chunk_free(Chunk* chunk);
-void chunk_write_byte(Chunk* chunk, uint8_t byte, size_t line);
-void chunk_write_offset(Chunk* chunk, uint16_t offset, size_t line);
+void chunk_init(Chunk* chunk);
+void chunk_free(Chunk* chunk, VM* vm);
+void chunk_write_byte(Chunk* chunk, VM* vm, uint8_t byte, size_t line);
+void chunk_write_offset(Chunk* chunk, VM* vm, uint16_t offset, size_t line);
 size_t chunk_get_line(Chunk* chunk, int offset);
-size_t chunk_write_constant(Chunk* chunk, Value v);
+size_t chunk_write_constant(Chunk* chunk, VM* vm, Value v);
 
 #endif

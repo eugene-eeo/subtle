@@ -22,13 +22,12 @@ typedef struct {
     Entry* entries;
     size_t count;
     size_t capacity;
-    VM* vm;
 } Table;
 
-void table_init(Table* table, VM* vm);
-void table_free(Table* table);
+void table_init(Table* table);
+void table_free(Table* table, VM* vm);
 bool table_get(Table* table, Value key, Value* value);
-bool table_set(Table* table, Value key, Value value);
+bool table_set(Table* table, VM* vm, Value key, Value value);
 bool table_delete(Table* table, Value key);
 ObjString* table_find_string(Table* table,
                              const char* str, size_t length, uint32_t hash);

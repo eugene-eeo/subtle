@@ -11,22 +11,23 @@
 
 void vm_init(VM* vm) {
     vm->stack_top = vm->stack;
-    vm->objects = NULL;
     vm->chunk = NULL;
     vm->ip = NULL;
-    table_init(&vm->strings, vm);
-    table_init(&vm->globals, vm);
+    vm->objects = NULL;
+    vm->bytes_allocated = 0;
+    table_init(&vm->strings);
+    table_init(&vm->globals);
 }
 
 void vm_free(VM* vm) {
     Object* obj = vm->objects;
     while (obj != NULL) {
         Object* next = obj->next;
-        object_free(obj);
+        object_free(obj, vm);
         obj = next;
     }
-    table_free(&vm->strings);
-    table_free(&vm->globals);
+    table_free(&vm->strings, vm);
+    table_free(&vm->globals, vm);
     vm_init(vm);
 }
 
@@ -155,7 +156,7 @@ static InterpretResult run(VM* vm) {
             case OP_NIL:   vm_push(vm, NIL_VAL); break;
             case OP_DEF_GLOBAL: {
                 Value name = READ_CONSTANT();
-                table_set(&vm->globals, name, vm_peek(vm, 0));
+                table_set(&vm->globals, vm, name, vm_peek(vm, 0));
                 vm_pop(vm);
                 break;
             }
@@ -172,7 +173,7 @@ static InterpretResult run(VM* vm) {
             }
             case OP_SET_GLOBAL: {
                 Value name = READ_CONSTANT();
-                if (table_set(&vm->globals, name, vm_peek(vm, 0))) {
+                if (table_set(&vm->globals, vm, name, vm_peek(vm, 0))) {
                     table_delete(&vm->globals, name);
                     runtime_error(vm, "Undefined variable '%s'.",
                                   VAL_TO_STRING(name)->chars);
@@ -211,9 +212,9 @@ static InterpretResult run(VM* vm) {
 InterpretResult vm_interpret(VM* vm, const char* source) {
     InterpretResult result;
     Chunk chunk;
-    chunk_init(&chunk, vm);
+    chunk_init(&chunk);
 
-    Compiler* compiler = ALLOCATE(Compiler, 1);
+    Compiler* compiler = ALLOCATE(vm, Compiler, 1);
     compiler_init(compiler, vm, &chunk, source);
 
     if (compiler_compile(compiler)) {
@@ -225,7 +226,7 @@ InterpretResult vm_interpret(VM* vm, const char* source) {
         result = INTERPRET_COMPILE_ERROR;
     }
 
-    FREE(Compiler, compiler);
-    chunk_free(&chunk);
+    FREE(vm, Compiler, compiler);
+    chunk_free(&chunk, vm);
     return result;
 }

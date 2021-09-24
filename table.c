@@ -5,16 +5,15 @@
 #include <stdio.h>
 #include <string.h>  // memcmp
 
-void table_init(Table* table, VM* vm) {
+void table_init(Table* table) {
     table->entries = NULL;
     table->count = 0;
     table->capacity = 0;
-    table->vm = vm;
 }
 
-void table_free(Table* table) {
-    FREE_ARRAY(table->entries, Entry, table->count);
-    table_init(table, NULL);
+void table_free(Table* table, VM* vm) {
+    FREE_ARRAY(vm, table->entries, Entry, table->capacity);
+    table_init(table);
 }
 
 static Entry* table_find_entry(Entry* entries, size_t capacity, Value key) {
@@ -40,8 +39,8 @@ static Entry* table_find_entry(Entry* entries, size_t capacity, Value key) {
     }
 }
 
-static void table_adjust_capacity(Table* table, size_t capacity) {
-    Entry* entries = ALLOCATE(Entry, capacity);
+static void table_adjust_capacity(Table* table, VM* vm, size_t capacity) {
+    Entry* entries = ALLOCATE(vm, Entry, capacity);
     for (size_t i = 0; i < capacity; i++) {
         entries[i].key = UNDEFINED_VAL;
         entries[i].value = NIL_VAL;
@@ -59,7 +58,7 @@ static void table_adjust_capacity(Table* table, size_t capacity) {
         table->count++;
     }
 
-    FREE_ARRAY(table->entries, Entry, table->capacity);
+    FREE_ARRAY(vm, table->entries, Entry, table->capacity);
     table->entries = entries;
     table->capacity = capacity;
 }
@@ -74,10 +73,10 @@ bool table_get(Table* table, Value key, Value* value) {
     return true;
 }
 
-bool table_set(Table* table, Value key, Value value) {
+bool table_set(Table* table, VM* vm, Value key, Value value) {
     if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
         size_t new_capacity = GROW_CAPACITY(table->capacity);
-        table_adjust_capacity(table, new_capacity);
+        table_adjust_capacity(table, vm, new_capacity);
     }
 
     Entry* entry = table_find_entry(table->entries, table->capacity, key);
@@ -105,7 +104,7 @@ bool table_delete(Table* table, Value key) {
 
 ObjString*
 table_find_string(Table* table,
-               const char* chars, size_t length, uint32_t hash)
+                  const char* chars, size_t length, uint32_t hash)
 {
     if (table->count == 0) return NULL;
     size_t index = hash & (table->capacity - 1);

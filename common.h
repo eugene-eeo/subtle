@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <sys/types.h>
 
 #define SUBTLE_DEBUG_TRACE_EXECUTION
 #define SUBTLE_DEBUG_PRINT_CODE
