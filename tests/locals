@@ -1,4 +1,8 @@
 do {
+    # check the default initializer value.
+    let b;
+    assert b == nil;
+
     let a = 1;
     assert a == 1;
     do {

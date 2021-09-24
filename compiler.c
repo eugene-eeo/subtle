@@ -111,7 +111,7 @@ static uint16_t make_constant(Compiler* compiler, Value v) {
 
 static uint16_t identifier_constant(Compiler* compiler, Token* token) {
     return make_constant(compiler,
-        OBJECT_TO_VAL(objstring_copy(
+        OBJ_TO_VAL(objstring_copy(
             compiler->vm,
             token->start,
             token->length
@@ -216,6 +216,9 @@ patch_jump(Compiler* compiler, int offset)
 static void
 emit_loop(Compiler* compiler, int start)
 {
+    // It's important that this line is here, otherwise we would jump
+    // over the wrong number of bytes: the bottom line assumes that
+    // we would skip over only the 2 byte argument.
     emit_byte(compiler, OP_LOOP);
 
     // Have to +2 here to account for the VM reading the 2 byte argument.
@@ -240,7 +243,7 @@ static void string(Compiler* compiler, bool can_assign) {
         compiler->previous.start + 1,
         compiler->previous.length - 2
         );
-    emit_constant(compiler, OBJECT_TO_VAL(str));
+    emit_constant(compiler, OBJ_TO_VAL(str));
 }
 
 static void number(Compiler* compiler, bool can_assign) {
@@ -253,7 +256,7 @@ static void literal(Compiler* compiler, bool can_assign) {
         case TOKEN_TRUE:  emit_byte(compiler, OP_TRUE); break;
         case TOKEN_FALSE: emit_byte(compiler, OP_FALSE); break;
         case TOKEN_NIL:   emit_byte(compiler, OP_NIL); break;
-        default: return; // Unreachable
+        default: UNREACHABLE();
     }
 }
 
@@ -318,7 +321,7 @@ static void unary(Compiler* compiler, bool can_assign) {
     switch (operator) {
         case TOKEN_MINUS: emit_byte(compiler, OP_NEGATE); break;
         case TOKEN_BANG:  emit_byte(compiler, OP_NOT); break;
-        default: return; // Unreachable.
+        default: UNREACHABLE();
     }
 }
 
@@ -341,7 +344,7 @@ static void binary(Compiler* compiler, bool can_assign) {
         case TOKEN_LEQ:   emit_byte(compiler, OP_LEQ); break;
         case TOKEN_GT:    emit_byte(compiler, OP_GT); break;
         case TOKEN_GEQ:   emit_byte(compiler, OP_GEQ); break;
-        default: return; // Unreachable.
+        default: UNREACHABLE();
     }
 }
 
@@ -476,8 +479,11 @@ static uint16_t parse_variable(Compiler* compiler, const char* msg) {
 static void let_decl(Compiler* compiler) {
     uint16_t global = parse_variable(compiler, "Expect variable name.");
 
-    consume(compiler, TOKEN_EQ, "Expect '=' after variable name.");
-    expression(compiler);
+    if (match(compiler, TOKEN_EQ)) {
+        expression(compiler);
+    } else {
+        emit_byte(compiler, OP_NIL);
+    }
     consume(compiler, TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
 
     define_variable(compiler, global);

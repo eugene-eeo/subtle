@@ -20,9 +20,9 @@ void vm_init(VM* vm) {
 }
 
 void vm_free(VM* vm) {
-    Object* obj = vm->objects;
+    Obj* obj = vm->objects;
     while (obj != NULL) {
-        Object* next = obj->next;
+        Obj* next = obj->next;
         object_free(obj, vm);
         obj = next;
     }
@@ -117,7 +117,7 @@ static InterpretResult run(VM* vm) {
                     );
                     vm_pop(vm);
                     vm_pop(vm);
-                    vm_push(vm, OBJECT_TO_VAL(result));
+                    vm_push(vm, OBJ_TO_VAL(result));
                 } else {
                     runtime_error(vm, "invalid types for +");
                     return INTERPRET_RUNTIME_ERROR;

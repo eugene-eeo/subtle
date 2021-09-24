@@ -1,6 +1,8 @@
-#include <stdio.h>
-
 #include "debug.h"
+#include "value.h"
+#include "object.h"
+
+#include <stdio.h>
 
 void debug_print_value(Value value) {
     switch (value.type) {
@@ -8,9 +10,9 @@ void debug_print_value(Value value) {
         case VALUE_NIL: printf("nil"); break;
         case VALUE_BOOL: printf(VAL_TO_BOOL(value) ? "true" : "false"); break;
         case VALUE_NUMBER: printf("%g", VAL_TO_NUMBER(value)); break;
-        case VALUE_OBJECT: {
-            switch (OBJECT_TYPE(value)) {
-                case OBJECT_STRING:
+        case VALUE_OBJ: {
+            switch (OBJ_TYPE(value)) {
+                case OBJ_STRING:
                     printf("%s", VAL_TO_STRING(value)->chars);
                     break;
             }
@@ -63,10 +65,8 @@ int debug_print_instruction(Chunk* chunk, int index) {
         printf("%4zu ", chunk_get_line(chunk, index));
     }
     switch (chunk->code[index]) {
-        case OP_RETURN:
-            return simple_instruction(index, "OP_RETURN");
-        case OP_CONSTANT:
-            return constant_instruction(chunk, index, "OP_CONSTANT");
+        case OP_RETURN:   return simple_instruction(index, "OP_RETURN");
+        case OP_CONSTANT: return constant_instruction(chunk, index, "OP_CONSTANT");
         case OP_POP:      return simple_instruction(index, "OP_POP");
         case OP_ADD:      return simple_instruction(index, "OP_ADD");
         case OP_SUBTRACT: return simple_instruction(index, "OP_SUBTRACT");

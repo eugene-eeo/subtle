@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "chunk.h"
+#include "value.h"
 #include "object.h"
 #include "table.h"
 
@@ -21,7 +22,7 @@ typedef struct VM {
     uint8_t* ip;
 
     // GC
-    Object* objects;
+    Obj* objects;
     ssize_t bytes_allocated;
 
     Table strings; // String interning

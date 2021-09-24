@@ -59,9 +59,9 @@ uint32_t value_hash(Value v) {
         case VALUE_NIL:    return 0;
         case VALUE_BOOL:   return VAL_TO_BOOL(v) ? 1 : 2;
         case VALUE_NUMBER: return hash_bits(VAL_TO_NUMBER(v));
-        case VALUE_OBJECT: {
-            switch (OBJECT_TYPE(v)) {
-                case OBJECT_STRING: return VAL_TO_STRING(v)->hash;
+        case VALUE_OBJ: {
+            switch (OBJ_TYPE(v)) {
+                case OBJ_STRING: return VAL_TO_STRING(v)->hash;
             }
         }
         default: UNREACHABLE();
@@ -74,7 +74,7 @@ bool value_equal(Value a, Value b) {
         case VALUE_NIL:    return true;
         case VALUE_BOOL:   return VAL_TO_BOOL(a) == VAL_TO_BOOL(b);
         case VALUE_NUMBER: return VAL_TO_NUMBER(a) == VAL_TO_NUMBER(b);
-        case VALUE_OBJECT: return VAL_TO_OBJECT(a) == VAL_TO_OBJECT(b);
+        case VALUE_OBJ: return VAL_TO_OBJ(a) == VAL_TO_OBJ(b);
         default: UNREACHABLE();
     }
 }
@@ -88,20 +88,20 @@ bool value_truthy(Value a) {
 // Object memory management
 // ========================
 
-Object* object_allocate(VM* vm, ObjectType type, size_t sz) {
+Obj* object_allocate(VM* vm, ObjType type, size_t sz) {
 #ifdef SUBTLE_DEBUG_TRACE_ALLOC
     printf("allocate %zu for type %d\n", sz, type);
 #endif
-    Object* object = memory_realloc(vm, NULL, 0, sz);
+    Obj* object = memory_realloc(vm, NULL, 0, sz);
     object->type = type;
     object->next = vm->objects;
     vm->objects = object;
     return object;
 }
 
-void object_free(Object* obj, VM* vm) {
+void object_free(Obj* obj, VM* vm) {
     switch (obj->type) {
-        case OBJECT_STRING: {
+        case OBJ_STRING: {
             ObjString* str = (ObjString*)obj;
             FREE_ARRAY(vm, str->chars, char, str->length + 1);
             FREE(vm, ObjString, str);
@@ -125,13 +125,13 @@ static uint32_t hash_string(const char* str, size_t length) {
 static ObjString*
 objstring_new(VM* vm, char* chars, size_t length, uint32_t hash)
 {
-    ObjString* str = ALLOCATE_OBJECT(vm, OBJECT_STRING, ObjString);
+    ObjString* str = ALLOCATE_OBJECT(vm, OBJ_STRING, ObjString);
     str->chars = chars;
     str->length = length;
     str->hash = hash;
 
     // intern the string here.
-    table_set(&vm->strings, vm, OBJECT_TO_VAL(str), NIL_VAL);
+    table_set(&vm->strings, vm, OBJ_TO_VAL(str), NIL_VAL);
     return str;
 }
 

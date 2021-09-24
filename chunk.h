@@ -2,7 +2,7 @@
 #define SUBTLE_CHUNK_H
 
 #include "common.h"
-#include "object.h"
+#include "value.h"
 #include "table.h"
 
 enum OpCode {
@@ -35,7 +35,7 @@ enum OpCode {
     OP_JUMP_IF_FALSE,
 };
 
-typedef struct {
+typedef struct Chunk {
     uint8_t*   code;
     size_t*    lines;
     size_t     length;

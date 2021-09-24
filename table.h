@@ -2,7 +2,7 @@
 #define SUBTLE_TABLE_H
 
 #include "common.h"
-#include "object.h"
+#include "value.h"
 
 #define TABLE_MAX_LOAD 0.75
 
@@ -17,6 +17,7 @@ typedef struct {
 
 // We need the VM struct here, but vm.h needs table.h as well.
 typedef struct VM VM;
+typedef struct ObjString ObjString;
 
 typedef struct {
     Entry* entries;
