@@ -214,7 +214,7 @@ InterpretResult vm_interpret(VM* vm, const char* source) {
     Chunk chunk;
     chunk_init(&chunk);
 
-    Compiler* compiler = ALLOCATE(vm, Compiler, 1);
+    Compiler* compiler = ALLOCATE(vm, Compiler);
     compiler_init(compiler, vm, &chunk, source);
 
     if (compiler_compile(compiler)) {

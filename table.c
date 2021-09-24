@@ -40,7 +40,7 @@ static Entry* table_find_entry(Entry* entries, size_t capacity, Value key) {
 }
 
 static void table_adjust_capacity(Table* table, VM* vm, size_t capacity) {
-    Entry* entries = ALLOCATE(vm, Entry, capacity);
+    Entry* entries = ALLOCATE_ARRAY(vm, Entry, capacity);
     for (size_t i = 0; i < capacity; i++) {
         entries[i].key = UNDEFINED_VAL;
         entries[i].value = NIL_VAL;

@@ -143,7 +143,7 @@ objstring_copy(VM* vm, const char* src, size_t length)
     if (interned != NULL)
         return interned;
 
-    char* chars = ALLOCATE(vm, char, length + 1);
+    char* chars = ALLOCATE_ARRAY(vm, char, length + 1);
     memcpy(chars, src, length);
     chars[length] = '\0';
 
@@ -154,7 +154,7 @@ ObjString*
 objstring_concat(VM* vm, ObjString* a, ObjString* b)
 {
     size_t length = a->length + b->length;
-    char* chars = ALLOCATE(vm, char, length + 1);
+    char* chars = ALLOCATE_ARRAY(vm, char, length + 1);
     memcpy(chars,             a->chars, a->length);
     memcpy(chars + a->length, b->chars, b->length);
     chars[length] = '\0';

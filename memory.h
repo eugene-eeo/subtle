@@ -6,9 +6,10 @@
 
 #define GROW_CAPACITY(n) ((n) < 8 ? 8 : (n) * 2)
 
-#define ALLOCATE(vm, type, size) (type*)memory_realloc(vm, NULL, 0, sizeof(type) * size)
+#define ALLOCATE(vm, type) (type*)memory_realloc(vm, NULL, 0, sizeof(type))
 #define FREE(vm, type, pointer) memory_realloc(vm, pointer, sizeof(type), 0)
 
+#define ALLOCATE_ARRAY(vm, type, size) (type*)memory_realloc(vm, NULL, 0, sizeof(type) * size)
 #define GROW_ARRAY(vm, ptr, type, old_size, new_size) \
     memory_realloc(vm, ptr, sizeof(type) * old_size, \
                    sizeof(type) * new_size)
