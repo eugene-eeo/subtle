@@ -1,0 +1,20 @@
+if (false) {
+    assert false;
+} else {
+    # nothing
+}
+
+assert (true || false) == true;
+assert (false || true) == true;
+assert (true && false) == false;
+assert (nil && false) == nil;
+assert (false || nil) == nil;
+assert (nil || 1) == 1;
+
+let a = 0;
+while (a != 10) {
+    if (a == 10)
+        assert false;
+    a = a + 1;
+}
+assert a == 10;
