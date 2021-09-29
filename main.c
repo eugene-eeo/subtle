@@ -1,3 +1,4 @@
+#include "common.h"
 #include "vm.h"
 
 #include <stdlib.h>
@@ -81,5 +82,7 @@ int main(int argc, const char* argv[]) {
         fprintf(stderr, "usage: subtle [filename]");
     }
     vm_free(&vm);
+    // Check that our memory accounting is correct.
+    ASSERT(vm.bytes_allocated == 0, "vm.bytes_allocated != 0");
     return rv;
 }
