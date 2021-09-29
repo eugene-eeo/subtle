@@ -3,6 +3,7 @@
 #include "vm.h"
 #include "table.h"
 
+#include <stdint.h>
 #include <string.h> // memcpy
 #ifdef SUBTLE_DEBUG_TRACE_ALLOC
 #include <stdio.h>
@@ -54,16 +55,22 @@ uint64_t double_to_bits(double d) {
     return data.bits64;
 }
 
+static uint32_t object_hash(Obj* obj)
+{
+    switch (obj->type) {
+        case OBJ_STRING:   return ((ObjString*)obj)->hash;
+        case OBJ_FUNCTION: return hash_bits((uintptr_t)obj);
+        case OBJ_CLOSURE:  return object_hash((Obj*) ((ObjClosure*)obj)->function);
+        case OBJ_UPVALUE:  UNREACHABLE();
+    }
+}
+
 uint32_t value_hash(Value v) {
     switch (v.type) {
         case VALUE_NIL:    return 0;
         case VALUE_BOOL:   return VAL_TO_BOOL(v) ? 1 : 2;
         case VALUE_NUMBER: return hash_bits(VAL_TO_NUMBER(v));
-        case VALUE_OBJ: {
-            switch (OBJ_TYPE(v)) {
-                case OBJ_STRING: return VAL_TO_STRING(v)->hash;
-            }
-        }
+        case VALUE_OBJ:    return object_hash(VAL_TO_OBJ(v));
         default: UNREACHABLE();
     }
 }
@@ -99,14 +106,17 @@ Obj* object_allocate(VM* vm, ObjType type, size_t sz) {
     return object;
 }
 
+static void objstring_free(VM*, Obj*);
+static void objfunction_free(VM*, Obj*);
+static void objupvalue_free(VM*, Obj*);
+static void objclosure_free(VM*, Obj*);
+
 void object_free(Obj* obj, VM* vm) {
     switch (obj->type) {
-        case OBJ_STRING: {
-            ObjString* str = (ObjString*)obj;
-            FREE_ARRAY(vm, str->chars, char, str->length + 1);
-            FREE(vm, ObjString, str);
-            break;
-        }
+        case OBJ_STRING:   objstring_free(vm,   obj); break;
+        case OBJ_FUNCTION: objfunction_free(vm, obj); break;
+        case OBJ_UPVALUE:  objupvalue_free(vm,  obj); break;
+        case OBJ_CLOSURE:  objclosure_free(vm,  obj); break;
     }
 }
 
@@ -133,6 +143,14 @@ objstring_new(VM* vm, char* chars, size_t length, uint32_t hash)
     // intern the string here.
     table_set(&vm->strings, vm, OBJ_TO_VAL(str), NIL_VAL);
     return str;
+}
+
+static void
+objstring_free(VM* vm, Obj* obj)
+{
+    ObjString* str = (ObjString*)obj;
+    FREE_ARRAY(vm, str->chars, char, str->length + 1);
+    FREE(vm, ObjString, str);
 }
 
 ObjString*
@@ -168,4 +186,70 @@ objstring_concat(VM* vm, ObjString* a, ObjString* b)
     }
 
     return objstring_new(vm, chars, length, hash);
+}
+
+// ObjFunction
+// ===========
+
+ObjFunction*
+objfunction_new(VM* vm)
+{
+    ObjFunction* fn = ALLOCATE_OBJECT(vm, OBJ_FUNCTION, ObjFunction);
+    fn->arity = 0;
+    fn->upvalue_count = 0;
+    chunk_init(&fn->chunk);
+    return fn;
+}
+
+static void
+objfunction_free(VM* vm, Obj* obj)
+{
+    ObjFunction* fn = (ObjFunction*)obj;
+    chunk_free(&fn->chunk, vm);
+    FREE(vm, ObjFunction, fn);
+}
+
+// ObjUpvalue
+// ==========
+
+ObjUpvalue*
+objupvalue_new(VM* vm, Value* slot)
+{
+    ObjUpvalue* upvalue = ALLOCATE_OBJECT(vm, OBJ_UPVALUE, ObjUpvalue);
+    upvalue->location = slot;
+    upvalue->closed = NIL_VAL;
+    upvalue->next = NULL;
+    return upvalue;
+}
+
+static void
+objupvalue_free(VM* vm, Obj* obj)
+{
+    ObjUpvalue* upvalue = (ObjUpvalue*)obj;
+    FREE(vm, ObjUpvalue, upvalue);
+}
+
+// ObjClosure
+// ==========
+
+ObjClosure*
+objclosure_new(VM* vm, ObjFunction* fn)
+{
+    ObjUpvalue** upvalues = ALLOCATE_ARRAY(vm, ObjUpvalue*, fn->upvalue_count);
+    for (int i = 0; i < fn->upvalue_count; i++)
+        upvalues[i] = NULL;
+
+    ObjClosure* closure = ALLOCATE_OBJECT(vm, OBJ_CLOSURE, ObjClosure);
+    closure->function = fn;
+    closure->upvalues = upvalues;
+    closure->upvalue_count = fn->upvalue_count;
+    return closure;
+}
+
+static void
+objclosure_free(VM* vm, Obj* obj)
+{
+    ObjClosure* closure = (ObjClosure*)obj;
+    FREE_ARRAY(vm, closure->upvalues, ObjUpvalue*, closure->upvalue_count);
+    FREE(vm, ObjClosure, closure);
 }

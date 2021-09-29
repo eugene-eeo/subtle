@@ -1,0 +1,27 @@
+# arguments are passed correctly.
+let f = fn(x, y)    { assert x == 1 && y == 2; };
+let g = fn(x, y, z) { assert x == 1 && y == 2 && z == 3; };
+f(1, 2);
+g(1, 2, 3);
+
+# fewer number of arguments --> nil
+let f = fn(x) { assert x == nil; };
+f();
+
+# more arguments --> ignored
+let f = fn(x) { assert x == 1; };
+f(1, 2);
+
+# no return value --> nil
+let f = fn() {
+    assert true;
+};
+assert f() == nil;
+
+# return values
+let fibo;
+fibo = fn(n) {
+    if (n <= 1) return n;
+    return fibo(n - 1) + fibo(n - 2);
+};
+assert fibo(10) == 55;

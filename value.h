@@ -6,7 +6,7 @@
 // Forward declarations
 // --------------------
 typedef struct VM VM;
-typedef struct Object Obj;
+typedef struct Obj Obj;
 
 // Macros
 // ------

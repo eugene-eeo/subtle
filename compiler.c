@@ -1,5 +1,8 @@
+#include "chunk.h"
 #include "compiler.h"
 #include "lexer.h"
+#include "vm.h"
+
 #include <stdio.h>  // fprintf
 #include <stdlib.h>  // strtod
 #include <string.h>
@@ -7,6 +10,55 @@
 #ifdef SUBTLE_DEBUG_PRINT_CODE
 #include "debug.h"
 #endif
+
+#define MAX_LOCALS   UINT8_MAX
+#define MAX_UPVALUES UINT8_MAX
+
+typedef enum {
+    FUNCTION_TYPE_SCRIPT,
+    FUNCTION_TYPE_FUNCTION,
+} FunctionType;
+
+typedef struct {
+    Token previous;
+    Token current;
+    Lexer lexer;
+
+    bool had_error;
+    bool panic_mode;
+} Parser;
+
+typedef struct {
+    Token name;
+    int depth;
+    // Is this local captured by any upvalues?
+    // If it is captured, this means we cannot pop this local
+    // off the stack -- otherwise, a closure that depends on
+    // this upvalue may exhibit undefined behaviour.
+    bool is_captured;
+} Local;
+
+typedef struct {
+    uint8_t index;
+    bool is_local;
+} Upvalue;
+
+typedef struct Compiler {
+    Compiler* enclosing;
+    Parser* parser;
+
+    // Where are we compiling to?
+    ObjFunction* function;
+    FunctionType type;
+
+    // Scoping
+    Local locals[MAX_LOCALS];
+    int local_count;
+    Upvalue upvalues[MAX_UPVALUES];
+    int scope_depth; // Current scope depth.
+
+    VM* vm;
+} Compiler;
 
 typedef enum {
     PREC_NONE,
@@ -30,19 +82,38 @@ typedef struct {
     Precedence precedence;
 } ParseRule;
 
-void compiler_init(Compiler* compiler, VM* vm, Chunk* chunk, const char* source) {
-    compiler->chunk = chunk;
-    compiler->had_error = false;
-    compiler->panic_mode = false;
-    compiler->vm = vm;
+static void
+parser_init(Parser* parser, const char* source)
+{
+    lexer_init(&parser->lexer, source);
+    parser->had_error = false;
+    parser->panic_mode = false;
+}
+
+static void
+compiler_init(Compiler* compiler, Compiler* enclosing,
+              Parser* parser, VM* vm, FunctionType type)
+{
+    compiler->enclosing = enclosing;
+    compiler->parser = parser;
+    compiler->function = objfunction_new(vm);
+    compiler->type = type;
     compiler->local_count = 0;
     compiler->scope_depth = 0;
-    lexer_init(&compiler->lexer, source);
+    compiler->vm = vm;
+
+    Local* local = &compiler->locals[compiler->local_count++];
+    local->depth = 0;
+    local->is_captured = false;
+    local->name.start = "";
+    local->name.length = 0;
+
+    vm->compiler = compiler;
 }
 
 static void error_at(Compiler* compiler, Token* token, const char* message) {
-    if (compiler->panic_mode) return;
-    compiler->panic_mode = true;
+    if (compiler->parser->panic_mode) return;
+    compiler->parser->panic_mode = true;
 
     fprintf(stderr, "[line %zu] Error at ", token->line);
     if (token->type == TOKEN_EOF) {
@@ -54,24 +125,24 @@ static void error_at(Compiler* compiler, Token* token, const char* message) {
     }
 
     fprintf(stderr, ": %s\n", message);
-    compiler->had_error = true;
+    compiler->parser->had_error = true;
 }
 
-static void error(Compiler* compiler, const char* message)            { error_at(compiler, &compiler->previous, message); }
-static void error_at_current(Compiler* compiler, const char* message) { error_at(compiler, &compiler->current, message); }
+static void error(Compiler* compiler, const char* message)            { error_at(compiler, &compiler->parser->previous, message); }
+static void error_at_current(Compiler* compiler, const char* message) { error_at(compiler, &compiler->parser->current, message); }
 
 static void advance(Compiler* compiler) {
-    compiler->previous = compiler->current;
+    compiler->parser->previous = compiler->parser->current;
     for (;;) {
-        compiler->current = lexer_next(&compiler->lexer);
-        if (compiler->current.type != TOKEN_ERROR) break;
+        compiler->parser->current = lexer_next(&compiler->parser->lexer);
+        if (compiler->parser->current.type != TOKEN_ERROR) break;
 
-        error_at_current(compiler, compiler->current.start);
+        error_at_current(compiler, compiler->parser->current.start);
     }
 }
 
 static bool check(Compiler* compiler, TokenType type) {
-    return compiler->current.type == type;
+    return compiler->parser->current.type == type;
 }
 
 static bool match(Compiler* compiler, TokenType type) {
@@ -89,15 +160,15 @@ static void consume(Compiler* compiler, TokenType type, const char* message) {
 // ==================
 
 static Chunk* current_chunk(Compiler* compiler) {
-    return compiler->chunk;
+    return &compiler->function->chunk;
 }
 
 static void emit_byte(Compiler* compiler, uint8_t b) {
-    chunk_write_byte(current_chunk(compiler), compiler->vm, b, compiler->previous.line);
+    chunk_write_byte(current_chunk(compiler), compiler->vm, b, compiler->parser->previous.line);
 }
 
 static void emit_offset(Compiler* compiler, uint16_t offset) {
-    chunk_write_offset(current_chunk(compiler), compiler->vm, offset, compiler->previous.line);
+    chunk_write_offset(current_chunk(compiler), compiler->vm, offset, compiler->parser->previous.line);
 }
 
 static uint16_t make_constant(Compiler* compiler, Value v) {
@@ -124,7 +195,27 @@ static void emit_constant(Compiler* compiler, Value v) {
 }
 
 static void emit_return(Compiler* compiler) {
+    emit_byte(compiler, OP_NIL);
     emit_byte(compiler, OP_RETURN);
+}
+
+ObjFunction*
+compiler_end(Compiler* compiler)
+{
+    emit_return(compiler);
+    compiler->vm->compiler = compiler->enclosing;
+#ifdef SUBTLE_DEBUG_PRINT_CODE
+    if (!compiler->parser->had_error)
+        printf("== ");
+        if (compiler->type == FUNCTION_TYPE_SCRIPT) {
+            printf("script");
+        } else {
+            printf("fn_%p", compiler->function);
+        }
+        printf(" ==\n");
+        debug_print_chunk(current_chunk(compiler));
+#endif
+    return compiler->function;
 }
 
 // Scoping helpers
@@ -140,7 +231,11 @@ static void end_block(Compiler* compiler) {
     while (compiler->local_count > 0
            && compiler->locals[compiler->local_count - 1].depth
                 > compiler->scope_depth) {
-        emit_byte(compiler, OP_POP);
+        if (compiler->locals[compiler->local_count - 1].is_captured) {
+            emit_byte(compiler, OP_CLOSE_UPVALUE);
+        } else {
+            emit_byte(compiler, OP_POP);
+        }
         compiler->local_count--;
     }
 }
@@ -154,6 +249,7 @@ static void add_local(Compiler* compiler, Token name) {
     Local* local = &compiler->locals[compiler->local_count];
     local->name = name;
     local->depth = -1;
+    local->is_captured = false;
     compiler->local_count++;
 }
 
@@ -182,6 +278,48 @@ resolve_local(Compiler* compiler, Token* token)
             return i;
         }
     }
+    return -1;
+}
+
+static int
+add_upvalue(Compiler* compiler, uint8_t index, bool is_local)
+{
+    int count = compiler->function->upvalue_count;
+
+    for (int i = 0; i < count; i++) {
+        Upvalue* upvalue = &compiler->upvalues[i];
+        if (upvalue->index == index && upvalue->is_local == is_local)
+            return i;
+    }
+
+    if (count == MAX_UPVALUES) {
+        error(compiler, "Too many upvalues.");
+        return 0;
+    }
+
+    compiler->upvalues[count].is_local = is_local;
+    compiler->upvalues[count].index = index;
+    compiler->function->upvalue_count++;
+    return count;
+}
+
+// Is there an upvalue with the given name? An upvalue is a local
+// variable defined on the outer scope.
+static int
+resolve_upvalue(Compiler* compiler, Token* token)
+{
+    if (compiler->enclosing == NULL) return -1;
+
+    int local = resolve_local(compiler->enclosing, token);
+    if (local != -1) {
+        compiler->enclosing->locals[local].is_captured = true;
+        return add_upvalue(compiler, (uint8_t)local, true);
+    }
+
+    int upvalue = resolve_upvalue(compiler->enclosing, token);
+    if (upvalue != -1)
+        return add_upvalue(compiler, (uint8_t)upvalue, false);
+
     return -1;
 }
 
@@ -232,6 +370,9 @@ emit_loop(Compiler* compiler, int start)
 // Expression parsing
 // ==================
 
+static void block(Compiler*);
+static uint16_t parse_variable(Compiler*, const char* msg);
+static void define_variable(Compiler*, uint16_t);
 static void expression(Compiler*);
 static void parse_precedence(Compiler*, Precedence);
 static ParseRule* get_rule(TokenType);
@@ -240,19 +381,19 @@ static ParseRule* get_rule(TokenType);
 static void string(Compiler* compiler, bool can_assign) {
     ObjString* str = objstring_copy(
         compiler->vm,
-        compiler->previous.start + 1,
-        compiler->previous.length - 2
+        compiler->parser->previous.start + 1,
+        compiler->parser->previous.length - 2
         );
     emit_constant(compiler, OBJ_TO_VAL(str));
 }
 
 static void number(Compiler* compiler, bool can_assign) {
-    double value = strtod(compiler->previous.start, NULL);
+    double value = strtod(compiler->parser->previous.start, NULL);
     emit_constant(compiler, NUMBER_TO_VAL(value));
 }
 
 static void literal(Compiler* compiler, bool can_assign) {
-    switch (compiler->previous.type) {
+    switch (compiler->parser->previous.type) {
         case TOKEN_TRUE:  emit_byte(compiler, OP_TRUE); break;
         case TOKEN_FALSE: emit_byte(compiler, OP_FALSE); break;
         case TOKEN_NIL:   emit_byte(compiler, OP_NIL); break;
@@ -293,6 +434,20 @@ static void named_variable(Compiler* compiler, Token* name, bool can_assign) {
         return;
     }
 
+    // Check if we can resolve it as an upvalue.
+    int upvalue = resolve_upvalue(compiler, name);
+    if (upvalue != -1) {
+        if (can_assign && match(compiler, TOKEN_EQ)) {
+            expression(compiler);
+            emit_byte(compiler, OP_SET_UPVALUE);
+            emit_byte(compiler, (uint8_t) upvalue);
+        } else {
+            emit_byte(compiler, OP_GET_UPVALUE);
+            emit_byte(compiler, (uint8_t) upvalue);
+        }
+        return;
+    }
+
     // Otherwise, it's a global.
     uint16_t global = identifier_constant(compiler, name);
     if (can_assign && match(compiler, TOKEN_EQ)) {
@@ -306,7 +461,62 @@ static void named_variable(Compiler* compiler, Token* name, bool can_assign) {
 }
 
 static void variable(Compiler* compiler, bool can_assign) {
-    named_variable(compiler, &compiler->previous, can_assign);
+    named_variable(compiler, &compiler->parser->previous, can_assign);
+}
+
+static void function(Compiler* compiler, bool can_assign) {
+    Compiler c;
+    compiler_init(&c, compiler, compiler->parser,
+                  compiler->vm, FUNCTION_TYPE_FUNCTION);
+    begin_block(&c);
+
+    // Parse the parameter list.
+    consume(&c, TOKEN_LPAREN, "Expect '(' after fn.");
+    if (!check(&c, TOKEN_RPAREN)) {
+        do {
+            c.function->arity++;
+            if (c.function->arity > 255) {
+                error_at_current(&c, "Cannot have more than 255 parameters.");
+            }
+            uint8_t constant = parse_variable(&c, "Expect parameter name.");
+            define_variable(&c, constant);
+        } while (match(&c, TOKEN_COMMA));
+    }
+    consume(&c, TOKEN_RPAREN, "Expect ')' after parameters.");
+    consume(&c, TOKEN_LBRACE, "Expect '{' before function body.");
+    block(&c);
+
+    end_block(&c);
+
+    ObjFunction* fn = compiler_end(&c);
+    uint16_t idx = make_constant(compiler, OBJ_TO_VAL(fn));
+    emit_byte(compiler, OP_CLOSURE);
+    emit_offset(compiler, idx);
+
+    for (int i = 0; i < fn->upvalue_count; i++) {
+        emit_byte(compiler, c.upvalues[i].is_local ? 1 : 0);
+        emit_byte(compiler, c.upvalues[i].index);
+    }
+}
+
+static uint8_t argument_list(Compiler* compiler) {
+    uint8_t count = 0;
+    if (!check(compiler, TOKEN_RPAREN)) {
+        do {
+            expression(compiler);
+            if (count == 255)
+                error(compiler, "Cannot have more than 255 arguments.");
+            count++;
+        } while (match(compiler, TOKEN_COMMA));
+    }
+    consume(compiler, TOKEN_RPAREN, "Expect ')' after arguments.");
+    return count;
+}
+
+static void call(Compiler* compiler, bool can_assign) {
+    uint8_t arg_count = argument_list(compiler);
+    emit_byte(compiler, OP_CALL);
+    emit_byte(compiler, arg_count);
 }
 
 static void grouping(Compiler* compiler, bool can_assign) {
@@ -315,7 +525,7 @@ static void grouping(Compiler* compiler, bool can_assign) {
 }
 
 static void unary(Compiler* compiler, bool can_assign) {
-    TokenType operator = compiler->previous.type;
+    TokenType operator = compiler->parser->previous.type;
     // Compile the operand.
     parse_precedence(compiler, PREC_UNARY);
     switch (operator) {
@@ -326,7 +536,7 @@ static void unary(Compiler* compiler, bool can_assign) {
 }
 
 static void binary(Compiler* compiler, bool can_assign) {
-    TokenType operator = compiler->previous.type;
+    TokenType operator = compiler->parser->previous.type;
     ParseRule* rule = get_rule(operator);
     parse_precedence(compiler, (Precedence)(rule->precedence + 1));
 
@@ -356,7 +566,7 @@ static ParseRule rules[] = {
     [TOKEN_SEMICOLON] = {NULL,     NULL,   PREC_NONE},
     [TOKEN_COMMA]     = {NULL,     NULL,   PREC_NONE},
     [TOKEN_DOT]       = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_LPAREN]    = {grouping, NULL,   PREC_NONE},
+    [TOKEN_LPAREN]    = {grouping, call,   PREC_CALL},
     [TOKEN_RPAREN]    = {NULL,     NULL,   PREC_NONE},
     [TOKEN_LBRACE]    = {NULL,     NULL,   PREC_NONE},
     [TOKEN_RBRACE]    = {NULL,     NULL,   PREC_NONE},
@@ -378,7 +588,7 @@ static ParseRule rules[] = {
     [TOKEN_NIL]       = {literal,  NULL,   PREC_NONE},
     [TOKEN_TRUE]      = {literal,  NULL,   PREC_NONE},
     [TOKEN_FALSE]     = {literal,  NULL,   PREC_NONE},
-    [TOKEN_FN]        = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_FN]        = {function, NULL,   PREC_NONE},
     [TOKEN_WHILE]     = {NULL,     NULL,   PREC_NONE},
     [TOKEN_THIS]      = {NULL,     NULL,   PREC_NONE},
     [TOKEN_SUPER]     = {NULL,     NULL,   PREC_NONE},
@@ -396,7 +606,7 @@ static void expression(Compiler* compiler) {
 
 static void parse_precedence(Compiler* compiler, Precedence prec) {
     advance(compiler);
-    ParseFn prefix_rule = get_rule(compiler->previous.type)->prefix;
+    ParseFn prefix_rule = get_rule(compiler->parser->previous.type)->prefix;
     if (prefix_rule == NULL) {
         error(compiler, "Expected an expression.");
         return;
@@ -405,9 +615,9 @@ static void parse_precedence(Compiler* compiler, Precedence prec) {
     bool can_assign = prec <= PREC_ASSIGNMENT;
     prefix_rule(compiler, can_assign);
 
-    while (prec <= get_rule(compiler->current.type)->precedence) {
+    while (prec <= get_rule(compiler->parser->current.type)->precedence) {
         advance(compiler);
-        ParseFn infix_rule = get_rule(compiler->previous.type)->infix;
+        ParseFn infix_rule = get_rule(compiler->parser->previous.type)->infix;
         infix_rule(compiler, can_assign);
     }
 }
@@ -438,7 +648,7 @@ static void declare_variable(Compiler* compiler) {
     int scope_depth = compiler->scope_depth;
     if (scope_depth == 0) return; // Nothing to do in global scope.
 
-    Token* name = &compiler->previous;
+    Token* name = &compiler->parser->previous;
     // Disallow declaring another variable with the same name,
     // within a local block.
     //    let a = 1;
@@ -473,7 +683,7 @@ static uint16_t parse_variable(Compiler* compiler, const char* msg) {
     if (compiler->scope_depth > 0)
         return 0;
 
-    return identifier_constant(compiler, &compiler->previous);
+    return identifier_constant(compiler, &compiler->parser->previous);
 }
 
 static void let_decl(Compiler* compiler) {
@@ -496,16 +706,16 @@ static void assert_stmt(Compiler* compiler) {
 }
 
 static void block(Compiler* compiler) {
-    begin_block(compiler);
     while (!check(compiler, TOKEN_EOF) && !check(compiler, TOKEN_RBRACE))
         declaration(compiler);
-    end_block(compiler);
     consume(compiler, TOKEN_RBRACE, "Expect '}' after block.");
 }
 
 static void block_or_stmt(Compiler* compiler) {
     if (match(compiler, TOKEN_LBRACE)) {
+        begin_block(compiler);
         block(compiler);
+        end_block(compiler);
     } else {
         statement(compiler);
     }
@@ -548,18 +758,27 @@ static void while_stmt(Compiler* compiler) {
 }
 
 static void do_stmt(Compiler* compiler) {
-    if (!match(compiler, TOKEN_LBRACE)) {
-        error_at_current(compiler, "Expect '{' after do.");
-        return;
+    block_or_stmt(compiler);
+}
+
+static void return_stmt(Compiler* compiler) {
+    if (compiler->type == FUNCTION_TYPE_SCRIPT)
+        error(compiler, "Cannot return from top-level code.");
+
+    if (match(compiler, TOKEN_SEMICOLON)) {
+        emit_return(compiler);
+    } else {
+        expression(compiler);
+        consume(compiler, TOKEN_SEMICOLON, "Expected ';' after expression.");
+        emit_byte(compiler, OP_RETURN);
     }
-    block(compiler);
 }
 
 static void synchronize(Compiler* compiler) {
-    compiler->panic_mode = false;
-    while (compiler->current.type != TOKEN_EOF) {
-        if (compiler->previous.type == TOKEN_SEMICOLON) return;
-        switch (compiler->current.type) {
+    compiler->parser->panic_mode = false;
+    while (compiler->parser->current.type != TOKEN_EOF) {
+        if (compiler->parser->previous.type == TOKEN_SEMICOLON) return;
+        switch (compiler->parser->current.type) {
             case TOKEN_LET:
             case TOKEN_WHILE:
             case TOKEN_RETURN:
@@ -580,7 +799,7 @@ static void declaration(Compiler* compiler) {
         statement(compiler);
     }
 
-    if (compiler->panic_mode) synchronize(compiler);
+    if (compiler->parser->panic_mode) synchronize(compiler);
 }
 
 static void statement(Compiler* compiler) {
@@ -592,6 +811,8 @@ static void statement(Compiler* compiler) {
         if_stmt(compiler);
     } else if (match(compiler, TOKEN_WHILE)) {
         while_stmt(compiler);
+    } else if (match(compiler, TOKEN_RETURN)) {
+        return_stmt(compiler);
     } else {
         // Expression statement
         expression(compiler);
@@ -600,19 +821,22 @@ static void statement(Compiler* compiler) {
     }
 }
 
-bool compiler_compile(Compiler* compiler) {
-    advance(compiler);
-    while (!match(compiler, TOKEN_EOF))
-        declaration(compiler);
+ObjFunction*
+compile(VM* vm, const char* source)
+{
+    Parser parser;
+    parser_init(&parser, source);
 
-    consume(compiler, TOKEN_EOF, "Expect end of expression.");
-    emit_return(compiler);
+    Compiler compiler;
+    compiler_init(&compiler, NULL, &parser, vm, FUNCTION_TYPE_SCRIPT);
 
-#ifdef SUBTLE_DEBUG_PRINT_CODE
-    if (!compiler->had_error) {
-        debug_print_chunk(current_chunk(compiler), "script");
-    }
-#endif
+    advance(&compiler);
+    while (!match(&compiler, TOKEN_EOF))
+        declaration(&compiler);
 
-    return !compiler->had_error;
+    ObjFunction* function = compiler_end(&compiler);
+    consume(&compiler, TOKEN_EOF, "Expect end of expression.");
+
+    function->arity = -1;
+    return parser.had_error ? NULL : function;
 }

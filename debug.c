@@ -4,24 +4,34 @@
 
 #include <stdio.h>
 
+static void debug_print_object(Obj* obj) {
+    switch (obj->type) {
+        case OBJ_STRING:
+            printf("%s", ((ObjString*) obj)->chars);
+            break;
+        case OBJ_FUNCTION:
+            printf("fn_%p", obj);
+            break;
+        case OBJ_CLOSURE:
+            debug_print_object((Obj*)(((ObjClosure*) obj)->function));
+            break;
+        case OBJ_UPVALUE:
+            printf("upvalue");
+            break;
+    }
+}
+
 void debug_print_value(Value value) {
     switch (value.type) {
         case VALUE_UNDEFINED: printf("undefined"); break;
         case VALUE_NIL: printf("nil"); break;
         case VALUE_BOOL: printf(VAL_TO_BOOL(value) ? "true" : "false"); break;
         case VALUE_NUMBER: printf("%g", VAL_TO_NUMBER(value)); break;
-        case VALUE_OBJ: {
-            switch (OBJ_TYPE(value)) {
-                case OBJ_STRING:
-                    printf("%s", VAL_TO_STRING(value)->chars);
-                    break;
-            }
-        }
+        case VALUE_OBJ: debug_print_object(VAL_TO_OBJ(value)); break;
     }
 }
 
-void debug_print_chunk(Chunk* chunk, const char* name) {
-    printf("==== %s ====\n", name);
+void debug_print_chunk(Chunk* chunk) {
     for (size_t i = 0; i < chunk->length;) {
         i = debug_print_instruction(chunk, i);
     }
@@ -92,6 +102,27 @@ int debug_print_instruction(Chunk* chunk, int index) {
         case OP_JUMP:          return jump_instruction(chunk, index, +1, "OP_JUMP");
         case OP_JUMP_IF_FALSE: return jump_instruction(chunk, index, +1, "OP_JUMP_IF_FALSE");
         case OP_JUMP_IF_TRUE:  return jump_instruction(chunk, index, +1, "OP_JUMP_IF_TRUE");
+        case OP_CALL:    return byte_instruction(chunk, index, "OP_CALL");
+        case OP_CLOSURE: {
+            index++;
+            uint16_t offset = (uint16_t)(chunk->code[index++] << 8);
+            offset |= chunk->code[index++];
+            printf("%-16s %4d ", "OP_CLOSURE", offset);
+            debug_print_value(chunk->constants.values[offset]);
+            printf("\n");
+
+            ObjFunction* fn = VAL_TO_FUNCTION(chunk->constants.values[offset]);
+            for (int j = 0; j < fn->upvalue_count; j++) {
+                uint8_t is_local = chunk->code[index++];
+                uint8_t upvalue_idx = chunk->code[index++];
+                printf("%04d    |                     %s %d\n",
+                       index - 2, (is_local == 1) ? "local" : "upvalue", upvalue_idx);
+            }
+            return index;
+        }
+        case OP_GET_UPVALUE: return byte_instruction(chunk, index, "OP_GET_UPVALUE"); break;
+        case OP_SET_UPVALUE: return byte_instruction(chunk, index, "OP_SET_UPVALUE"); break;
+        case OP_CLOSE_UPVALUE: return simple_instruction(index, "OP_CLOSE_UPVALUE"); break;
         default:
             printf("Unknown instruction.\n");
             return index + 1;

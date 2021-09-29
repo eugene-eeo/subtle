@@ -1,0 +1,38 @@
+# Simple upvalues
+let outer = fn() {
+    let a = 1;
+    let f = fn() {
+        let b = 2;
+        assert a == 1;
+        assert b == 2;
+    };
+    f();
+};
+outer();
+
+# Nested upvalues
+let outer = fn() {
+  let a = 1;
+  let b = 2;
+  let middle = fn() {
+    let c = 3;
+    let d = 4;
+    let inner = fn() {
+      assert a + c + b + d == 10;
+    };
+    inner();
+  };
+  middle();
+};
+outer();
+
+# Upvalues closed over
+let outer = fn() {
+    let x = "outside";
+    return fn() {
+        assert x == "outside";
+        return x;
+    };
+};
+
+assert outer()() == "outside";
