@@ -23,16 +23,10 @@ void valuearray_write(ValueArray* va, VM* vm, Value v) {
     va->length++;
 }
 
-#include <stdio.h>
-#include "debug.h"
-
 void valuearray_mark(ValueArray* va, VM* vm)
 {
-    for (size_t i = 0; i < va->length; i++) {
-        printf("mark ");
-        debug_print_value(va->values[i]);
+    for (size_t i = 0; i < va->length; i++)
         mark_value(vm, va->values[i]);
-    }
 }
 
 // Hashing
