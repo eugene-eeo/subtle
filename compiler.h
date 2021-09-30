@@ -8,5 +8,6 @@ typedef struct VM VM;
 typedef struct Compiler Compiler;
 
 ObjFunction* compile(VM* vm, const char* source);
+void compiler_mark(Compiler* compiler, VM* vm);
 
 #endif

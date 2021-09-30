@@ -5,6 +5,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h> // free
 
 #ifdef SUBTLE_DEBUG_TRACE_EXECUTION
 #include "debug.h"
@@ -13,11 +14,20 @@
 void vm_init(VM* vm) {
     vm->frame_count = 0;
     vm->stack_top = vm->stack;
+    vm->open_upvalues = NULL;
+
     vm->objects = NULL;
     vm->bytes_allocated = 0;
-    vm->open_upvalues = NULL;
+    vm->next_gc = 1024 * 1024;
+    vm->gray_capacity = 0;
+    vm->gray_count = 0;
+    vm->gray_stack = NULL;
+    vm->roots_count = 0;
+
     table_init(&vm->strings);
     table_init(&vm->globals);
+
+    vm->compiler = NULL;
 }
 
 void vm_free(VM* vm) {
@@ -29,6 +39,7 @@ void vm_free(VM* vm) {
     }
     table_free(&vm->strings, vm);
     table_free(&vm->globals, vm);
+    free(vm->gray_stack);
     vm_init(vm);
 }
 
@@ -44,6 +55,16 @@ Value vm_pop(VM* vm) {
 
 Value vm_peek(VM* vm, int distance) {
     return vm->stack_top[-1 - distance];
+}
+
+void vm_push_root(VM* vm, Value value) {
+    ASSERT(vm->roots_count < MAX_ROOTS, "vm->roots_count == MAX_ROOTS");
+    vm->roots[vm->roots_count] = value;
+    vm->roots_count++;
+}
+
+void vm_pop_root(VM* vm) {
+    vm->roots_count--;
 }
 
 // Resets the VM's stack pointer

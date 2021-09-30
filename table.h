@@ -32,5 +32,7 @@ bool table_set(Table* table, VM* vm, Value key, Value value);
 bool table_delete(Table* table, Value key);
 ObjString* table_find_string(Table* table,
                              const char* str, size_t length, uint32_t hash);
+void table_mark(Table* table, VM* vm);
+void table_remove_white(Table* table, VM* vm);
 
 #endif

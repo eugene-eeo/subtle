@@ -2,6 +2,8 @@
 #define SUBTLE_MEMORY_H
 
 #include "common.h"
+#include "object.h"
+#include "value.h"
 #include "vm.h"
 
 #define GROW_CAPACITY(n) ((n) < 8 ? 8 : (n) * 2)
@@ -18,5 +20,8 @@
     memory_realloc(vm, ptr, sizeof(type) * size, 0)
 
 void* memory_realloc(VM* vm, void* ptr, size_t old_size, size_t new_size);
+void mark_object(VM*, Obj*);
+void mark_value(VM*, Value);
+void memory_collect(VM* vm);
 
 #endif

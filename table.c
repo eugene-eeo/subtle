@@ -123,3 +123,24 @@ table_find_string(Table* table,
         index = (index + 1) & (table->capacity - 1);
     }
 }
+
+void
+table_mark(Table* table, VM* vm)
+{
+    for (size_t i = 0; i < table->capacity; i++) {
+        Entry* entry = &table->entries[i];
+        mark_value(vm, entry->key);
+        mark_value(vm, entry->value);
+    }
+}
+
+
+void
+table_remove_white(Table* table, VM* vm)
+{
+    for (size_t i = 0; i < table->capacity; i++) {
+        Entry* entry = &table->entries[i];
+        if (IS_OBJ(entry->key) && !VAL_TO_OBJ(entry->key)->marked)
+            table_delete(table, entry->key);
+    }
+}

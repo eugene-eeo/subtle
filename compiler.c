@@ -2,6 +2,7 @@
 #include "compiler.h"
 #include "lexer.h"
 #include "vm.h"
+#include "memory.h"
 
 #include <stdio.h>  // fprintf
 #include <stdlib.h>  // strtod
@@ -190,8 +191,9 @@ static uint16_t identifier_constant(Compiler* compiler, Token* token) {
 }
 
 static void emit_constant(Compiler* compiler, Value v) {
+    uint16_t constant = make_constant(compiler, v);
     emit_byte(compiler, OP_CONSTANT);
-    emit_offset(compiler, make_constant(compiler, v));
+    emit_offset(compiler, constant);
 }
 
 static void emit_return(Compiler* compiler) {
@@ -839,4 +841,14 @@ compile(VM* vm, const char* source)
 
     function->arity = -1;
     return parser.had_error ? NULL : function;
+}
+
+void
+compiler_mark(Compiler* compiler, VM* vm)
+{
+    if (compiler == NULL) return;
+
+    // mark the enclosing compiler.
+    compiler_mark(compiler->enclosing, vm);
+    mark_object(vm, (Obj*)compiler->function);
 }

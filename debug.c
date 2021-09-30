@@ -4,7 +4,7 @@
 
 #include <stdio.h>
 
-static void debug_print_object(Obj* obj) {
+void debug_print_object(Obj* obj) {
     switch (obj->type) {
         case OBJ_STRING:
             printf("%s", ((ObjString*) obj)->chars);

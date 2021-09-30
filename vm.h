@@ -10,6 +10,7 @@
 
 #define FRAMES_MAX 64
 #define STACK_MAX (256 * FRAMES_MAX)
+#define MAX_ROOTS 8
 
 typedef enum {
     INTERPRET_OK,
@@ -39,6 +40,20 @@ typedef struct VM {
     // GC
     Obj* objects;
     ssize_t bytes_allocated;
+    ssize_t next_gc;
+    // The gray_* information encodes the gray stack used by the GC.
+    // The mark-sweep GC uses a tricolour abstraction:
+    //   1. Black objects are marked, and already processed.
+    //   2. Gray objects are marked but not processed (their links
+    //      still need to be traversed).
+    //   3. White objects are everything else.
+    // We put gray objects in gray_stack, and pop it off one-by-one.
+    int gray_capacity;
+    int gray_count;
+    Obj** gray_stack;
+    // Temporary stack for roots.
+    Value roots[MAX_ROOTS];
+    int roots_count;
 
     Table strings; // String interning
     Table globals; // Globals
@@ -53,6 +68,8 @@ void vm_free(VM* vm);
 void vm_push(VM* vm, Value value);
 Value vm_pop(VM* vm);
 Value vm_peek(VM* vm, int distance);
+void vm_push_root(VM* vm, Value value);
+void vm_pop_root(VM* vm);
 InterpretResult vm_interpret(VM* vm, const char* source);
 
 #endif

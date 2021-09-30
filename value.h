@@ -56,6 +56,7 @@ typedef struct {
 void valuearray_init(ValueArray* va);
 void valuearray_free(ValueArray* va, VM* vm);
 void valuearray_write(ValueArray* va, VM* vm, Value v);
+void valuearray_mark(ValueArray* va, VM* vm);
 
 uint32_t value_hash(Value v);
 bool value_equal(Value a, Value b);

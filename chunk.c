@@ -46,9 +46,18 @@ size_t chunk_write_constant(Chunk* chunk, VM* vm, Value value) {
     if (table_get(&chunk->constants_index, value, &offset))
         return (size_t)VAL_TO_NUMBER(offset);
 
+    vm_push_root(vm, value);
     valuearray_write(&chunk->constants, vm, value);
+
     size_t rv = chunk->constants.length - 1;
     offset = NUMBER_TO_VAL(rv);
     table_set(&chunk->constants_index, vm, value, offset);
+    vm_pop_root(vm);
     return rv;
+}
+
+void chunk_mark(Chunk* chunk, VM* vm) {
+    valuearray_mark(&chunk->constants, vm);
+    // Don't need to mark constants_index, because everything inside it
+    // must also be inside the constants array.
 }

@@ -9,100 +9,22 @@
 #include <stdio.h>
 #endif
 
-void valuearray_init(ValueArray* va) {
-    va->values = NULL;
-    va->length = 0;
-    va->capacity = 0;
-}
-
-void valuearray_free(ValueArray* va, VM* vm) {
-    FREE_ARRAY(vm, va->values, Value, va->capacity);
-    valuearray_init(va);
-}
-
-void valuearray_write(ValueArray* va, VM* vm, Value v) {
-    if (va->length + 1 > va->capacity) {
-        size_t new_size = GROW_CAPACITY(va->capacity);
-        va->values = GROW_ARRAY(vm, va->values, Value, va->capacity, new_size);
-        va->capacity = new_size;
-    }
-
-    va->values[va->length] = v;
-    va->length++;
-}
-
-// Hashing
-// =======
-
-static inline uint32_t hash_bits(uint64_t hash) {
-    hash = ~hash + (hash << 18);
-    hash = hash ^ (hash >> 31);
-    hash = hash * 21;
-    hash = hash ^ (hash >> 11);
-    hash = hash + (hash << 6);
-    hash = hash ^ (hash >> 22);
-    return (uint32_t)(hash & 0x3fffffff);
-}
-
-typedef union {
-    double   num;
-    uint64_t bits64;
-} double_bits;
-
-uint64_t double_to_bits(double d) {
-    double_bits data;
-    data.num = d;
-    return data.bits64;
-}
-
-static uint32_t object_hash(Obj* obj)
-{
-    switch (obj->type) {
-        case OBJ_STRING:   return ((ObjString*)obj)->hash;
-        case OBJ_FUNCTION: return hash_bits((uintptr_t)obj);
-        case OBJ_CLOSURE:  return object_hash((Obj*) ((ObjClosure*)obj)->function);
-        case OBJ_UPVALUE:  UNREACHABLE();
-    }
-}
-
-uint32_t value_hash(Value v) {
-    switch (v.type) {
-        case VALUE_NIL:    return 0;
-        case VALUE_BOOL:   return VAL_TO_BOOL(v) ? 1 : 2;
-        case VALUE_NUMBER: return hash_bits(VAL_TO_NUMBER(v));
-        case VALUE_OBJ:    return object_hash(VAL_TO_OBJ(v));
-        default: UNREACHABLE();
-    }
-}
-
-bool value_equal(Value a, Value b) {
-    if (a.type != b.type) return false;
-    switch (a.type) {
-        case VALUE_NIL:    return true;
-        case VALUE_BOOL:   return VAL_TO_BOOL(a) == VAL_TO_BOOL(b);
-        case VALUE_NUMBER: return VAL_TO_NUMBER(a) == VAL_TO_NUMBER(b);
-        case VALUE_OBJ: return VAL_TO_OBJ(a) == VAL_TO_OBJ(b);
-        default: UNREACHABLE();
-    }
-}
-
-bool value_truthy(Value a) {
-    if (IS_NIL(a)) return false;
-    if (IS_BOOL(a)) return VAL_TO_BOOL(a);
-    return true;
-}
-
 // Object memory management
 // ========================
 
 Obj* object_allocate(VM* vm, ObjType type, size_t sz) {
-#ifdef SUBTLE_DEBUG_TRACE_ALLOC
-    printf("allocate %zu for type %d\n", sz, type);
-#endif
     Obj* object = memory_realloc(vm, NULL, 0, sz);
+    // It is safe to make ->marked = false here, because
+    // the GC only happens ``inside'' the memory_realloc
+    // call. After the previous line, the GC won't run
+    // again in this function.
     object->type = type;
     object->next = vm->objects;
+    object->marked = false;
     vm->objects = object;
+#ifdef SUBTLE_DEBUG_TRACE_ALLOC
+    printf("%p allocate %zu for type %d\n", object, sz, type);
+#endif
     return object;
 }
 
@@ -112,6 +34,9 @@ static void objupvalue_free(VM*, Obj*);
 static void objclosure_free(VM*, Obj*);
 
 void object_free(Obj* obj, VM* vm) {
+#ifdef SUBTLE_DEBUG_TRACE_ALLOC
+    printf("%p free type %d\n", (void*)obj, obj->type);
+#endif
     switch (obj->type) {
         case OBJ_STRING:   objstring_free(vm,   obj); break;
         case OBJ_FUNCTION: objfunction_free(vm, obj); break;
@@ -141,7 +66,9 @@ objstring_new(VM* vm, char* chars, size_t length, uint32_t hash)
     str->hash = hash;
 
     // intern the string here.
+    vm_push_root(vm, OBJ_TO_VAL(str));
     table_set(&vm->strings, vm, OBJ_TO_VAL(str), NIL_VAL);
+    vm_pop_root(vm);
     return str;
 }
 

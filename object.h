@@ -32,6 +32,8 @@ typedef enum {
 
 typedef struct Obj {
     ObjType type;
+    // Does this object have a live reference?
+    bool marked;
     // Link to the next allocated object.
     struct Obj* next;
 } Obj;
