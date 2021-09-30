@@ -191,6 +191,10 @@ static uint16_t identifier_constant(Compiler* compiler, Token* token) {
 }
 
 static void emit_constant(Compiler* compiler, Value v) {
+    // Subtle point: the make_constant call has to come _before_ the
+    // call to emit_byte(), because v might be freed during emit_byte.
+    // make_constant() calls chunk_write_constant, which saves the
+    // constant to the VM's root stack.
     uint16_t constant = make_constant(compiler, v);
     emit_byte(compiler, OP_CONSTANT);
     emit_offset(compiler, constant);
