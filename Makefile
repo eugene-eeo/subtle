@@ -5,10 +5,6 @@ debug:
 		-DSUBTLE_DEBUG_TRACE_ALLOC \
 		-DSUBTLE_DEBUG_STRESS_GC \
 		-g -Og *.c -o subtle
-	# gcc -DSUBTLE_DEBUG \
-	# 	-DSUBTLE_DEBUG_TRACE_EXECUTION \
-	# 	-DSUBTLE_DEBUG_STRESS_GC \
-	# 	-g -Og *.c -o subtle
 
 build:
 	gcc -Og -g *.c -o subtle
