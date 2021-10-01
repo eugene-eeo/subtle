@@ -71,7 +71,7 @@ typedef enum {
     PREC_TERM,       // + -
     PREC_FACTOR,     // * /
     PREC_UNARY,      // ! -
-    PREC_CALL,       // ()
+    PREC_CALL,       // (), .
     PREC_LITERAL,    // literals
 } Precedence;
 
@@ -528,7 +528,7 @@ static void call(Compiler* compiler, bool can_assign) {
 static void object(Compiler* compiler, bool can_assign) {
     // Object literal.
     emit_byte(compiler, OP_OBJECT);
-    if (!match(compiler, TOKEN_RBRACE)) {
+    if (!check(compiler, TOKEN_RBRACE)) {
         do {
             consume(compiler, TOKEN_VARIABLE, "Expect an identifier as key.");
             uint16_t constant = identifier_constant(compiler, &compiler->parser->previous);
@@ -539,6 +539,35 @@ static void object(Compiler* compiler, bool can_assign) {
         } while (match(compiler, TOKEN_COMMA));
     }
     consume(compiler, TOKEN_RBRACE, "Expect '}' after items.");
+}
+
+static void dot(Compiler* compiler, bool can_assign) {
+    consume(compiler, TOKEN_VARIABLE, "Expect slot name after '.'.");
+    uint16_t slot_name = identifier_constant(compiler, &compiler->parser->previous);
+
+    if (can_assign && match(compiler, TOKEN_EQ)) {
+        expression(compiler);
+        emit_byte(compiler, OP_OBJECT_SET);
+        emit_offset(compiler, slot_name);
+        return;
+    }
+
+    uint8_t num_args = 0;
+    // Match the optional arguments.
+    if (match(compiler, TOKEN_LPAREN)) {
+        if (!check(compiler, TOKEN_RPAREN)) {
+            do {
+                if (num_args == 255)
+                    error(compiler, "");
+                expression(compiler);
+                num_args++;
+            } while (match(compiler, TOKEN_COMMA));
+        }
+        consume(compiler, TOKEN_RPAREN, "Expect ')' after arguments.");
+    }
+    emit_byte(compiler, OP_INVOKE);
+    emit_offset(compiler, slot_name);
+    emit_byte(compiler, num_args);
 }
 
 static void grouping(Compiler* compiler, bool can_assign) {
@@ -587,7 +616,7 @@ static ParseRule rules[] = {
     [TOKEN_SLASH]     = {NULL,     binary, PREC_FACTOR},
     [TOKEN_SEMICOLON] = {NULL,     NULL,   PREC_NONE},
     [TOKEN_COMMA]     = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_DOT]       = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_DOT]       = {NULL,     dot,    PREC_CALL},
     [TOKEN_LPAREN]    = {grouping, call,   PREC_CALL},
     [TOKEN_RPAREN]    = {NULL,     NULL,   PREC_NONE},
     [TOKEN_LBRACE]    = {object,   NULL,   PREC_NONE},

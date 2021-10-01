@@ -159,6 +159,12 @@ close_upvalues(VM* vm, Value* last)
     }
 }
 
+static bool
+is_activatable(Value value)
+{
+    return IS_CLOSURE(value);
+}
+
 static InterpretResult run(VM* vm) {
     CallFrame* frame;
 
@@ -382,14 +388,42 @@ static InterpretResult run(VM* vm) {
             case OP_OBJECT_SET: {
                 Value key = READ_CONSTANT();
                 Value value = vm_peek(vm, 0);
-                Value target = vm_peek(vm, 1);
-                if (!IS_OBJECT(target)) {
+                if (!IS_OBJECT(vm_peek(vm, 1))) {
                     runtime_error(vm, "Trying to set attribute on non-object.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                ObjObject* target_object = VAL_TO_OBJECT(target);
-                objobject_set(target_object, vm, key, value);
+                ObjObject* object = VAL_TO_OBJECT(vm_peek(vm, 1));
+                objobject_set(object, vm, key, value);
                 vm_pop(vm);
+                break;
+            }
+            case OP_INVOKE: {
+                Value key = READ_CONSTANT();
+                uint8_t num_args = READ_BYTE();
+                Value obj = vm_peek(vm, num_args);
+                if (!IS_OBJECT(obj)) {
+                    runtime_error(vm, "Trying to access slot of non-object.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                ObjObject* object = VAL_TO_OBJECT(obj);
+                Value slot;
+                if (!objobject_get(object, key, &slot)) {
+                    for (int i = 0; i < num_args; i++)
+                        vm_pop(vm);
+                    vm_pop(vm); // The object.
+                    vm_push(vm, NIL_VAL);
+                    break;
+                }
+                if (!is_activatable(slot)) {
+                    for (int i = 0; i < num_args; i++)
+                        vm_pop(vm);
+                    vm_pop(vm); // The object.
+                    vm_push(vm, slot);
+                    break;
+                }
+                if (!call_value(vm, slot, num_args))
+                    return INTERPRET_RUNTIME_ERROR;
+                REFRESH_FRAME();
                 break;
             }
             default: UNREACHABLE();

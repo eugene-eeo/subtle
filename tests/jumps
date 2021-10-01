@@ -18,3 +18,8 @@ while (a != 10) {
     a = a + 1;
 }
 assert a == 10;
+
+# Short circuiting
+let a = fn() { assert false; };
+assert true || a();
+assert !(false && a());

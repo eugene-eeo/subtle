@@ -40,6 +40,7 @@ enum OpCode {
     OP_CLOSE_UPVALUE,
     OP_OBJECT,
     OP_OBJECT_SET,
+    OP_INVOKE,
 };
 
 typedef struct Chunk {
