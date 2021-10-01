@@ -39,7 +39,7 @@ typedef struct Obj {
 } Obj;
 
 typedef struct ObjString {
-    Obj obj; // header
+    Obj obj;
     size_t length;
     char*  chars;
     uint32_t hash;
@@ -47,6 +47,7 @@ typedef struct ObjString {
 
 typedef struct {
     Obj obj;
+    // If the arity is -1, then this is a script.
     int arity;
     int upvalue_count;
     Chunk chunk;

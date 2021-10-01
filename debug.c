@@ -7,10 +7,14 @@
 void debug_print_object(Obj* obj) {
     switch (obj->type) {
         case OBJ_STRING:
-            printf("%s", ((ObjString*) obj)->chars);
+            printf("\"%s\"", ((ObjString*) obj)->chars);
             break;
         case OBJ_FUNCTION:
-            printf("fn_%p", obj);
+            if (((ObjFunction*)obj)->arity == -1) {
+                printf("script");
+            } else {
+                printf("fn_%p", (void*)obj);
+            }
             break;
         case OBJ_CLOSURE:
             debug_print_object((Obj*)(((ObjClosure*) obj)->function));
