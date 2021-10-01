@@ -525,6 +525,22 @@ static void call(Compiler* compiler, bool can_assign) {
     emit_byte(compiler, arg_count);
 }
 
+static void object(Compiler* compiler, bool can_assign) {
+    // Object literal.
+    emit_byte(compiler, OP_OBJECT);
+    if (!match(compiler, TOKEN_RBRACE)) {
+        do {
+            consume(compiler, TOKEN_VARIABLE, "Expect an identifier as key.");
+            uint16_t constant = identifier_constant(compiler, &compiler->parser->previous);
+            consume(compiler, TOKEN_COLON, "Expect ':' after key.");
+            expression(compiler);
+            emit_byte(compiler, OP_OBJECT_SET);
+            emit_offset(compiler, constant);
+        } while (match(compiler, TOKEN_COMMA));
+    }
+    consume(compiler, TOKEN_RBRACE, "Expect '}' after items.");
+}
+
 static void grouping(Compiler* compiler, bool can_assign) {
     expression(compiler);
     consume(compiler, TOKEN_RPAREN, "Expect ')' after expression.");
@@ -574,7 +590,7 @@ static ParseRule rules[] = {
     [TOKEN_DOT]       = {NULL,     NULL,   PREC_NONE},
     [TOKEN_LPAREN]    = {grouping, call,   PREC_CALL},
     [TOKEN_RPAREN]    = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_LBRACE]    = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_LBRACE]    = {object,   NULL,   PREC_NONE},
     [TOKEN_RBRACE]    = {NULL,     NULL,   PREC_NONE},
     [TOKEN_EQ]        = {NULL,     NULL,   PREC_NONE},
     [TOKEN_EQ_EQ]     = {NULL,     binary, PREC_EQ},

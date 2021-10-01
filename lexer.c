@@ -189,6 +189,7 @@ Token lexer_next(Lexer* lexer) {
         case '*': return make_token(lexer, TOKEN_TIMES);
         case '/': return make_token(lexer, TOKEN_SLASH);
         case ',': return make_token(lexer, TOKEN_COMMA);
+        case ':': return make_token(lexer, TOKEN_COLON);
         case ';': return make_token(lexer, TOKEN_SEMICOLON);
         case '.': return make_token(lexer, TOKEN_DOT);
         case '(': return make_token(lexer, TOKEN_LPAREN);

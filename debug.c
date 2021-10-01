@@ -22,6 +22,9 @@ void debug_print_object(Obj* obj) {
         case OBJ_UPVALUE:
             printf("upvalue");
             break;
+        case OBJ_OBJECT:
+            printf("object_%p", (void*)obj);
+            break;
     }
 }
 
@@ -124,9 +127,11 @@ int debug_print_instruction(Chunk* chunk, int index) {
             }
             return index;
         }
-        case OP_GET_UPVALUE: return byte_instruction(chunk, index, "OP_GET_UPVALUE"); break;
-        case OP_SET_UPVALUE: return byte_instruction(chunk, index, "OP_SET_UPVALUE"); break;
-        case OP_CLOSE_UPVALUE: return simple_instruction(index, "OP_CLOSE_UPVALUE"); break;
+        case OP_GET_UPVALUE: return byte_instruction(chunk, index, "OP_GET_UPVALUE");
+        case OP_SET_UPVALUE: return byte_instruction(chunk, index, "OP_SET_UPVALUE");
+        case OP_CLOSE_UPVALUE: return simple_instruction(index, "OP_CLOSE_UPVALUE");
+        case OP_OBJECT: return simple_instruction(index, "OP_OBJECT");
+        case OP_OBJECT_SET: return constant_instruction(chunk, index, "OP_OBJECT_SET");
         default:
             printf("Unknown instruction.\n");
             return index + 1;

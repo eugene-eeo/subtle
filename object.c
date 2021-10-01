@@ -32,6 +32,7 @@ static void objstring_free(VM*, Obj*);
 static void objfunction_free(VM*, Obj*);
 static void objupvalue_free(VM*, Obj*);
 static void objclosure_free(VM*, Obj*);
+static void objobject_free(VM*, Obj*);
 
 void object_free(Obj* obj, VM* vm) {
 #ifdef SUBTLE_DEBUG_TRACE_ALLOC
@@ -42,6 +43,7 @@ void object_free(Obj* obj, VM* vm) {
         case OBJ_FUNCTION: objfunction_free(vm, obj); break;
         case OBJ_UPVALUE:  objupvalue_free(vm,  obj); break;
         case OBJ_CLOSURE:  objclosure_free(vm,  obj); break;
+        case OBJ_OBJECT:   objobject_free(vm,   obj); break;
     }
 }
 
@@ -179,4 +181,43 @@ objclosure_free(VM* vm, Obj* obj)
     ObjClosure* closure = (ObjClosure*)obj;
     FREE_ARRAY(vm, closure->upvalues, ObjUpvalue*, closure->upvalue_count);
     FREE(vm, ObjClosure, closure);
+}
+
+// ObjObject
+// =========
+
+ObjObject*
+objobject_new(VM* vm)
+{
+    ObjObject* object = ALLOCATE_OBJECT(vm, OBJ_OBJECT, ObjObject);
+    object->proto = NULL;
+    table_init(&object->slots);
+    return object;
+}
+
+inline bool
+objobject_has(ObjObject* obj, Value key)
+{
+    Value res;
+    return objobject_get(obj, key, &res);
+}
+
+bool
+objobject_get(ObjObject* obj, Value key, Value* result)
+{
+    return table_get(&obj->slots, key, result);
+}
+
+void
+objobject_set(ObjObject* obj, VM* vm, Value key, Value value)
+{
+    table_set(&obj->slots, vm, key, value);
+}
+
+static void
+objobject_free(VM* vm, Obj* obj)
+{
+    ObjObject* object = (ObjObject*)obj;
+    table_free(&object->slots, vm);
+    FREE(vm, ObjObject, object);
 }

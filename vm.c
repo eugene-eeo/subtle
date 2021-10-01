@@ -375,6 +375,23 @@ static InterpretResult run(VM* vm) {
                 vm_pop(vm);
                 break;
             }
+            case OP_OBJECT: {
+                vm_push(vm, OBJ_TO_VAL(objobject_new(vm)));
+                break;
+            }
+            case OP_OBJECT_SET: {
+                Value key = READ_CONSTANT();
+                Value value = vm_peek(vm, 0);
+                Value target = vm_peek(vm, 1);
+                if (!IS_OBJECT(target)) {
+                    runtime_error(vm, "Trying to set attribute on non-object.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                ObjObject* target_object = VAL_TO_OBJECT(target);
+                objobject_set(target_object, vm, key, value);
+                vm_pop(vm);
+                break;
+            }
             default: UNREACHABLE();
         }
     }

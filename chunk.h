@@ -38,6 +38,8 @@ enum OpCode {
     OP_GET_UPVALUE,
     OP_SET_UPVALUE,
     OP_CLOSE_UPVALUE,
+    OP_OBJECT,
+    OP_OBJECT_SET,
 };
 
 typedef struct Chunk {

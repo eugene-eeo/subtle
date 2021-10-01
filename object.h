@@ -4,6 +4,7 @@
 #include "common.h"
 #include "value.h"
 #include "chunk.h"
+#include "table.h"
 
 // Forward declarations
 // --------------------
@@ -15,6 +16,7 @@ typedef struct VM VM;
 #define IS_FUNCTION(value)   (is_object_type(value, OBJ_FUNCTION))
 #define IS_UPVALUE(value)    (is_object_type(value, OBJ_UPVALUE))
 #define IS_CLOSURE(value)    (is_object_type(value, OBJ_CLOSURE))
+#define IS_OBJECT(value)     (is_object_type(value, OBJ_OBJECT))
 
 #define OBJ_TYPE(value)      (VAL_TO_OBJ(value)->type)
 
@@ -22,12 +24,14 @@ typedef struct VM VM;
 #define VAL_TO_FUNCTION(value) ((ObjFunction*)VAL_TO_OBJ(value))
 #define VAL_TO_UPVALUE(value)  ((ObjUpvalue*)VAL_TO_OBJ(value))
 #define VAL_TO_CLOSURE(value)  ((ObjClosure*)VAL_TO_OBJ(value))
+#define VAL_TO_OBJECT(value)   ((ObjObject*)VAL_TO_OBJ(value))
 
 typedef enum {
     OBJ_STRING,
     OBJ_FUNCTION,
     OBJ_UPVALUE,
     OBJ_CLOSURE,
+    OBJ_OBJECT,
 } ObjType;
 
 typedef struct Obj {
@@ -37,6 +41,10 @@ typedef struct Obj {
     // Link to the next allocated object.
     struct Obj* next;
 } Obj;
+
+static inline bool is_object_type(Value value, ObjType type) {
+    return IS_OBJ(value) && VAL_TO_OBJ(value)->type == type;
+}
 
 typedef struct ObjString {
     Obj obj;
@@ -72,9 +80,11 @@ typedef struct {
     int upvalue_count;
 } ObjClosure;
 
-static inline bool is_object_type(Value value, ObjType type) {
-    return IS_OBJ(value) && VAL_TO_OBJ(value)->type == type;
-}
+typedef struct {
+    Obj obj;
+    Obj* proto;
+    Table slots;
+} ObjObject;
 
 // Object memory management
 // ========================
@@ -105,5 +115,13 @@ ObjUpvalue* objupvalue_new(VM* vm, Value* slot);
 // ==========
 
 ObjClosure* objclosure_new(VM* vm, ObjFunction* fn);
+
+// ObjObject
+// =========
+
+ObjObject* objobject_new(VM* vm);
+bool objobject_has(ObjObject* obj, Value key);
+bool objobject_get(ObjObject* obj, Value key, Value* result);
+void objobject_set(ObjObject* obj, VM* vm, Value key, Value value);
 
 #endif
