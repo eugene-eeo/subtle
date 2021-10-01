@@ -190,7 +190,7 @@ ObjObject*
 objobject_new(VM* vm)
 {
     ObjObject* object = ALLOCATE_OBJECT(vm, OBJ_OBJECT, ObjObject);
-    object->proto = NULL;
+    object->proto = NIL_VAL;
     table_init(&object->slots);
     return object;
 }

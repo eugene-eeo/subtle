@@ -118,9 +118,9 @@ static void blacken_object(VM* vm, Obj* obj) {
             break;
         }
         case OBJ_OBJECT: {
-            ObjObject* obj = (ObjObject*)obj;
-            mark_object(vm, obj->proto);
-            table_mark(&obj->slots, vm);
+            ObjObject* object = (ObjObject*)obj;
+            mark_value(vm, object->proto);
+            table_mark(&object->slots, vm);
             break;
         }
     }

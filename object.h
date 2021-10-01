@@ -82,7 +82,7 @@ typedef struct {
 
 typedef struct {
     Obj obj;
-    Obj* proto;
+    Value proto;
     Table slots;
 } ObjObject;
 
