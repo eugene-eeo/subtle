@@ -41,7 +41,6 @@ typedef enum {
     TOKEN_LET,
     TOKEN_RETURN,
     TOKEN_ASSERT,
-    TOKEN_DO,
 
     TOKEN_ERROR,
     TOKEN_EOF,

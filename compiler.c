@@ -810,16 +810,16 @@ static void assert_stmt(Compiler* compiler) {
 }
 
 static void block(Compiler* compiler) {
+    begin_block(compiler);
     while (!check(compiler, TOKEN_EOF) && !check(compiler, TOKEN_RBRACE))
         declaration(compiler);
     consume(compiler, TOKEN_RBRACE, "Expect '}' after block.");
+    end_block(compiler);
 }
 
 static void block_or_stmt(Compiler* compiler) {
     if (match(compiler, TOKEN_LBRACE)) {
-        begin_block(compiler);
         block(compiler);
-        end_block(compiler);
     } else {
         statement(compiler);
     }
@@ -861,10 +861,6 @@ static void while_stmt(Compiler* compiler) {
     emit_byte(compiler, OP_POP);
 }
 
-static void do_stmt(Compiler* compiler) {
-    block_or_stmt(compiler);
-}
-
 static void return_stmt(Compiler* compiler) {
     if (compiler->type == FUNCTION_TYPE_SCRIPT)
         error(compiler, "Cannot return from top-level code.");
@@ -888,7 +884,6 @@ static void synchronize(Compiler* compiler) {
             case TOKEN_RETURN:
             case TOKEN_ASSERT:
             case TOKEN_IF:
-            case TOKEN_DO:
                 return;
             default:
                 advance(compiler);
@@ -909,8 +904,6 @@ static void declaration(Compiler* compiler) {
 static void statement(Compiler* compiler) {
     if (match(compiler, TOKEN_ASSERT)) {
         assert_stmt(compiler);
-    } else if (match(compiler, TOKEN_DO)) {
-        do_stmt(compiler);
     } else if (match(compiler, TOKEN_IF)) {
         if_stmt(compiler);
     } else if (match(compiler, TOKEN_WHILE)) {

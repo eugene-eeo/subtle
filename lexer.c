@@ -138,7 +138,6 @@ match_rest(Lexer* lexer, TokenType type,
 static TokenType variable_type(Lexer* lexer) {
     switch (lexer->start[0]) {
         case 'a': return match_rest(lexer, TOKEN_ASSERT, 1, "ssert", 5);
-        case 'd': return match_rest(lexer, TOKEN_DO, 1, "o", 1);
         case 'e': return match_rest(lexer, TOKEN_ELSE, 1, "lse", 3);
         case 'f':
             if (lexer->current - lexer->start >= 2) {
