@@ -1,0 +1,8 @@
+let x = {};
+x.a = fn(u, f) {
+    assert u == f(u);
+};
+
+x.a(1) { |u|
+    return u;
+};

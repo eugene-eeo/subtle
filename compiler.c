@@ -544,6 +544,38 @@ static void object(Compiler* compiler, bool can_assign) {
     consume(compiler, TOKEN_RBRACE, "Expect '}' after items.");
 }
 
+static void block_argument(Compiler* compiler) {
+    Compiler c;
+    compiler_init(&c, compiler, compiler->parser,
+                  compiler->vm, FUNCTION_TYPE_FUNCTION);
+    begin_block(&c);
+
+    // Parse the optional parameter list, if any.
+    if (match(&c, TOKEN_PIPE)) {
+        do {
+            c.function->arity++;
+            if (c.function->arity > 255) {
+                error_at_current(&c, "Cannot have more than 255 parameters.");
+            }
+            uint8_t constant = parse_variable(&c, "Expect parameter name.");
+            define_variable(&c, constant);
+        } while (match(&c, TOKEN_COMMA));
+        consume(&c, TOKEN_PIPE, "Expect '|' after parameters.");
+    }
+    block(&c);
+    end_block(&c);
+
+    ObjFunction* fn = compiler_end(&c);
+    uint16_t idx = make_constant(compiler, OBJ_TO_VAL(fn));
+    emit_byte(compiler, OP_CLOSURE);
+    emit_offset(compiler, idx);
+
+    for (int i = 0; i < fn->upvalue_count; i++) {
+        emit_byte(compiler, c.upvalues[i].is_local ? 1 : 0);
+        emit_byte(compiler, c.upvalues[i].index);
+    }
+}
+
 static void dot(Compiler* compiler, bool can_assign) {
     consume(compiler, TOKEN_VARIABLE, "Expect slot name after '.'.");
     uint16_t slot_name = identifier_constant(compiler, &compiler->parser->previous);
@@ -561,13 +593,21 @@ static void dot(Compiler* compiler, bool can_assign) {
         if (!check(compiler, TOKEN_RPAREN)) {
             do {
                 if (num_args == 255)
-                    error(compiler, "");
+                    error(compiler, "Cannot have more than 255 arguments.");
                 expression(compiler);
                 num_args++;
             } while (match(compiler, TOKEN_COMMA));
         }
         consume(compiler, TOKEN_RPAREN, "Expect ')' after arguments.");
     }
+    // Match a function block at the end.
+    if (match(compiler, TOKEN_LBRACE)) {
+        if (num_args == 255)
+            error(compiler, "Cannot have more than 255 arguments.");
+        num_args++;
+        block_argument(compiler);
+    }
+
     emit_byte(compiler, OP_INVOKE);
     emit_offset(compiler, slot_name);
     emit_byte(compiler, num_args);
