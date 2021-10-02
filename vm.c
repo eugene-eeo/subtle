@@ -89,7 +89,7 @@ static void runtime_error(VM* vm, const char* format, ...) {
     }
 }
 
-static bool call(VM* vm, ObjClosure* closure, int args)
+static bool call(VM* vm, Value this, ObjClosure* closure, int args)
 {
     if (vm->frame_count == FRAMES_MAX) {
         runtime_error(vm, "Stack overflow.");
@@ -100,6 +100,7 @@ static bool call(VM* vm, ObjClosure* closure, int args)
     frame->closure = closure;
     frame->ip = function->chunk.code;
     frame->slots = vm->stack_top - args - 1;
+    frame->slots[0] = this;
     // Fix the number of arguments.
     // Since -1 arity means a script function, we ignore that here.
     if (function->arity != -1) {
@@ -109,12 +110,13 @@ static bool call(VM* vm, ObjClosure* closure, int args)
     return true;
 }
 
-static bool call_value(VM* vm, Value callee, int args)
+static bool call_value(VM* vm, Value this, Value callee, int args)
 {
     if (IS_OBJ(callee)) {
         switch(VAL_TO_OBJ(callee)->type) {
-        case OBJ_CLOSURE: return call(vm, VAL_TO_CLOSURE(callee), args);
-        default: ; // It's an error.
+            case OBJ_CLOSURE:
+                return call(vm, this, VAL_TO_CLOSURE(callee), args);
+            default: ; // It's an error.
         }
     }
     runtime_error(vm, "Tried to call non-callable value.");
@@ -341,7 +343,8 @@ static InterpretResult run(VM* vm) {
             }
             case OP_CALL: {
                 uint8_t args = READ_BYTE();
-                if (!call_value(vm, vm_peek(vm, args), args))
+                Value target = vm_peek(vm, args);
+                if (!call_value(vm, target, target, args))
                     return INTERPRET_RUNTIME_ERROR;
                 REFRESH_FRAME();
                 break;
@@ -421,7 +424,7 @@ static InterpretResult run(VM* vm) {
                     vm_push(vm, slot);
                     break;
                 }
-                if (!call_value(vm, slot, num_args))
+                if (!call_value(vm, obj, slot, num_args))
                     return INTERPRET_RUNTIME_ERROR;
                 REFRESH_FRAME();
                 break;
@@ -445,7 +448,7 @@ InterpretResult vm_interpret(VM* vm, const char* source) {
     ObjClosure* closure = objclosure_new(vm, fn);
     vm_pop(vm);
     vm_push(vm, OBJ_TO_VAL(closure));
-    call(vm, closure, 0);
+    call(vm, NIL_VAL, closure, 0);
 
     InterpretResult result = run(vm);
     vm_reset_stack(vm);

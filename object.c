@@ -195,7 +195,7 @@ objobject_new(VM* vm)
     return object;
 }
 
-inline bool
+bool
 objobject_has(ObjObject* obj, Value key)
 {
     Value res;

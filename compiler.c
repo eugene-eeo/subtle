@@ -98,6 +98,9 @@ compiler_init(Compiler* compiler, Compiler* enclosing,
     compiler->enclosing = enclosing;
     compiler->parser = parser;
     compiler->function = objfunction_new(vm);
+    if (type == FUNCTION_TYPE_SCRIPT)
+        compiler->function->arity = -1;
+
     compiler->type = type;
     compiler->local_count = 0;
     compiler->scope_depth = 0;
@@ -570,6 +573,16 @@ static void dot(Compiler* compiler, bool can_assign) {
     emit_byte(compiler, num_args);
 }
 
+static void this(Compiler* compiler, bool can_assign) {
+    if (compiler->type == FUNCTION_TYPE_SCRIPT) {
+        error(compiler, "Cannot use 'this' in top-level code.");
+    }
+    // The 0-th stack slot contains the target of the call.
+    // Remember that we put this slot aside in compiler_init.
+    emit_byte(compiler, OP_GET_LOCAL);
+    emit_byte(compiler, 0);
+}
+
 static void grouping(Compiler* compiler, bool can_assign) {
     expression(compiler);
     consume(compiler, TOKEN_RPAREN, "Expect ')' after expression.");
@@ -641,7 +654,7 @@ static ParseRule rules[] = {
     [TOKEN_FALSE]     = {literal,  NULL,   PREC_NONE},
     [TOKEN_FN]        = {function, NULL,   PREC_NONE},
     [TOKEN_WHILE]     = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_THIS]      = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_THIS]      = {this,     NULL,   PREC_NONE},
     [TOKEN_SUPER]     = {NULL,     NULL,   PREC_NONE},
     [TOKEN_IF]        = {NULL,     NULL,   PREC_NONE},
     [TOKEN_ELSE]      = {NULL,     NULL,   PREC_NONE},
@@ -887,8 +900,6 @@ compile(VM* vm, const char* source)
 
     ObjFunction* function = compiler_end(&compiler);
     consume(&compiler, TOKEN_EOF, "Expect end of expression.");
-
-    function->arity = -1;
     return parser.had_error ? NULL : function;
 }
 
