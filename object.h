@@ -17,6 +17,7 @@ typedef struct VM VM;
 #define IS_UPVALUE(value)    (is_object_type(value, OBJ_UPVALUE))
 #define IS_CLOSURE(value)    (is_object_type(value, OBJ_CLOSURE))
 #define IS_OBJECT(value)     (is_object_type(value, OBJ_OBJECT))
+#define IS_NATIVE(value)     (is_object_type(value, OBJ_NATIVE))
 
 #define OBJ_TYPE(value)      (VAL_TO_OBJ(value)->type)
 
@@ -25,6 +26,7 @@ typedef struct VM VM;
 #define VAL_TO_UPVALUE(value)  ((ObjUpvalue*)VAL_TO_OBJ(value))
 #define VAL_TO_CLOSURE(value)  ((ObjClosure*)VAL_TO_OBJ(value))
 #define VAL_TO_OBJECT(value)   ((ObjObject*)VAL_TO_OBJ(value))
+#define VAL_TO_NATIVE(value)   ((ObjNative*)VAL_TO_OBJ(value))
 
 typedef enum {
     OBJ_STRING,
@@ -32,6 +34,7 @@ typedef enum {
     OBJ_UPVALUE,
     OBJ_CLOSURE,
     OBJ_OBJECT,
+    OBJ_NATIVE,
 } ObjType;
 
 typedef struct Obj {
@@ -86,6 +89,13 @@ typedef struct {
     Table slots;
 } ObjObject;
 
+typedef bool (*NativeFn)(VM* vm, Value* args, int num_args);
+
+typedef struct {
+    Obj obj;
+    NativeFn fn;
+} ObjNative;
+
 // Object memory management
 // ========================
 
@@ -123,5 +133,10 @@ ObjObject* objobject_new(VM* vm);
 bool objobject_has(ObjObject* obj, Value key);
 bool objobject_get(ObjObject* obj, Value key, Value* result);
 void objobject_set(ObjObject* obj, VM* vm, Value key, Value value);
+
+// ObjNative
+// =========
+
+ObjNative* objnative_new(VM* vm, NativeFn fn);
 
 #endif

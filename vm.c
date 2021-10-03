@@ -1,3 +1,4 @@
+#include "common.h"
 #include "compiler.h"
 #include "memory.h"
 #include "object.h"
@@ -16,6 +17,9 @@ void vm_init(VM* vm) {
     vm->stack_top = vm->stack;
     vm->open_upvalues = NULL;
 
+    vm->ObjectProto = NULL;
+    vm->FnProto = NULL;
+
     vm->objects = NULL;
     vm->bytes_allocated = 0;
     vm->next_gc = 1024 * 1024;
@@ -31,6 +35,7 @@ void vm_init(VM* vm) {
 }
 
 void vm_free(VM* vm) {
+    // Note: the loop below will free the *Proto fields.
     Obj* obj = vm->objects;
     while (obj != NULL) {
         Obj* next = obj->next;
@@ -72,7 +77,7 @@ static void vm_reset_stack(VM* vm) {
     vm->stack_top = vm->stack;
 }
 
-static void runtime_error(VM* vm, const char* format, ...) {
+void vm_runtime_error(VM* vm, const char* format, ...) {
     va_list args;
     va_start(args, format);
     vfprintf(stderr, format, args);
@@ -89,10 +94,11 @@ static void runtime_error(VM* vm, const char* format, ...) {
     }
 }
 
-static bool call(VM* vm, Value this, ObjClosure* closure, int args)
+bool
+vm_call_closure(VM* vm, Value this, ObjClosure* closure, int args)
 {
     if (vm->frame_count == FRAMES_MAX) {
-        runtime_error(vm, "Stack overflow.");
+        vm_runtime_error(vm, "Stack overflow.");
         return false;
     }
     ObjFunction* function = closure->function;
@@ -102,7 +108,7 @@ static bool call(VM* vm, Value this, ObjClosure* closure, int args)
     frame->slots = vm->stack_top - args - 1;
     frame->slots[0] = this;
     // Fix the number of arguments.
-    // Since -1 arity means a script function, we ignore that here.
+    // Since -1 arity means a script, we ignore that here.
     if (function->arity != -1) {
         for (int i = 0; i < function->arity - args; i++) vm_push(vm, NIL_VAL);
         for (int i = 0; i < args - function->arity; i++) vm_pop(vm);
@@ -115,11 +121,20 @@ static bool call_value(VM* vm, Value this, Value callee, int args)
     if (IS_OBJ(callee)) {
         switch(VAL_TO_OBJ(callee)->type) {
             case OBJ_CLOSURE:
-                return call(vm, this, VAL_TO_CLOSURE(callee), args);
+                return vm_call_closure(vm, this, VAL_TO_CLOSURE(callee), args);
+            case OBJ_NATIVE: {
+                ObjNative* native = VAL_TO_NATIVE(callee);
+                Value* args_start = &vm->stack_top[-args - 1];
+                *args_start = this;
+                bool result = native->fn(vm, args_start, args);
+                for (int i = 0; i < args; i++)
+                    vm_pop(vm);
+                return result;
+            }
             default: ; // It's an error.
         }
     }
-    runtime_error(vm, "Tried to call non-callable value.");
+    vm_runtime_error(vm, "Tried to call non-callable value.");
     return false;
 }
 
@@ -161,10 +176,48 @@ close_upvalues(VM* vm, Value* last)
     }
 }
 
-static bool
+Value
+get_prototype(VM* vm, Value value)
+{
+    switch (value.type) {
+        case VALUE_UNDEFINED: UNREACHABLE();
+        case VALUE_NIL: return NIL_VAL;
+        case VALUE_BOOL:
+        case VALUE_NUMBER:
+            return NIL_VAL;
+        case VALUE_OBJ: {
+            Obj* object = VAL_TO_OBJ(value);
+            switch (object->type) {
+                case OBJ_FUNCTION:
+                case OBJ_UPVALUE:
+                    UNREACHABLE();
+                case OBJ_STRING:
+                case OBJ_NATIVE:
+                    return NIL_VAL;
+                case OBJ_OBJECT:
+                    return ((ObjObject*)object)->proto;
+                case OBJ_CLOSURE:
+                    return OBJ_TO_VAL(vm->FnProto);
+            }
+        }
+    }
+}
+
+bool
+get_slot(VM* vm, Value src, Value slot_name, Value* rv)
+{
+    while (!IS_NIL(src)) {
+        if (IS_OBJECT(src) && objobject_get(VAL_TO_OBJECT(src), slot_name, rv))
+            return true;
+        src = get_prototype(vm, src);
+    }
+    return false;
+}
+
+static inline bool
 is_activatable(Value value)
 {
-    return IS_CLOSURE(value);
+    return IS_CLOSURE(value) || IS_NATIVE(value);
 }
 
 static InterpretResult run(VM* vm) {
@@ -179,7 +232,7 @@ static InterpretResult run(VM* vm) {
 #define BINARY_OP(value_type, op) \
     do { \
         if (!IS_NUMBER(vm_peek(vm, 0)) || !IS_NUMBER(vm_peek(vm, 1))) { \
-            runtime_error(vm, "invalid types for " #op); \
+            vm_runtime_error(vm, "invalid types for " #op); \
             return INTERPRET_RUNTIME_ERROR; \
         } \
         Value b = vm_pop(vm); \
@@ -239,7 +292,7 @@ static InterpretResult run(VM* vm) {
                     vm_pop(vm);
                     vm_push(vm, OBJ_TO_VAL(result));
                 } else {
-                    runtime_error(vm, "invalid types for +");
+                    vm_runtime_error(vm, "invalid types for +");
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 break;
@@ -256,7 +309,7 @@ static InterpretResult run(VM* vm) {
             case OP_NEGATE: {
                 Value a = vm_pop(vm);
                 if (!IS_NUMBER(a)) {
-                    runtime_error(vm, "invalid type for negation");
+                    vm_runtime_error(vm, "invalid type for negation");
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 vm_push(vm, NUMBER_TO_VAL(-VAL_TO_NUMBER(a)));
@@ -284,7 +337,7 @@ static InterpretResult run(VM* vm) {
                 Value name = READ_CONSTANT();
                 Value value;
                 if (!table_get(&vm->globals, name, &value)) {
-                    runtime_error(vm, "Undefined variable '%s'.",
+                    vm_runtime_error(vm, "Undefined variable '%s'.",
                                   VAL_TO_STRING(name)->chars);
                     return INTERPRET_RUNTIME_ERROR;
                 }
@@ -295,7 +348,7 @@ static InterpretResult run(VM* vm) {
                 Value name = READ_CONSTANT();
                 if (table_set(&vm->globals, vm, name, vm_peek(vm, 0))) {
                     table_delete(&vm->globals, name);
-                    runtime_error(vm, "Undefined variable '%s'.",
+                    vm_runtime_error(vm, "Undefined variable '%s'.",
                                   VAL_TO_STRING(name)->chars);
                     return INTERPRET_RUNTIME_ERROR;
                 }
@@ -303,7 +356,7 @@ static InterpretResult run(VM* vm) {
             }
             case OP_ASSERT: {
                 if (!value_truthy(vm_peek(vm, 0))) {
-                    runtime_error(vm, "Assertion failed.");
+                    vm_runtime_error(vm, "Assertion failed.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 vm_pop(vm);
@@ -385,14 +438,16 @@ static InterpretResult run(VM* vm) {
                 break;
             }
             case OP_OBJECT: {
-                vm_push(vm, OBJ_TO_VAL(objobject_new(vm)));
+                ObjObject* object = objobject_new(vm);
+                object->proto = OBJ_TO_VAL(vm->ObjectProto);
+                vm_push(vm, OBJ_TO_VAL(object));
                 break;
             }
             case OP_OBJECT_SET: {
                 Value key = READ_CONSTANT();
                 Value value = vm_peek(vm, 0);
                 if (!IS_OBJECT(vm_peek(vm, 1))) {
-                    runtime_error(vm, "Trying to set attribute on non-object.");
+                    vm_runtime_error(vm, "Trying to set attribute on non-object.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 ObjObject* object = VAL_TO_OBJECT(vm_peek(vm, 1));
@@ -404,22 +459,16 @@ static InterpretResult run(VM* vm) {
                 Value key = READ_CONSTANT();
                 uint8_t num_args = READ_BYTE();
                 Value obj = vm_peek(vm, num_args);
-                if (!IS_OBJECT(obj)) {
-                    runtime_error(vm, "Trying to access slot of non-object.");
+                Value slot;
+                if (!get_slot(vm, obj, key, &slot)) {
+                    vm_runtime_error(vm, "Tried to access non-existent slot.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                ObjObject* object = VAL_TO_OBJECT(obj);
-                Value slot;
-                if (!objobject_get(object, key, &slot)) {
-                    for (int i = 0; i < num_args; i++)
-                        vm_pop(vm);
-                    vm_pop(vm); // The object.
-                    vm_push(vm, NIL_VAL);
-                    break;
-                }
                 if (!is_activatable(slot)) {
-                    for (int i = 0; i < num_args; i++)
-                        vm_pop(vm);
+                    if (num_args != 0) {
+                        vm_runtime_error(vm, "Non-activatable slot called with %d arguments", num_args);
+                        return INTERPRET_RUNTIME_ERROR;
+                    }
                     vm_pop(vm); // The object.
                     vm_push(vm, slot);
                     break;
@@ -448,7 +497,7 @@ InterpretResult vm_interpret(VM* vm, const char* source) {
     ObjClosure* closure = objclosure_new(vm, fn);
     vm_pop(vm);
     vm_push(vm, OBJ_TO_VAL(closure));
-    call(vm, NIL_VAL, closure, 0);
+    vm_call_closure(vm, NIL_VAL, closure, 0);
 
     InterpretResult result = run(vm);
     vm_reset_stack(vm);

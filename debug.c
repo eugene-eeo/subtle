@@ -16,6 +16,9 @@ void debug_print_object(Obj* obj) {
                 printf("fn_%p", (void*)obj);
             }
             break;
+        case OBJ_NATIVE:
+            printf("native_%p", (void*)obj);
+            break;
         case OBJ_CLOSURE:
             debug_print_object((Obj*)(((ObjClosure*) obj)->function));
             break;

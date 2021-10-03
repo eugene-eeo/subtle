@@ -33,6 +33,7 @@ static void objfunction_free(VM*, Obj*);
 static void objupvalue_free(VM*, Obj*);
 static void objclosure_free(VM*, Obj*);
 static void objobject_free(VM*, Obj*);
+static void objnative_free(VM*, Obj*);
 
 void object_free(Obj* obj, VM* vm) {
 #ifdef SUBTLE_DEBUG_TRACE_ALLOC
@@ -44,6 +45,7 @@ void object_free(Obj* obj, VM* vm) {
         case OBJ_UPVALUE:  objupvalue_free(vm,  obj); break;
         case OBJ_CLOSURE:  objclosure_free(vm,  obj); break;
         case OBJ_OBJECT:   objobject_free(vm,   obj); break;
+        case OBJ_NATIVE:   objnative_free(vm,   obj); break;
     }
 }
 
@@ -220,4 +222,21 @@ objobject_free(VM* vm, Obj* obj)
     ObjObject* object = (ObjObject*)obj;
     table_free(&object->slots, vm);
     FREE(vm, ObjObject, object);
+}
+
+// ObjNative
+// =========
+
+ObjNative*
+objnative_new(VM* vm, NativeFn fn)
+{
+    ObjNative* native = ALLOCATE_OBJECT(vm, OBJ_NATIVE, ObjNative);
+    native->fn = fn;
+    return native;
+}
+
+static void
+objnative_free(VM* vm, Obj* obj)
+{
+    FREE(vm, ObjNative, obj);
 }

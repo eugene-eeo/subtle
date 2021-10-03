@@ -1,4 +1,5 @@
 #include "common.h"
+#include "core.h"
 #include "vm.h"
 
 #include <stdlib.h>
@@ -74,6 +75,8 @@ int main(int argc, const char* argv[]) {
     int rv = 0;
     VM vm;
     vm_init(&vm);
+    core_init_vm(&vm);
+
     if (argc == 1) {
         repl(&vm);
     } else if (argc == 2) {

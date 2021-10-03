@@ -37,6 +37,10 @@ typedef struct VM {
     // stack_top to the 'bottom' of the stack.
     ObjUpvalue* open_upvalues;
 
+    // Globals
+    ObjObject* FnProto;
+    ObjObject* ObjectProto;
+
     // GC
     Obj* objects;
     ssize_t bytes_allocated;
@@ -70,6 +74,12 @@ Value vm_pop(VM* vm);
 Value vm_peek(VM* vm, int distance);
 void vm_push_root(VM* vm, Value value);
 void vm_pop_root(VM* vm);
+void vm_runtime_error(VM* vm, const char* format, ...);
+bool vm_call_closure(VM* vm, Value this_, ObjClosure* closure, int args);
 InterpretResult vm_interpret(VM* vm, const char* source);
+
+// Runtime helpers.
+Value get_prototype(VM*, Value);
+bool get_slot(VM* vm, Value src, Value key, Value* slot);
 
 #endif

@@ -88,6 +88,10 @@ static void mark_roots(VM* vm) {
     for (int i = 0; i < vm->roots_count; i++)
         mark_value(vm, vm->roots[i]);
 
+    // Mark the *Protos
+    mark_object(vm, (Obj*)vm->ObjectProto);
+    mark_object(vm, (Obj*)vm->FnProto);
+
     table_mark(&vm->globals, vm);
     compiler_mark(vm->compiler, vm);
 }
@@ -100,8 +104,8 @@ static void blacken_object(VM* vm, Obj* obj) {
 #endif
 
     switch (obj->type) {
-        // Nothing to do here.
-        case OBJ_STRING: break;
+        case OBJ_STRING: break; // Nothing to do here.
+        case OBJ_NATIVE: break; // Nothing to do here.
         case OBJ_FUNCTION: {
             ObjFunction* function = (ObjFunction*)obj;
             chunk_mark(&function->chunk, vm);
