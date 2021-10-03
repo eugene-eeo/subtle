@@ -1,27 +1,27 @@
 # arguments are passed correctly.
-let f = fn(x, y)    { assert x == 1 && y == 2; };
-let g = fn(x, y, z) { assert x == 1 && y == 2 && z == 3; };
-f(1, 2);
-g(1, 2, 3);
+let f = Fn.new { |x, y|    assert x == 1 && y == 2; };
+let g = Fn.new { |x, y, z| assert x == 1 && y == 2 && z == 3; };
+f.call(1, 2);
+g.call(1, 2, 3);
 
 # fewer number of arguments --> nil
-let f = fn(x) { assert x == nil; };
-f();
+let f = Fn.new { |x| assert x == nil; };
+f.call();
 
 # more arguments --> ignored
-let f = fn(x) { assert x == 1; };
-f(1, 2);
+let f = Fn.new { |x| assert x == 1; };
+f.call(1, 2);
 
 # no return value --> nil
-let f = fn() {
+let f = Fn.new {
     assert true;
 };
-assert f() == nil;
+assert f.call() == nil;
 
 # return values
 let fibo;
-fibo = fn(n) {
+fibo = Fn.new {|n|
     if (n <= 1) return n;
-    return fibo(n - 1) + fibo(n - 2);
+    return fibo.call(n - 1) + fibo.call(n - 2);
 };
-assert fibo(10) == 55;
+assert fibo.call(10) == 55;

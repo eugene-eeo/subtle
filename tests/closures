@@ -1,38 +1,38 @@
 # Simple upvalues
-let outer = fn() {
+let outer = Fn.new {
     let a = 1;
-    let f = fn() {
+    let f = Fn.new {
         let b = 2;
         assert a == 1;
         assert b == 2;
     };
-    f();
+    f.call();
 };
-outer();
+outer.call();
 
 # Nested upvalues
-let outer = fn() {
+let outer = Fn.new {
   let a = 1;
   let b = 2;
-  let middle = fn() {
+  let middle = Fn.new {
     let c = 3;
     let d = 4;
-    let inner = fn() {
+    let inner = Fn.new {
       assert a + c + b + d == 10;
     };
-    inner();
+    inner.call();
   };
-  middle();
+  middle.call();
 };
-outer();
+outer.call();
 
 # Upvalues closed over
-let outer = fn() {
+let outer = Fn.new {
     let x = "outside";
-    return fn() {
+    return Fn.new {
         assert x == "outside";
         return x;
     };
 };
 
-assert outer()() == "outside";
+assert outer.call().call() == "outside";

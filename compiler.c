@@ -522,12 +522,6 @@ static uint8_t argument_list(Compiler* compiler) {
     return count;
 }
 
-static void call(Compiler* compiler, bool can_assign) {
-    uint8_t arg_count = argument_list(compiler);
-    emit_byte(compiler, OP_CALL);
-    emit_byte(compiler, arg_count);
-}
-
 static void object(Compiler* compiler, bool can_assign) {
     // Object literal.
     emit_byte(compiler, OP_OBJECT);
@@ -670,7 +664,7 @@ static ParseRule rules[] = {
     [TOKEN_SEMICOLON] = {NULL,     NULL,   PREC_NONE},
     [TOKEN_COMMA]     = {NULL,     NULL,   PREC_NONE},
     [TOKEN_DOT]       = {NULL,     dot,    PREC_CALL},
-    [TOKEN_LPAREN]    = {grouping, call,   PREC_CALL},
+    [TOKEN_LPAREN]    = {grouping, NULL,   PREC_NONE},
     [TOKEN_RPAREN]    = {NULL,     NULL,   PREC_NONE},
     [TOKEN_LBRACE]    = {object,   NULL,   PREC_NONE},
     [TOKEN_RBRACE]    = {NULL,     NULL,   PREC_NONE},

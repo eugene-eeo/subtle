@@ -20,6 +20,6 @@ while (a != 10) {
 assert a == 10;
 
 # Short circuiting
-let a = fn() { assert false; };
-assert true || a();
-assert !(false && a());
+let a = Fn.new { assert false; };
+assert true || a.call();
+assert !(false && a.call());

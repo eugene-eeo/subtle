@@ -112,7 +112,6 @@ int debug_print_instruction(Chunk* chunk, int index) {
         case OP_JUMP:          return jump_instruction(chunk, index, +1, "OP_JUMP");
         case OP_JUMP_IF_FALSE: return jump_instruction(chunk, index, +1, "OP_JUMP_IF_FALSE");
         case OP_JUMP_IF_TRUE:  return jump_instruction(chunk, index, +1, "OP_JUMP_IF_TRUE");
-        case OP_CALL:    return byte_instruction(chunk, index, "OP_CALL");
         case OP_CLOSURE: {
             index++;
             uint16_t offset = (uint16_t)(chunk->code[index++] << 8);

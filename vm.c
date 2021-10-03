@@ -72,9 +72,9 @@ void vm_pop_root(VM* vm) {
     vm->roots_count--;
 }
 
-// Resets the VM's stack pointer
 static void vm_reset_stack(VM* vm) {
     vm->stack_top = vm->stack;
+    vm->frame_count = 0;
 }
 
 void vm_runtime_error(VM* vm, const char* format, ...) {
@@ -126,10 +126,7 @@ static bool call_value(VM* vm, Value this, Value callee, int args)
                 ObjNative* native = VAL_TO_NATIVE(callee);
                 Value* args_start = &vm->stack_top[-args - 1];
                 *args_start = this;
-                bool result = native->fn(vm, args_start, args);
-                for (int i = 0; i < args; i++)
-                    vm_pop(vm);
-                return result;
+                return native->fn(vm, args_start, args);
             }
             default: ; // It's an error.
         }
@@ -392,14 +389,6 @@ static InterpretResult run(VM* vm) {
                 uint16_t offset = READ_SHORT();
                 if (!value_truthy(vm_peek(vm, 0)))
                     frame->ip += offset;
-                break;
-            }
-            case OP_CALL: {
-                uint8_t args = READ_BYTE();
-                Value target = vm_peek(vm, args);
-                if (!call_value(vm, target, target, args))
-                    return INTERPRET_RUNTIME_ERROR;
-                REFRESH_FRAME();
                 break;
             }
             case OP_CLOSURE: {
