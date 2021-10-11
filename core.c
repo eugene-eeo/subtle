@@ -139,7 +139,33 @@ DEFINE_NATIVE(Fn, callWithThis) {
     Value this = args[1];
     for (int i = 0; i < num_args - 1; i++)
         args[i + 1] = args[i + 2];
+    POP_ARGS(1);
     return vm_call_closure(vm, this, VAL_TO_CLOSURE(args[0]), num_args - 1);
+}
+
+DEFINE_NATIVE(Native, call) {
+    if (!IS_NATIVE(args[0])) {
+        vm_runtime_error(vm, "Native_call called on a non-native.");
+        return false;
+    }
+    ObjNative* native = VAL_TO_NATIVE(args[0]);
+    return native->fn(vm, args, num_args);
+}
+
+DEFINE_NATIVE(Native, callWithThis) {
+    if (!IS_NATIVE(args[0])) {
+        vm_runtime_error(vm, "Native_callWithThis called on a non-native.");
+        return false;
+    }
+    if (num_args == 0) {
+        vm_runtime_error(vm, "Native_callWithThis called with no arguments.");
+        return false;
+    }
+    ObjNative* native = VAL_TO_NATIVE(args[0]);
+    for (int i = 0; i < num_args; i++)
+        args[i] = args[i + 1];
+    POP_ARGS(1);
+    return native->fn(vm, args, num_args - 1);
 }
 
 // Define the methods for Number
@@ -191,6 +217,11 @@ void core_init_vm(VM* vm)
     ADD_NATIVE(&vm->FnProto->slots, "call", Fn_call);
     ADD_NATIVE(&vm->FnProto->slots, "callWithThis", Fn_callWithThis);
 
+    vm->NativeProto = objobject_new(vm);
+    vm->NativeProto->proto = OBJ_TO_VAL(vm->NativeProto);
+    ADD_NATIVE(&vm->NativeProto->slots, "call", Native_call);
+    ADD_NATIVE(&vm->NativeProto->slots, "callWithThis", Native_callWithThis);
+
     vm->NumberProto = objobject_new(vm);
     vm->NumberProto->proto = OBJ_TO_VAL(vm->ObjectProto);
     ADD_NATIVE(&vm->NumberProto->slots, "+", Number_plus);
@@ -206,8 +237,9 @@ void core_init_vm(VM* vm)
     vm->BooleanProto = objobject_new(vm);
     vm->BooleanProto->proto = OBJ_TO_VAL(vm->ObjectProto);
 
-    ADD_OBJECT(&vm->globals, "Fn", vm->FnProto);
     ADD_OBJECT(&vm->globals, "Object", vm->ObjectProto);
+    ADD_OBJECT(&vm->globals, "Fn", vm->FnProto);
+    ADD_OBJECT(&vm->globals, "Native", vm->NativeProto);
     ADD_OBJECT(&vm->globals, "Number", vm->NumberProto);
     ADD_OBJECT(&vm->globals, "Boolean", vm->BooleanProto);
 

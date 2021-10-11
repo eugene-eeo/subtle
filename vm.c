@@ -19,6 +19,7 @@ void vm_init(VM* vm) {
 
     vm->ObjectProto = NULL;
     vm->FnProto = NULL;
+    vm->NativeProto = NULL;
     vm->NumberProto = NULL;
     vm->BooleanProto = NULL;
 
@@ -192,7 +193,7 @@ get_prototype(VM* vm, Value value)
                 case OBJ_STRING:
                     return OBJ_TO_VAL(vm->ObjectProto);
                 case OBJ_NATIVE:
-                    return NIL_VAL;
+                    return OBJ_TO_VAL(vm->NativeProto);
                 case OBJ_OBJECT:
                     return ((ObjObject*)object)->proto;
                 case OBJ_CLOSURE:

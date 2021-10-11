@@ -628,26 +628,22 @@ static void unary(Compiler* compiler, bool can_assign) {
     TokenType operator = op_token.type;
     // Compile the operand.
     parse_precedence(compiler, PREC_UNARY);
+    uint16_t constant;
     switch (operator) {
         case TOKEN_BANG:
-        {
-            uint16_t constant = identifier_constant(compiler, &op_token);
-            emit_byte(compiler, OP_INVOKE);
-            emit_offset(compiler, constant);
-            emit_byte(compiler, 0); // 0 arguments.
+            constant = identifier_constant(compiler, &op_token);
             break;
-        }
         case TOKEN_MINUS:
         {
             Token synth = {.type = TOKEN_MINUS, .start = "neg", .length = 3, .line = 0};
-            uint16_t constant = identifier_constant(compiler, &synth);
-            emit_byte(compiler, OP_INVOKE);
-            emit_offset(compiler, constant);
-            emit_byte(compiler, 0); // 0 arguments.
+            constant = identifier_constant(compiler, &synth);
             break;
         }
         default: UNREACHABLE();
     }
+    emit_byte(compiler, OP_INVOKE);
+    emit_offset(compiler, constant);
+    emit_byte(compiler, 0); // 0 arguments.
 }
 
 static void binary(Compiler* compiler, bool can_assign) {

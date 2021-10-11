@@ -91,6 +91,7 @@ static void mark_roots(VM* vm) {
     // Mark the *Protos
     mark_object(vm, (Obj*)vm->ObjectProto);
     mark_object(vm, (Obj*)vm->FnProto);
+    mark_object(vm, (Obj*)vm->NativeProto);
     mark_object(vm, (Obj*)vm->NumberProto);
     mark_object(vm, (Obj*)vm->BooleanProto);
 

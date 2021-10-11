@@ -38,8 +38,9 @@ typedef struct VM {
     ObjUpvalue* open_upvalues;
 
     // Globals
-    ObjObject* FnProto;
     ObjObject* ObjectProto;
+    ObjObject* FnProto;
+    ObjObject* NativeProto;
     ObjObject* NumberProto;
     ObjObject* BooleanProto;
 
