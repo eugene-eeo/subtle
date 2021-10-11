@@ -275,26 +275,6 @@ static InterpretResult run(VM* vm) {
                 break;
             }
             case OP_POP: vm_pop(vm); break;
-            case OP_EQUAL: {
-                Value b = vm_pop(vm);
-                Value a = vm_pop(vm);
-                vm_push(vm, BOOL_TO_VAL(value_equal(a, b)));
-                break;
-            }
-            case OP_NEGATE: {
-                Value a = vm_pop(vm);
-                if (!IS_NUMBER(a)) {
-                    vm_runtime_error(vm, "invalid type for negation");
-                    return INTERPRET_RUNTIME_ERROR;
-                }
-                vm_push(vm, NUMBER_TO_VAL(-VAL_TO_NUMBER(a)));
-                break;
-            }
-            case OP_NOT: {
-                Value a = vm_pop(vm);
-                vm_push(vm, BOOL_TO_VAL(!value_truthy(a)));
-                break;
-            }
             case OP_TRUE:  vm_push(vm, BOOL_TO_VAL(true)); break;
             case OP_FALSE: vm_push(vm, BOOL_TO_VAL(false)); break;
             case OP_NIL:   vm_push(vm, NIL_VAL); break;

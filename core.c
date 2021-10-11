@@ -101,6 +101,11 @@ DEFINE_NATIVE(Object, notEqual) {
                                     args[1])));
 }
 
+// Defines the ! method.
+DEFINE_NATIVE(Object, not) {
+    RETURN(BOOL_TO_VAL(!value_truthy(args[0])));
+}
+
 DEFINE_NATIVE(Fn, new) {
     if (num_args == 0)
         ERROR("Fn_new called with 0 arguments.");
@@ -141,13 +146,12 @@ DEFINE_NATIVE(Fn, callWithThis) {
 
 #define DEFINE_ARITHMETIC_METHOD(name, op, return_type) \
     DEFINE_NATIVE(Number, name) {\
+        if (!IS_NUMBER(args[0])) \
+            ERROR("Expected to be called on a number."); \
         if (num_args == 0 || !IS_NUMBER(args[1])) \
             ERROR("Expected a number."); \
         Value this = args[0]; \
-        if (!IS_NUMBER(args[0])) \
-            ERROR("Expected to be called on a number."); \
-        double number = VAL_TO_NUMBER(args[1]); \
-        RETURN(return_type(VAL_TO_NUMBER(this) op number)); \
+        RETURN(return_type(VAL_TO_NUMBER(this) op VAL_TO_NUMBER(args[1]))); \
     }
 
 DEFINE_ARITHMETIC_METHOD(plus,     +,  NUMBER_TO_VAL);
@@ -158,6 +162,12 @@ DEFINE_ARITHMETIC_METHOD(lt,       <,  BOOL_TO_VAL);
 DEFINE_ARITHMETIC_METHOD(gt,       >,  BOOL_TO_VAL);
 DEFINE_ARITHMETIC_METHOD(leq,      <=, BOOL_TO_VAL);
 DEFINE_ARITHMETIC_METHOD(geq,      >=, BOOL_TO_VAL);
+
+DEFINE_NATIVE(Number, negate) {
+    if (!IS_NUMBER(args[0]))
+        ERROR("Expected to be called on a number.");
+    RETURN(NUMBER_TO_VAL(-VAL_TO_NUMBER(args[0])));
+}
 
 #undef DEFINE_ARITHMETIC_METHOD
 
@@ -173,6 +183,7 @@ void core_init_vm(VM* vm)
     ADD_NATIVE(&vm->ObjectProto->slots, "setSlot",  Object_setSlot);
     ADD_NATIVE(&vm->ObjectProto->slots, "==",       Object_equal);
     ADD_NATIVE(&vm->ObjectProto->slots, "!=",       Object_notEqual);
+    ADD_NATIVE(&vm->ObjectProto->slots, "!",        Object_not);
 
     vm->FnProto = objobject_new(vm);
     vm->FnProto->proto = OBJ_TO_VAL(vm->ObjectProto);
@@ -190,6 +201,7 @@ void core_init_vm(VM* vm)
     ADD_NATIVE(&vm->NumberProto->slots, ">", Number_gt);
     ADD_NATIVE(&vm->NumberProto->slots, "<=", Number_leq);
     ADD_NATIVE(&vm->NumberProto->slots, ">=", Number_geq);
+    ADD_NATIVE(&vm->NumberProto->slots, "neg", Number_negate);
 
     vm->BooleanProto = objobject_new(vm);
     vm->BooleanProto->proto = OBJ_TO_VAL(vm->ObjectProto);
