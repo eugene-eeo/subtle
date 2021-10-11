@@ -19,6 +19,8 @@ void vm_init(VM* vm) {
 
     vm->ObjectProto = NULL;
     vm->FnProto = NULL;
+    vm->NumberProto = NULL;
+    vm->BooleanProto = NULL;
 
     vm->objects = NULL;
     vm->bytes_allocated = 0;
@@ -178,10 +180,9 @@ get_prototype(VM* vm, Value value)
 {
     switch (value.type) {
         case VALUE_UNDEFINED: UNREACHABLE();
-        case VALUE_NIL: return NIL_VAL;
-        case VALUE_BOOL:
-        case VALUE_NUMBER:
-            return NIL_VAL;
+        case VALUE_NIL: return OBJ_TO_VAL(vm->ObjectProto);
+        case VALUE_BOOL: return OBJ_TO_VAL(vm->BooleanProto);
+        case VALUE_NUMBER: return OBJ_TO_VAL(vm->NumberProto);
         case VALUE_OBJ: {
             Obj* object = VAL_TO_OBJ(value);
             switch (object->type) {
@@ -189,6 +190,7 @@ get_prototype(VM* vm, Value value)
                 case OBJ_UPVALUE:
                     UNREACHABLE();
                 case OBJ_STRING:
+                    return OBJ_TO_VAL(vm->ObjectProto);
                 case OBJ_NATIVE:
                     return NIL_VAL;
                 case OBJ_OBJECT:
@@ -203,11 +205,11 @@ get_prototype(VM* vm, Value value)
 bool
 get_slot(VM* vm, Value src, Value slot_name, Value* rv)
 {
-    while (!IS_NIL(src)) {
+    do {
         if (IS_OBJECT(src) && objobject_get(VAL_TO_OBJECT(src), slot_name, rv))
             return true;
         src = get_prototype(vm, src);
-    }
+    } while (!IS_NIL(src));
     return false;
 }
 
@@ -273,30 +275,6 @@ static InterpretResult run(VM* vm) {
                 break;
             }
             case OP_POP: vm_pop(vm); break;
-            case OP_ADD: {
-                Value b = vm_peek(vm, 0);
-                Value a = vm_peek(vm, 1);
-                if (IS_NUMBER(a) && IS_NUMBER(b)) {
-                    vm_pop(vm);
-                    vm_pop(vm);
-                    vm_push(vm, NUMBER_TO_VAL(VAL_TO_NUMBER(a) + VAL_TO_NUMBER(b)));
-                } else if (IS_STRING(a) && IS_STRING(b)) {
-                    ObjString* result = objstring_concat(vm,
-                        VAL_TO_STRING(a),
-                        VAL_TO_STRING(b)
-                    );
-                    vm_pop(vm);
-                    vm_pop(vm);
-                    vm_push(vm, OBJ_TO_VAL(result));
-                } else {
-                    vm_runtime_error(vm, "invalid types for +");
-                    return INTERPRET_RUNTIME_ERROR;
-                }
-                break;
-            }
-            case OP_SUBTRACT: BINARY_OP(NUMBER_TO_VAL, -); break;
-            case OP_MULTIPLY: BINARY_OP(NUMBER_TO_VAL, *); break;
-            case OP_DIVIDE:   BINARY_OP(NUMBER_TO_VAL, /); break;
             case OP_EQUAL: {
                 Value b = vm_pop(vm);
                 Value a = vm_pop(vm);
@@ -317,10 +295,6 @@ static InterpretResult run(VM* vm) {
                 vm_push(vm, BOOL_TO_VAL(!value_truthy(a)));
                 break;
             }
-            case OP_LT:  BINARY_OP(BOOL_TO_VAL, <); break;
-            case OP_GT:  BINARY_OP(BOOL_TO_VAL, >); break;
-            case OP_LEQ: BINARY_OP(BOOL_TO_VAL, <=); break;
-            case OP_GEQ: BINARY_OP(BOOL_TO_VAL, >=); break;
             case OP_TRUE:  vm_push(vm, BOOL_TO_VAL(true)); break;
             case OP_FALSE: vm_push(vm, BOOL_TO_VAL(false)); break;
             case OP_NIL:   vm_push(vm, NIL_VAL); break;

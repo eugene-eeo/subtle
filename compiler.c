@@ -634,24 +634,30 @@ static void unary(Compiler* compiler, bool can_assign) {
 }
 
 static void binary(Compiler* compiler, bool can_assign) {
-    TokenType operator = compiler->parser->previous.type;
+    Token op_token = compiler->parser->previous;
+    TokenType operator = op_token.type;
     ParseRule* rule = get_rule(operator);
     parse_precedence(compiler, (Precedence)(rule->precedence + 1));
 
+    uint16_t constant = identifier_constant(compiler, &op_token);
+
     switch (operator) {
-        case TOKEN_PLUS:  emit_byte(compiler, OP_ADD); break;
-        case TOKEN_MINUS: emit_byte(compiler, OP_SUBTRACT); break;
-        case TOKEN_TIMES: emit_byte(compiler, OP_MULTIPLY); break;
-        case TOKEN_SLASH: emit_byte(compiler, OP_DIVIDE); break;
-        case TOKEN_EQ_EQ: emit_byte(compiler, OP_EQUAL); break;
+        case TOKEN_PLUS:
+        case TOKEN_MINUS:
+        case TOKEN_TIMES:
+        case TOKEN_SLASH:
+        case TOKEN_EQ_EQ:
         case TOKEN_BANG_EQ:
-            emit_byte(compiler, OP_EQUAL);
-            emit_byte(compiler, OP_NOT);
+        case TOKEN_LT:
+        case TOKEN_LEQ:
+        case TOKEN_GT:
+        case TOKEN_GEQ:
+        {
+            emit_byte(compiler, OP_INVOKE);
+            emit_offset(compiler, constant);
+            emit_byte(compiler, 1); // 1 argument.
             break;
-        case TOKEN_LT:    emit_byte(compiler, OP_LT); break;
-        case TOKEN_LEQ:   emit_byte(compiler, OP_LEQ); break;
-        case TOKEN_GT:    emit_byte(compiler, OP_GT); break;
-        case TOKEN_GEQ:   emit_byte(compiler, OP_GEQ); break;
+        }
         default: UNREACHABLE();
     }
 }

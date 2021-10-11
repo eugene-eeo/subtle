@@ -40,6 +40,8 @@ typedef struct VM {
     // Globals
     ObjObject* FnProto;
     ObjObject* ObjectProto;
+    ObjObject* NumberProto;
+    ObjObject* BooleanProto;
 
     // GC
     Obj* objects;

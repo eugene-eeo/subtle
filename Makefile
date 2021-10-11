@@ -1,3 +1,9 @@
+cute:
+	gcc -DSUBTLE_DEBUG \
+		-DSUBTLE_DEBUG_TRACE_EXECUTION \
+		-DSUBTLE_DEBUG_PRINT_CODE \
+		-g -Og *.c -o subtle
+
 debug:
 	gcc -DSUBTLE_DEBUG \
 		-DSUBTLE_DEBUG_TRACE_EXECUTION \

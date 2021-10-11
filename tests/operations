@@ -11,7 +11,7 @@ assert !false;
 assert !0 == false;
 assert !nil == true;
 
-assert "a" + "b" == "ab";
+# assert "a" + "b" == "ab";
 assert "ab" == "ab";
 assert (1 + 2 == 3) == true;
 assert true == true;

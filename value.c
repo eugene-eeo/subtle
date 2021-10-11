@@ -57,8 +57,11 @@ static uint32_t object_hash(Obj* obj)
 {
     switch (obj->type) {
         case OBJ_STRING:   return ((ObjString*)obj)->hash;
-        case OBJ_FUNCTION: return hash_bits((uintptr_t)obj);
         case OBJ_CLOSURE:  return object_hash((Obj*) ((ObjClosure*)obj)->function);
+        case OBJ_FUNCTION:
+        case OBJ_OBJECT:
+        case OBJ_NATIVE:
+            return hash_bits((uintptr_t)obj);
         case OBJ_UPVALUE:  UNREACHABLE();
     }
 }
