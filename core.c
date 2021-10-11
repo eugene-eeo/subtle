@@ -218,7 +218,7 @@ void core_init_vm(VM* vm)
     ADD_NATIVE(&vm->FnProto->slots, "callWithThis", Fn_callWithThis);
 
     vm->NativeProto = objobject_new(vm);
-    vm->NativeProto->proto = OBJ_TO_VAL(vm->NativeProto);
+    vm->NativeProto->proto = OBJ_TO_VAL(vm->ObjectProto);
     ADD_NATIVE(&vm->NativeProto->slots, "call", Native_call);
     ADD_NATIVE(&vm->NativeProto->slots, "callWithThis", Native_callWithThis);
 
