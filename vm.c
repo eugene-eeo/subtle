@@ -205,6 +205,7 @@ get_prototype(VM* vm, Value value)
 bool
 get_slot(VM* vm, Value src, Value slot_name, Value* rv)
 {
+    // FIXME: this is not safe in the presence of cycles.
     do {
         if (IS_OBJECT(src) && objobject_get(VAL_TO_OBJECT(src), slot_name, rv))
             return true;
