@@ -211,6 +211,9 @@ void core_init_vm(VM* vm)
     ADD_NATIVE(&vm->ObjectProto->slots, "!=",       Object_notEqual);
     ADD_NATIVE(&vm->ObjectProto->slots, "!",        Object_not);
 
+    // Note: allocating here is safe, because all *Protos are marked as
+    // roots, and remaining *Protos are initialized to NULL. Thus we won't
+    // potentially free ObjectProto.
     vm->FnProto = objobject_new(vm);
     vm->FnProto->proto = OBJ_TO_VAL(vm->ObjectProto);
     ADD_NATIVE(&vm->FnProto->slots, "new", Fn_new);
