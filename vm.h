@@ -82,6 +82,13 @@ void vm_runtime_error(VM* vm, const char* format, ...);
 bool vm_call_closure(VM* vm, Value this_, ObjClosure* closure, int args);
 InterpretResult vm_interpret(VM* vm, const char* source);
 
+// Runs the given slot, returning true if the call succeeded
+// and false otherwise. Note that unlike vm_call_closure()
+// this will run the slot until completion.
+// TODO: implement this method, it allows C code to call other
+// funtions...
+bool vm_call(VM* vm, Value slot, Value* return_value);
+
 // Runtime helpers.
 Value get_prototype(VM*, Value);
 bool get_slot(VM* vm, Value src, Value key, Value* slot);

@@ -10,10 +10,17 @@ void chunk_init(Chunk* chunk) {
     table_init(&chunk->constants_index);
 }
 
+void chunk_done(Chunk* chunk, VM* vm) {
+    // Save some memory by freeing the constants_index, because we
+    // won't be writing to it any more.
+    table_free(&chunk->constants_index, vm);
+}
+
 void chunk_free(Chunk* chunk, VM* vm) {
     FREE_ARRAY(vm, chunk->code, uint8_t, chunk->capacity);
     FREE_ARRAY(vm, chunk->lines, size_t, chunk->capacity);
     valuearray_free(&chunk->constants, vm);
+    // Just in case we didn't call chunk_done()
     table_free(&chunk->constants_index, vm);
     chunk_init(chunk);
 }
@@ -58,6 +65,4 @@ size_t chunk_write_constant(Chunk* chunk, VM* vm, Value value) {
 
 void chunk_mark(Chunk* chunk, VM* vm) {
     valuearray_mark(&chunk->constants, vm);
-    // Don't need to mark constants_index, because everything inside it
-    // must also be inside the constants array.
 }

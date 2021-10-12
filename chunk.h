@@ -45,6 +45,7 @@ typedef struct Chunk {
 typedef struct VM VM;
 
 void chunk_init(Chunk* chunk);
+void chunk_done(Chunk* chunk, VM* vm);
 void chunk_free(Chunk* chunk, VM* vm);
 void chunk_write_byte(Chunk* chunk, VM* vm, uint8_t byte, size_t line);
 void chunk_write_offset(Chunk* chunk, VM* vm, uint16_t offset, size_t line);

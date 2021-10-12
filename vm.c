@@ -381,12 +381,13 @@ static InterpretResult run(VM* vm) {
             }
             case OP_OBJECT_SET: {
                 Value key = READ_CONSTANT();
+                Value obj = vm_peek(vm, 1);
                 Value value = vm_peek(vm, 0);
-                if (!IS_OBJECT(vm_peek(vm, 1))) {
-                    vm_runtime_error(vm, "Trying to set attribute on non-object.");
+                if (!IS_OBJECT(obj)) {
+                    vm_runtime_error(vm, "Trying to set slot on non-object.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                ObjObject* object = VAL_TO_OBJECT(vm_peek(vm, 1));
+                ObjObject* object = VAL_TO_OBJECT(obj);
                 objobject_set(object, vm, key, value);
                 vm_pop(vm);
                 break;
