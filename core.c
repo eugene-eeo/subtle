@@ -50,7 +50,7 @@ DEFINE_NATIVE(Object, proto) {
 
 DEFINE_NATIVE(Object, setProto) {
     if (num_args == 0)
-        ERROR("Object_setProto called with 0 arguments");
+        ERROR("Object_setProto called with 0 arguments.");
 
     if (!IS_OBJECT(args[0]))
         ERROR("Object_setProto called on a non-object.");
@@ -62,7 +62,7 @@ DEFINE_NATIVE(Object, setProto) {
 
 DEFINE_NATIVE(Object, getSlot) {
     if (num_args == 0)
-        ERROR("Object_getSlot called with 0 arguments");
+        ERROR("Object_getSlot called with 0 arguments.");
 
     Value this = args[0];
     Value slot;
@@ -197,55 +197,74 @@ DEFINE_NATIVE(Number, negate) {
 
 #undef DEFINE_ARITHMETIC_METHOD
 
+DEFINE_NATIVE(String, plus) {
+    Value this = args[0];
+    if (!IS_STRING(this))
+        ERROR("Expected to be called on a string.");
+    if (num_args == 0 || !IS_STRING(args[1]))
+        ERROR("Expected a string.");
+    RETURN(OBJ_TO_VAL(objstring_concat(vm,
+        VAL_TO_STRING(this),
+        VAL_TO_STRING(args[1])
+        )));
+}
+
 void core_init_vm(VM* vm)
 {
-#define ADD_NATIVE(table, name, fn)  (define_on_table(vm, table, name, OBJ_TO_VAL(objnative_new(vm, fn))))
 #define ADD_OBJECT(table, name, obj) (define_on_table(vm, table, name, OBJ_TO_VAL(obj)))
+#define ADD_NATIVE(table, name, fn)  (ADD_OBJECT(table, name, objnative_new(vm, fn)))
+#define ADD_METHOD(PROTO, name, fn)  (ADD_NATIVE(&vm->PROTO->slots, name, fn))
 
     vm->ObjectProto = objobject_new(vm);
-    ADD_NATIVE(&vm->ObjectProto->slots, "proto",    Object_proto);
-    ADD_NATIVE(&vm->ObjectProto->slots, "setProto", Object_setProto);
-    ADD_NATIVE(&vm->ObjectProto->slots, "getSlot",  Object_getSlot);
-    ADD_NATIVE(&vm->ObjectProto->slots, "setSlot",  Object_setSlot);
-    ADD_NATIVE(&vm->ObjectProto->slots, "==",       Object_equal);
-    ADD_NATIVE(&vm->ObjectProto->slots, "!=",       Object_notEqual);
-    ADD_NATIVE(&vm->ObjectProto->slots, "!",        Object_not);
+    ADD_METHOD(ObjectProto, "proto",    Object_proto);
+    ADD_METHOD(ObjectProto, "setProto", Object_setProto);
+    ADD_METHOD(ObjectProto, "getSlot",  Object_getSlot);
+    ADD_METHOD(ObjectProto, "setSlot",  Object_setSlot);
+    ADD_METHOD(ObjectProto, "==",       Object_equal);
+    ADD_METHOD(ObjectProto, "!=",       Object_notEqual);
+    ADD_METHOD(ObjectProto, "!",        Object_not);
 
     // Note: allocating here is safe, because all *Protos are marked as
     // roots, and remaining *Protos are initialized to NULL. Thus we won't
     // potentially free ObjectProto.
     vm->FnProto = objobject_new(vm);
     vm->FnProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    ADD_NATIVE(&vm->FnProto->slots, "new", Fn_new);
-    ADD_NATIVE(&vm->FnProto->slots, "call", Fn_call);
-    ADD_NATIVE(&vm->FnProto->slots, "callWithThis", Fn_callWithThis);
+    ADD_METHOD(FnProto, "new",          Fn_new);
+    ADD_METHOD(FnProto, "call",         Fn_call);
+    ADD_METHOD(FnProto, "callWithThis", Fn_callWithThis);
 
     vm->NativeProto = objobject_new(vm);
     vm->NativeProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    ADD_NATIVE(&vm->NativeProto->slots, "call", Native_call);
-    ADD_NATIVE(&vm->NativeProto->slots, "callWithThis", Native_callWithThis);
+    ADD_METHOD(NativeProto, "call",         Native_call);
+    ADD_METHOD(NativeProto, "callWithThis", Native_callWithThis);
 
     vm->NumberProto = objobject_new(vm);
     vm->NumberProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    ADD_NATIVE(&vm->NumberProto->slots, "+", Number_plus);
-    ADD_NATIVE(&vm->NumberProto->slots, "-", Number_minus);
-    ADD_NATIVE(&vm->NumberProto->slots, "*", Number_multiply);
-    ADD_NATIVE(&vm->NumberProto->slots, "/", Number_divide);
-    ADD_NATIVE(&vm->NumberProto->slots, "<", Number_lt);
-    ADD_NATIVE(&vm->NumberProto->slots, ">", Number_gt);
-    ADD_NATIVE(&vm->NumberProto->slots, "<=", Number_leq);
-    ADD_NATIVE(&vm->NumberProto->slots, ">=", Number_geq);
-    ADD_NATIVE(&vm->NumberProto->slots, "neg", Number_negate);
+    ADD_METHOD(NumberProto, "+",   Number_plus);
+    ADD_METHOD(NumberProto, "-",   Number_minus);
+    ADD_METHOD(NumberProto, "*",   Number_multiply);
+    ADD_METHOD(NumberProto, "/",   Number_divide);
+    ADD_METHOD(NumberProto, "<",   Number_lt);
+    ADD_METHOD(NumberProto, ">",   Number_gt);
+    ADD_METHOD(NumberProto, "<=",  Number_leq);
+    ADD_METHOD(NumberProto, ">=",  Number_geq);
+    ADD_METHOD(NumberProto, "neg", Number_negate);
 
     vm->BooleanProto = objobject_new(vm);
     vm->BooleanProto->proto = OBJ_TO_VAL(vm->ObjectProto);
 
-    ADD_OBJECT(&vm->globals, "Object", vm->ObjectProto);
-    ADD_OBJECT(&vm->globals, "Fn", vm->FnProto);
-    ADD_OBJECT(&vm->globals, "Native", vm->NativeProto);
-    ADD_OBJECT(&vm->globals, "Number", vm->NumberProto);
-    ADD_OBJECT(&vm->globals, "Boolean", vm->BooleanProto);
+    vm->StringProto = objobject_new(vm);
+    vm->StringProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    ADD_METHOD(StringProto, "+", String_plus);
 
-#undef ADD_NATIVE
+    ADD_OBJECT(&vm->globals, "Object",  vm->ObjectProto);
+    ADD_OBJECT(&vm->globals, "Fn",      vm->FnProto);
+    ADD_OBJECT(&vm->globals, "Native",  vm->NativeProto);
+    ADD_OBJECT(&vm->globals, "Number",  vm->NumberProto);
+    ADD_OBJECT(&vm->globals, "Boolean", vm->BooleanProto);
+    ADD_OBJECT(&vm->globals, "String",  vm->StringProto);
+
 #undef ADD_OBJECT
+#undef ADD_NATIVE
+#undef ADD_METHOD
 }

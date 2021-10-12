@@ -94,6 +94,7 @@ static void mark_roots(VM* vm) {
     mark_object(vm, (Obj*)vm->NativeProto);
     mark_object(vm, (Obj*)vm->NumberProto);
     mark_object(vm, (Obj*)vm->BooleanProto);
+    mark_object(vm, (Obj*)vm->StringProto);
 
     table_mark(&vm->globals, vm);
     compiler_mark(vm->compiler, vm);

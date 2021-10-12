@@ -22,6 +22,7 @@ void vm_init(VM* vm) {
     vm->NativeProto = NULL;
     vm->NumberProto = NULL;
     vm->BooleanProto = NULL;
+    vm->StringProto = NULL;
 
     vm->objects = NULL;
     vm->bytes_allocated = 0;
@@ -191,7 +192,7 @@ get_prototype(VM* vm, Value value)
                 case OBJ_UPVALUE:
                     UNREACHABLE();
                 case OBJ_STRING:
-                    return OBJ_TO_VAL(vm->ObjectProto);
+                    return OBJ_TO_VAL(vm->StringProto);
                 case OBJ_NATIVE:
                     return OBJ_TO_VAL(vm->NativeProto);
                 case OBJ_OBJECT:
@@ -230,16 +231,6 @@ static InterpretResult run(VM* vm) {
     (frame->ip += 2, \
      (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
 #define READ_CONSTANT() (frame->closure->function->chunk.constants.values[READ_SHORT()])
-#define BINARY_OP(value_type, op) \
-    do { \
-        if (!IS_NUMBER(vm_peek(vm, 0)) || !IS_NUMBER(vm_peek(vm, 1))) { \
-            vm_runtime_error(vm, "invalid types for " #op); \
-            return INTERPRET_RUNTIME_ERROR; \
-        } \
-        Value b = vm_pop(vm); \
-        Value a = vm_pop(vm); \
-        vm_push(vm, value_type(VAL_TO_NUMBER(a) op VAL_TO_NUMBER(b))); \
-    } while(false)
 
     // Actually start running the code here.
     REFRESH_FRAME();
@@ -431,7 +422,6 @@ static InterpretResult run(VM* vm) {
 #undef READ_BYTE
 #undef READ_SHORT
 #undef READ_CONSTANT
-#undef BINARY_OP
 }
 
 InterpretResult vm_interpret(VM* vm, const char* source) {

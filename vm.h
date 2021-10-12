@@ -43,6 +43,7 @@ typedef struct VM {
     ObjObject* NativeProto;
     ObjObject* NumberProto;
     ObjObject* BooleanProto;
+    ObjObject* StringProto;
 
     // GC
     Obj* objects;
