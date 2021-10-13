@@ -106,6 +106,12 @@ DEFINE_NATIVE(Object, not) {
     RETURN(BOOL_TO_VAL(!value_truthy(args[0])));
 }
 
+DEFINE_NATIVE(Object, clone) {
+    ObjObject* obj = objobject_new(vm);
+    obj->proto = args[0];
+    RETURN(OBJ_TO_VAL(obj));
+}
+
 DEFINE_NATIVE(Fn, new) {
     if (num_args == 0)
         ERROR("Fn_new called with 0 arguments.");
@@ -162,7 +168,7 @@ DEFINE_NATIVE(Native, callWithThis) {
     ObjNative* native = VAL_TO_NATIVE(args[0]);
     for (int i = 0; i < num_args; i++)
         args[i] = args[i + 1];
-    POP_ARGS(1);
+    vm_pop(vm);
     return native->fn(vm, args, num_args - 1);
 }
 
@@ -221,6 +227,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "==",       Object_equal);
     ADD_METHOD(ObjectProto, "!=",       Object_notEqual);
     ADD_METHOD(ObjectProto, "!",        Object_not);
+    ADD_METHOD(ObjectProto, "clone",    Object_clone);
 
     // Note: allocating here is safe, because all *Protos are marked as
     // roots, and remaining *Protos are initialized to NULL. Thus we won't
