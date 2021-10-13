@@ -26,3 +26,4 @@ test: stress
 	valgrind -q ./subtle ./tests/jumps
 	valgrind -q ./subtle ./tests/functions
 	valgrind -q ./subtle ./tests/closures
+	valgrind -q ./subtle ./tests/this

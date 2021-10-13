@@ -8,9 +8,9 @@
 #include <stdio.h>
 #include <stdlib.h> // free
 
-#ifdef SUBTLE_DEBUG_TRACE_EXECUTION
+/* #ifdef SUBTLE_DEBUG_TRACE_EXECUTION */
 #include "debug.h"
-#endif
+/* #endif */
 
 void vm_init(VM* vm) {
     vm->frame_count = 0;
@@ -99,7 +99,7 @@ void vm_runtime_error(VM* vm, const char* format, ...) {
 }
 
 bool
-vm_call_closure(VM* vm, Value this, ObjClosure* closure, int args)
+vm_push_frame(VM* vm, ObjClosure* closure, int args)
 {
     if (vm->frame_count == FRAMES_MAX) {
         vm_runtime_error(vm, "Stack overflow.");
@@ -110,7 +110,6 @@ vm_call_closure(VM* vm, Value this, ObjClosure* closure, int args)
     frame->closure = closure;
     frame->ip = function->chunk.code;
     frame->slots = vm->stack_top - args - 1;
-    frame->slots[0] = this;
     // Fix the number of arguments.
     // Since -1 arity means a script, we ignore that here.
     if (function->arity != -1) {
@@ -120,16 +119,16 @@ vm_call_closure(VM* vm, Value this, ObjClosure* closure, int args)
     return true;
 }
 
-static bool call_value(VM* vm, Value this, Value callee, int args)
+static bool
+complete_call(VM* vm, Value callee, int args)
 {
     if (IS_OBJ(callee)) {
         switch(VAL_TO_OBJ(callee)->type) {
             case OBJ_CLOSURE:
-                return vm_call_closure(vm, this, VAL_TO_CLOSURE(callee), args);
+                return vm_push_frame(vm, VAL_TO_CLOSURE(callee), args);
             case OBJ_NATIVE: {
                 ObjNative* native = VAL_TO_NATIVE(callee);
                 Value* args_start = &vm->stack_top[-args - 1];
-                *args_start = this;
                 return native->fn(vm, args_start, args);
             }
             default: ; // It's an error.
@@ -222,7 +221,7 @@ is_activatable(Value value)
     return IS_CLOSURE(value) || IS_NATIVE(value);
 }
 
-static InterpretResult run(VM* vm) {
+static InterpretResult run(VM* vm, ObjClosure* top_level) {
     CallFrame* frame;
 
 #define REFRESH_FRAME() (frame = &vm->frames[vm->frame_count - 1])
@@ -254,10 +253,9 @@ static InterpretResult run(VM* vm) {
                 Value result = vm_pop(vm);
                 close_upvalues(vm, frame->slots);
                 vm->frame_count--;
-                if (vm->frame_count == 0) {
-                    vm_pop(vm); // Pop the initial script.
+                if (frame->closure == top_level)
                     return INTERPRET_OK;
-                }
+                ASSERT(vm->frame_count > 0, "vm->frame_count == 0");
                 vm->stack_top = frame->slots;
                 vm_push(vm, result);
                 REFRESH_FRAME();
@@ -388,8 +386,24 @@ static InterpretResult run(VM* vm) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 ObjObject* object = VAL_TO_OBJECT(obj);
-                objobject_set(object, vm, key, value);
-                vm_pop(vm);
+
+                // Check if there is a custom setslot method
+                Value setSlot_slot;
+                if (get_slot(vm, obj, OBJ_TO_VAL(objstring_copy(vm, "setSlot", 7)), &setSlot_slot)) {
+                    InterpretResult rv;
+                    vm_push(vm, obj);
+                    vm_push(vm, key);
+                    vm_push(vm, value);
+                    Value return_value;
+                    if (!vm_call(vm, setSlot_slot, 2, &return_value, &rv))
+                        return rv;
+                    vm_pop(vm);
+                    vm_push(vm, return_value);
+                } else {
+                    objobject_set(object, vm, key, value);
+                    vm_pop(vm); // The object.
+                }
+
                 break;
             }
             case OP_INVOKE: {
@@ -397,9 +411,16 @@ static InterpretResult run(VM* vm) {
                 uint8_t num_args = READ_BYTE();
                 Value obj = vm_peek(vm, num_args);
                 Value slot;
-                if (!get_slot(vm, obj, key, &slot)) {
-                    vm_runtime_error(vm, "Tried to access non-existent slot.");
-                    return INTERPRET_RUNTIME_ERROR;
+                Value getSlot_slot;
+                // Check if there is a custom getSlot method
+                if (get_slot(vm, obj, OBJ_TO_VAL(objstring_copy(vm, "getSlot", 7)), &getSlot_slot)) {
+                    InterpretResult rv;
+                    vm_push(vm, obj);
+                    vm_push(vm, key);
+                    if (!vm_call(vm, getSlot_slot, 1, &slot, &rv))
+                        return rv;
+                } else if (!get_slot(vm, obj, key, &slot)) {
+                    slot = NIL_VAL;
                 }
                 if (!is_activatable(slot)) {
                     if (num_args != 0) {
@@ -410,7 +431,9 @@ static InterpretResult run(VM* vm) {
                     vm_push(vm, slot);
                     break;
                 }
-                if (!call_value(vm, obj, slot, num_args))
+                // The stack is already in the correct form for a method call.
+                // The object is above `num_args` values.
+                if (!complete_call(vm, slot, num_args))
                     return INTERPRET_RUNTIME_ERROR;
                 REFRESH_FRAME();
                 break;
@@ -425,6 +448,42 @@ static InterpretResult run(VM* vm) {
 #undef READ_CONSTANT
 }
 
+bool
+vm_call(VM* vm, Value slot, int num_args,
+        Value* return_value, InterpretResult* rv)
+{
+    if (!IS_OBJ(slot)) {
+        vm_runtime_error(vm, "Tried to call a non-activatable slot.");
+        *rv = INTERPRET_RUNTIME_ERROR;
+        return false;
+    }
+
+    switch (VAL_TO_OBJ(slot)->type) {
+        case OBJ_CLOSURE: {
+            ObjClosure* closure = VAL_TO_CLOSURE(slot);
+            vm_push_frame(vm, closure, num_args);
+            *rv = run(vm, closure);
+            break;
+        }
+        case OBJ_NATIVE: {
+            ObjNative* native = VAL_TO_NATIVE(slot);
+            if (native->fn(vm, &vm->stack_top[-num_args - 1], num_args)) {
+                *rv = INTERPRET_OK;
+            } else {
+                *rv = INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
+        default: UNREACHABLE();
+    }
+
+    if (*rv == INTERPRET_OK) {
+        *return_value = vm_pop(vm);
+        return true;
+    }
+    return false;
+}
+
 InterpretResult vm_interpret(VM* vm, const char* source) {
     ObjFunction* fn = compile(vm, source);
     if (fn == NULL) return INTERPRET_COMPILE_ERROR;
@@ -433,9 +492,9 @@ InterpretResult vm_interpret(VM* vm, const char* source) {
     ObjClosure* closure = objclosure_new(vm, fn);
     vm_pop(vm);
     vm_push(vm, OBJ_TO_VAL(closure));
-    vm_call_closure(vm, NIL_VAL, closure, 0);
+    vm_push_frame(vm, closure, 0);
 
-    InterpretResult result = run(vm);
+    InterpretResult result = run(vm, closure);
     vm_reset_stack(vm);
     return result;
 }

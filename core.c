@@ -121,9 +121,7 @@ DEFINE_NATIVE(Fn, call) {
         vm_runtime_error(vm, "Fn_call called on a non-closure.");
         return false;
     }
-    // Don't need to pop off the stack:
-    // The stack is perfectly set up for the function call.
-    return vm_call_closure(vm, args[0], VAL_TO_CLOSURE(args[0]), num_args);
+    return vm_push_frame(vm, VAL_TO_CLOSURE(args[0]), num_args);
 }
 
 DEFINE_NATIVE(Fn, callWithThis) {
@@ -136,11 +134,11 @@ DEFINE_NATIVE(Fn, callWithThis) {
         return false;
     }
     // Shift the arguments, so that we set up the stack properly.
-    Value this = args[1];
-    for (int i = 0; i < num_args - 1; i++)
-        args[i + 1] = args[i + 2];
-    POP_ARGS(1);
-    return vm_call_closure(vm, this, VAL_TO_CLOSURE(args[0]), num_args - 1);
+    ObjClosure* closure = VAL_TO_CLOSURE(args[0]);
+    for (int i = 0; i < num_args; i++)
+        args[i] = args[i + 1];
+    vm_pop(vm);
+    return vm_push_frame(vm, closure, num_args - 1);
 }
 
 DEFINE_NATIVE(Native, call) {
