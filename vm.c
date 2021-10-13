@@ -253,11 +253,11 @@ static InterpretResult run(VM* vm, ObjClosure* top_level) {
                 Value result = vm_pop(vm);
                 close_upvalues(vm, frame->slots);
                 vm->frame_count--;
+                vm->stack_top = frame->slots;
+                vm_push(vm, result);
                 if (frame->closure == top_level)
                     return INTERPRET_OK;
                 ASSERT(vm->frame_count > 0, "vm->frame_count == 0");
-                vm->stack_top = frame->slots;
-                vm_push(vm, result);
                 REFRESH_FRAME();
                 break;
             }

@@ -21,3 +21,18 @@ x.getSlot = Fn.new{|k|
 assert (x.u = 2) == 2; # This should call setSlot
 assert x.u == 2;       # This should call getSlot
 assert record.u == 2;
+
+let custom_getSlot = Fn.new{ |k|
+    if (k == "k") return record.k;
+    return getSlot.callWithThis(this, k);
+};
+
+assert (x.getSlot = custom_getSlot) == custom_getSlot;
+
+record.k = 1;
+assert x.k == 1;
+
+record.k = 2;
+assert x.k == 2;
+
+assert x.getSlot("getSlot") == custom_getSlot;
