@@ -377,6 +377,15 @@ static InterpretResult run(VM* vm, ObjClosure* top_level) {
                 vm_push(vm, OBJ_TO_VAL(object));
                 break;
             }
+            case OP_OBJLIT_SET: {
+                Value key = READ_CONSTANT();
+                Value obj = vm_peek(vm, 1);
+                Value value = vm_peek(vm, 0);
+                ObjObject* object = VAL_TO_OBJECT(obj);
+                objobject_set(object, vm, key, value);
+                vm_pop(vm); // value
+                break;
+            }
             case OP_OBJECT_SET: {
                 Value key = READ_CONSTANT();
                 Value obj = vm_peek(vm, 1);
@@ -397,13 +406,14 @@ static InterpretResult run(VM* vm, ObjClosure* top_level) {
                     Value return_value;
                     if (!vm_call(vm, setSlot_slot, 2, &return_value, &rv))
                         return rv;
-                    vm_pop(vm);
-                    vm_push(vm, return_value);
+                    value = return_value;
                 } else {
                     objobject_set(object, vm, key, value);
-                    vm_pop(vm); // The object.
                 }
 
+                vm_pop(vm); // value
+                vm_pop(vm); // object
+                vm_push(vm, value);
                 break;
             }
             case OP_INVOKE: {

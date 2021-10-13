@@ -1,0 +1,23 @@
+# Currently getSlot and setSlot use vm_call.
+# We stress-test them below...
+
+let setSlot = Object.getSlot("setSlot");
+let getSlot = Object.getSlot("getSlot");
+
+let x = {};
+x.setSlot = Fn.new{|k, v|
+    setSlot.callWithThis(this, k, v);
+    return v;
+};
+
+let record = {};
+
+x.getSlot = Fn.new{|k|
+    let rv = getSlot.callWithThis(this, k);
+    record.setSlot(k, rv);
+    return rv;
+};
+
+assert (x.u = 2) == 2; # This should call setSlot
+assert x.u == 2;       # This should call getSlot
+assert record.u == 2;

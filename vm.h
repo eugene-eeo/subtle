@@ -83,10 +83,8 @@ bool vm_push_frame(VM* vm, ObjClosure* closure, int args);
 InterpretResult vm_interpret(VM* vm, const char* source);
 
 // Runs the given slot, returning true if the call succeeded
-// and false otherwise. Note that unlike vm_push_frame()
+// and false otherwise. Note that unlike vm_push_frame(),
 // this will run the slot until completion.
-// TODO: implement this method, it allows C code to call other
-// funtions...
 bool vm_call(VM* vm, Value callable, int num_args,
              Value* return_value, InterpretResult* rv);
 

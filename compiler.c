@@ -533,7 +533,7 @@ static void object(Compiler* compiler, bool can_assign) {
             uint16_t constant = identifier_constant(compiler, &compiler->parser->previous);
             consume(compiler, TOKEN_COLON, "Expect ':' after key.");
             expression(compiler);
-            emit_byte(compiler, OP_OBJECT_SET);
+            emit_byte(compiler, OP_OBJLIT_SET);
             emit_offset(compiler, constant);
         } while (match(compiler, TOKEN_COMMA));
     }
