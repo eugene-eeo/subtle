@@ -5,17 +5,17 @@ let setSlot = Object.getSlot("setSlot");
 let getSlot = Object.getSlot("getSlot");
 
 let x = {};
-x.setSlot = Fn.new{|k, v|
-    setSlot.callWithThis(this, k, v);
-    return v;
-};
-
 let record = {};
 
 x.getSlot = Fn.new{|k|
     let rv = getSlot.callWithThis(this, k);
     record.setSlot(k, rv);
     return rv;
+};
+
+x.setSlot = Fn.new{|k, v|
+    setSlot.callWithThis(this, k, v);
+    return v;
 };
 
 assert (x.u = 2) == 2; # This should call setSlot
