@@ -44,7 +44,7 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
 
 
 DEFINE_NATIVE(Object, proto) {
-    Value proto = get_prototype(vm, args[0]);
+    Value proto = vm_get_prototype(vm, args[0]);
     RETURN(proto);
 }
 
@@ -66,7 +66,7 @@ DEFINE_NATIVE(Object, getSlot) {
 
     Value this = args[0];
     Value slot;
-    if (!get_slot(vm, this, args[1], &slot))
+    if (!vm_get_slot(vm, this, args[1], &slot))
         slot = NIL_VAL;
     RETURN(slot);
 }
@@ -85,23 +85,20 @@ DEFINE_NATIVE(Object, setSlot) {
     RETURN(NIL_VAL);
 }
 
-// Defines the == method.
 DEFINE_NATIVE(Object, equal) {
     if (num_args == 0)
-        ERROR("Object_equal called with 0 arguments.");
+        ERROR("Object_== called with 0 arguments.");
     RETURN(BOOL_TO_VAL(value_equal(args[0],
                                    args[1])));
 }
 
-// Defines the != method.
 DEFINE_NATIVE(Object, notEqual) {
     if (num_args == 0)
-        ERROR("Object_notEqual called with 0 arguments.");
+        ERROR("Object_!= called with 0 arguments.");
     RETURN(BOOL_TO_VAL(!value_equal(args[0],
                                     args[1])));
 }
 
-// Defines the ! method.
 DEFINE_NATIVE(Object, not) {
     RETURN(BOOL_TO_VAL(!value_truthy(args[0])));
 }

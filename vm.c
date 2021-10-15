@@ -12,6 +12,8 @@
 #include "debug.h"
 #endif
 
+#define MAX_LOOKUPS 64
+
 void vm_init(VM* vm) {
     vm->frame_count = 0;
     vm->stack_top = vm->stack;
@@ -177,7 +179,7 @@ close_upvalues(VM* vm, Value* last)
 }
 
 Value
-get_prototype(VM* vm, Value value)
+vm_get_prototype(VM* vm, Value value)
 {
     switch (value.type) {
         case VALUE_UNDEFINED: UNREACHABLE();
@@ -204,14 +206,15 @@ get_prototype(VM* vm, Value value)
 }
 
 bool
-get_slot(VM* vm, Value src, Value slot_name, Value* rv)
+vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
 {
-    // FIXME: this is not safe in the presence of cycles.
+    int lookups = 0;
     do {
-        if (IS_OBJECT(src) && objobject_get(VAL_TO_OBJECT(src), slot_name, rv))
+        if (IS_OBJECT(src) && objobject_get(VAL_TO_OBJECT(src), slot_name, slot_value))
             return true;
-        src = get_prototype(vm, src);
-    } while (!IS_NIL(src));
+        src = vm_get_prototype(vm, src);
+        lookups++;
+    } while (!IS_NIL(src) && lookups < MAX_LOOKUPS);
     return false;
 }
 
@@ -398,7 +401,7 @@ static InterpretResult run(VM* vm, ObjClosure* top_level) {
 
                 // Check if there is a custom setslot method
                 Value setSlot_slot;
-                if (get_slot(vm, obj, OBJ_TO_VAL(objstring_copy(vm, "setSlot", 7)), &setSlot_slot)) {
+                if (vm_get_slot(vm, obj, OBJ_TO_VAL(objstring_copy(vm, "setSlot", 7)), &setSlot_slot)) {
                     InterpretResult rv;
                     vm_push(vm, obj);
                     vm_push(vm, key);
@@ -423,13 +426,13 @@ static InterpretResult run(VM* vm, ObjClosure* top_level) {
                 Value slot;
                 Value getSlot_slot;
                 // Check if there is a custom getSlot method
-                if (get_slot(vm, obj, OBJ_TO_VAL(objstring_copy(vm, "getSlot", 7)), &getSlot_slot)) {
+                if (vm_get_slot(vm, obj, OBJ_TO_VAL(objstring_copy(vm, "getSlot", 7)), &getSlot_slot)) {
                     InterpretResult rv;
                     vm_push(vm, obj);
                     vm_push(vm, key);
                     if (!vm_call(vm, getSlot_slot, 1, &slot, &rv))
                         return rv;
-                } else if (!get_slot(vm, obj, key, &slot)) {
+                } else if (!vm_get_slot(vm, obj, key, &slot)) {
                     slot = NIL_VAL;
                 }
                 if (!is_activatable(slot)) {

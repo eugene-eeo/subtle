@@ -79,8 +79,26 @@ Value vm_peek(VM* vm, int distance);
 void vm_push_root(VM* vm, Value value);
 void vm_pop_root(VM* vm);
 void vm_runtime_error(VM* vm, const char* format, ...);
-bool vm_push_frame(VM* vm, ObjClosure* closure, int args);
 InterpretResult vm_interpret(VM* vm, const char* source);
+
+// Object system
+// =============
+Value vm_get_prototype(VM* vm, Value value);
+bool vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value);
+
+// Function calls
+// ==============
+
+// Pushes the given closure onto the call stack. Note that the
+// num_args argument should be the number of _actual_ arguments.
+// The stack should look like this:
+//
+//          | nargs |
+//   +------+-------+
+//   | this |  ...  |
+//   +------+-------|
+//                  ^-- stack_top
+bool vm_push_frame(VM* vm, ObjClosure* closure, int num_args);
 
 // Runs the given slot, returning true if the call succeeded
 // and false otherwise. Note that unlike vm_push_frame(),
