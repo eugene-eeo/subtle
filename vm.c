@@ -8,9 +8,9 @@
 #include <stdio.h>
 #include <stdlib.h> // free
 
-/* #ifdef SUBTLE_DEBUG_TRACE_EXECUTION */
+#ifdef SUBTLE_DEBUG_TRACE_EXECUTION
 #include "debug.h"
-/* #endif */
+#endif
 
 void vm_init(VM* vm) {
     vm->frame_count = 0;
