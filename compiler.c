@@ -475,55 +475,6 @@ static void variable(Compiler* compiler, bool can_assign) {
     named_variable(compiler, &compiler->parser->previous, can_assign);
 }
 
-static void function(Compiler* compiler, bool can_assign) {
-    Compiler c;
-    compiler_init(&c, compiler, compiler->parser,
-                  compiler->vm, FUNCTION_TYPE_FUNCTION);
-    begin_block(&c);
-
-    // Parse the parameter list.
-    consume(&c, TOKEN_LPAREN, "Expect '(' after fn.");
-    if (!check(&c, TOKEN_RPAREN)) {
-        do {
-            c.function->arity++;
-            if (c.function->arity > 255) {
-                error_at_current(&c, "Cannot have more than 255 parameters.");
-            }
-            uint8_t constant = parse_variable(&c, "Expect parameter name.");
-            define_variable(&c, constant);
-        } while (match(&c, TOKEN_COMMA));
-    }
-    consume(&c, TOKEN_RPAREN, "Expect ')' after parameters.");
-    consume(&c, TOKEN_LBRACE, "Expect '{' before function body.");
-    block(&c);
-
-    end_block(&c);
-
-    ObjFunction* fn = compiler_end(&c);
-    uint16_t idx = make_constant(compiler, OBJ_TO_VAL(fn));
-    emit_byte(compiler, OP_CLOSURE);
-    emit_offset(compiler, idx);
-
-    for (int i = 0; i < fn->upvalue_count; i++) {
-        emit_byte(compiler, c.upvalues[i].is_local ? 1 : 0);
-        emit_byte(compiler, c.upvalues[i].index);
-    }
-}
-
-static uint8_t argument_list(Compiler* compiler) {
-    uint8_t count = 0;
-    if (!check(compiler, TOKEN_RPAREN)) {
-        do {
-            expression(compiler);
-            if (count == 255)
-                error(compiler, "Cannot have more than 255 arguments.");
-            count++;
-        } while (match(compiler, TOKEN_COMMA));
-    }
-    consume(compiler, TOKEN_RPAREN, "Expect ')' after arguments.");
-    return count;
-}
-
 static void object(Compiler* compiler, bool can_assign) {
     // Object literal.
     emit_byte(compiler, OP_OBJECT);
@@ -707,7 +658,6 @@ static ParseRule rules[] = {
     [TOKEN_NIL]       = {literal,  NULL,   PREC_NONE},
     [TOKEN_TRUE]      = {literal,  NULL,   PREC_NONE},
     [TOKEN_FALSE]     = {literal,  NULL,   PREC_NONE},
-    [TOKEN_FN]        = {function, NULL,   PREC_NONE},
     [TOKEN_WHILE]     = {NULL,     NULL,   PREC_NONE},
     [TOKEN_THIS]      = {this,     NULL,   PREC_NONE},
     [TOKEN_SUPER]     = {NULL,     NULL,   PREC_NONE},

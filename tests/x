@@ -1,5 +1,5 @@
 let x = {};
-x.a = fn(u, f) {
+x.a = Fn.new { |u, f|
     assert u == f(u);
 };
 

@@ -2,11 +2,13 @@
 #include "compiler.h"
 #include "memory.h"
 #include "object.h"
+#include "value.h"
 #include "vm.h"
 
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h> // free
+#include <string.h> // strlen
 
 #ifdef SUBTLE_DEBUG_TRACE_EXECUTION
 #include "debug.h"
@@ -210,12 +212,21 @@ vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
 {
     int lookups = 0;
     do {
-        if (IS_OBJECT(src) && objobject_get(VAL_TO_OBJECT(src), slot_name, slot_value))
-            return true;
+        if (IS_OBJECT(src)) {
+            if (objobject_get(VAL_TO_OBJECT(src), slot_name, slot_value))
+                return true;
+        }
         src = vm_get_prototype(vm, src);
         lookups++;
     } while (!IS_NIL(src) && lookups < MAX_LOOKUPS);
     return false;
+}
+
+bool
+vm_get_string_slot(VM* vm, Value src, const char* slot_name, Value* slot_value)
+{
+    ObjString* slot_name_str = objstring_copy(vm, slot_name, strlen(slot_name));
+    return vm_get_slot(vm, src, OBJ_TO_VAL(slot_name_str), slot_value);
 }
 
 static inline bool
@@ -399,42 +410,45 @@ static InterpretResult run(VM* vm, ObjClosure* top_level) {
                 }
                 ObjObject* object = VAL_TO_OBJECT(obj);
 
-                // Check if there is a custom setslot method
                 Value setSlot_slot;
-                if (vm_get_slot(vm, obj, OBJ_TO_VAL(objstring_copy(vm, "setSlot", 7)), &setSlot_slot)) {
-                    InterpretResult rv;
-                    vm_push(vm, obj);
-                    vm_push(vm, key);
-                    vm_push(vm, value);
-                    Value return_value;
-                    if (!vm_call(vm, setSlot_slot, 2, &return_value, &rv))
-                        return rv;
-                    value = return_value;
-                } else {
-                    objobject_set(object, vm, key, value);
+                if (!vm_get_string_slot(vm, obj, "setSlot", &setSlot_slot)) {
+                    vm_runtime_error(vm, "Object has no slot `setSlot`.");
+                    return INTERPRET_RUNTIME_ERROR;
                 }
+
+                // Call <obj>.setSlot(<key>, <value>)
+                InterpretResult rv;
+                vm_push(vm, obj);
+                vm_push(vm, key);
+                vm_push(vm, value);
+                Value return_value;
+                if (!vm_call(vm, setSlot_slot, 2, &return_value, &rv))
+                    return rv;
 
                 vm_pop(vm); // value
                 vm_pop(vm); // object
-                vm_push(vm, value);
+                vm_push(vm, return_value);
                 break;
             }
             case OP_INVOKE: {
                 Value key = READ_CONSTANT();
                 uint8_t num_args = READ_BYTE();
                 Value obj = vm_peek(vm, num_args);
-                Value slot;
+
                 Value getSlot_slot;
-                // Check if there is a custom getSlot method
-                if (vm_get_slot(vm, obj, OBJ_TO_VAL(objstring_copy(vm, "getSlot", 7)), &getSlot_slot)) {
-                    InterpretResult rv;
-                    vm_push(vm, obj);
-                    vm_push(vm, key);
-                    if (!vm_call(vm, getSlot_slot, 1, &slot, &rv))
-                        return rv;
-                } else if (!vm_get_slot(vm, obj, key, &slot)) {
-                    slot = NIL_VAL;
+                if (!vm_get_string_slot(vm, obj, "getSlot", &getSlot_slot)) {
+                    vm_runtime_error(vm, "Object has no slot `getSlot`.");
+                    return INTERPRET_RUNTIME_ERROR;
                 }
+
+                // Call <obj>.getSlot(<key>)
+                InterpretResult rv;
+                Value slot;
+                vm_push(vm, obj);
+                vm_push(vm, key);
+                if (!vm_call(vm, getSlot_slot, 1, &slot, &rv))
+                    return rv;
+
                 if (!is_activatable(slot)) {
                     if (num_args != 0) {
                         vm_runtime_error(vm, "Non-activatable slot called with %d arguments", num_args);
@@ -463,11 +477,11 @@ static InterpretResult run(VM* vm, ObjClosure* top_level) {
 
 bool
 vm_call(VM* vm, Value slot, int num_args,
-        Value* return_value, InterpretResult* rv)
+        Value* return_value, InterpretResult* res)
 {
     if (!is_activatable(slot)) {
         vm_runtime_error(vm, "Tried to call a non-activatable slot.");
-        *rv = INTERPRET_RUNTIME_ERROR;
+        *res = INTERPRET_RUNTIME_ERROR;
         return false;
     }
 
@@ -475,22 +489,22 @@ vm_call(VM* vm, Value slot, int num_args,
         case OBJ_CLOSURE: {
             ObjClosure* closure = VAL_TO_CLOSURE(slot);
             vm_push_frame(vm, closure, num_args);
-            *rv = run(vm, closure);
+            *res = run(vm, closure);
             break;
         }
         case OBJ_NATIVE: {
             ObjNative* native = VAL_TO_NATIVE(slot);
             if (native->fn(vm, &vm->stack_top[-num_args - 1], num_args)) {
-                *rv = INTERPRET_OK;
+                *res = INTERPRET_OK;
             } else {
-                *rv = INTERPRET_RUNTIME_ERROR;
+                *res = INTERPRET_RUNTIME_ERROR;
             }
             break;
         }
         default: UNREACHABLE();
     }
 
-    if (*rv == INTERPRET_OK) {
+    if (*res == INTERPRET_OK) {
         *return_value = vm_pop(vm);
         return true;
     }

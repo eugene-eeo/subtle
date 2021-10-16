@@ -32,7 +32,6 @@ typedef enum {
     // Keywords
     TOKEN_NIL,
     TOKEN_TRUE, TOKEN_FALSE,
-    TOKEN_FN,
     TOKEN_WHILE,
     TOKEN_THIS,
     TOKEN_SUPER,
