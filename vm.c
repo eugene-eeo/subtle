@@ -465,7 +465,7 @@ bool
 vm_call(VM* vm, Value slot, int num_args,
         Value* return_value, InterpretResult* rv)
 {
-    if (!IS_OBJ(slot)) {
+    if (!is_activatable(slot)) {
         vm_runtime_error(vm, "Tried to call a non-activatable slot.");
         *rv = INTERPRET_RUNTIME_ERROR;
         return false;
