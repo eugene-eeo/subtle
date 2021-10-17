@@ -133,7 +133,7 @@ ObjObject* objobject_new(VM* vm);
 bool objobject_has(ObjObject* obj, Value key);
 bool objobject_get(ObjObject* obj, Value key, Value* result);
 void objobject_set(ObjObject* obj, VM* vm, Value key, Value value);
-bool objobject_delete(ObjObject* obj, Value key);
+bool objobject_delete(ObjObject* obj, VM* vm, Value key);
 
 // ObjNative
 // =========

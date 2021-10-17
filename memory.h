@@ -6,7 +6,8 @@
 #include "value.h"
 #include "vm.h"
 
-#define GROW_CAPACITY(n) ((n) < 8 ? 8 : (n) * 2)
+#define GROW_CAPACITY(n)   ((n) <  8 ? 8 : (n) * 2)
+#define SHRINK_CAPACITY(n) ((n) <= 8 ? 8 : (n) / 2)
 
 #define ALLOCATE(vm, type) (type*)memory_realloc(vm, NULL, 0, sizeof(type))
 #define FREE(vm, type, pointer) memory_realloc(vm, pointer, sizeof(type), 0)

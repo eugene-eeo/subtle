@@ -303,7 +303,7 @@ static InterpretResult run(VM* vm, ObjClosure* top_level) {
             case OP_SET_GLOBAL: {
                 Value name = READ_CONSTANT();
                 if (table_set(&vm->globals, vm, name, vm_peek(vm, 0))) {
-                    table_delete(&vm->globals, name);
+                    table_delete(&vm->globals, vm, name);
                     vm_runtime_error(vm, "Undefined variable '%s'.",
                                   VAL_TO_STRING(name)->chars);
                     return INTERPRET_RUNTIME_ERROR;

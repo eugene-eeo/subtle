@@ -96,11 +96,18 @@ DEFINE_NATIVE(Object, deleteSlot) {
         ERROR("Object_deleteSlot called with 0 arguments.");
 
     if (!IS_OBJECT(args[0]))
-        ERROR("Object_setProto called on a non-object.");
+        ERROR("Object_deleteSlot called on a non-object.");
 
     ObjObject* this = VAL_TO_OBJECT(args[0]);
-    bool has_slot = objobject_delete(this, args[1]);
+    bool has_slot = objobject_delete(this, vm, args[1]);
     RETURN(BOOL_TO_VAL(has_slot));
+}
+
+DEFINE_NATIVE(Object, same) {
+    if (num_args < 2)
+        ERROR("Object_same requires 2 arguments.");
+    RETURN(BOOL_TO_VAL(value_equal(args[1],
+                                   args[2])));
 }
 
 DEFINE_NATIVE(Object, equal) {
@@ -241,6 +248,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "setSlot",    Object_setSlot);
     ADD_METHOD(ObjectProto, "hasSlot",    Object_hasSlot);
     ADD_METHOD(ObjectProto, "deleteSlot", Object_deleteSlot);
+    ADD_METHOD(ObjectProto, "same",       Object_same);
     ADD_METHOD(ObjectProto, "==",         Object_equal);
     ADD_METHOD(ObjectProto, "!=",         Object_notEqual);
     ADD_METHOD(ObjectProto, "!",          Object_not);

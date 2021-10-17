@@ -217,9 +217,9 @@ objobject_set(ObjObject* obj, VM* vm, Value key, Value value)
 }
 
 bool
-objobject_delete(ObjObject* obj, Value key)
+objobject_delete(ObjObject* obj, VM* vm, Value key)
 {
-    return table_delete(&obj->slots, key);
+    return table_delete(&obj->slots, vm, key);
 }
 
 static void
