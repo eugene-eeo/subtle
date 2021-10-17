@@ -434,24 +434,29 @@ static InterpretResult run(VM* vm, ObjClosure* top_level) {
                 Value key = READ_CONSTANT();
                 uint8_t num_args = READ_BYTE();
                 Value obj = vm_peek(vm, num_args);
+                Value slot;
 
-                Value getSlot_slot;
-                if (!vm_get_string_slot(vm, obj, "getSlot", &getSlot_slot)) {
-                    vm_runtime_error(vm, "Object has no slot `getSlot`.");
-                    return INTERPRET_RUNTIME_ERROR;
+                // If the slot doesn't exist directly on the object, then
+                // we have to resort to getSlot.
+                if (!vm_get_slot(vm, obj, key, &slot)) {
+                    Value getSlot_slot;
+                    if (!vm_get_string_slot(vm, obj, "getSlot", &getSlot_slot)) {
+                        vm_runtime_error(vm, "Object has no slot `getSlot`.");
+                        return INTERPRET_RUNTIME_ERROR;
+                    }
+
+                    // Call <obj>.getSlot(<key>)
+                    InterpretResult rv;
+                    vm_push(vm, obj);
+                    vm_push(vm, key);
+                    if (!vm_call(vm, getSlot_slot, 1, &slot, &rv))
+                        return rv;
                 }
 
-                // Call <obj>.getSlot(<key>)
-                InterpretResult rv;
-                Value slot;
-                vm_push(vm, obj);
-                vm_push(vm, key);
-                if (!vm_call(vm, getSlot_slot, 1, &slot, &rv))
-                    return rv;
-
+                // Check if the slot is activatable.
                 if (!is_activatable(slot)) {
                     if (num_args != 0) {
-                        vm_runtime_error(vm, "Non-activatable slot called with %d arguments", num_args);
+                        vm_runtime_error(vm, "Tried to call non-activatable slot with %d arguments.", num_args);
                         return INTERPRET_RUNTIME_ERROR;
                     }
                     vm_pop(vm); // The object.
