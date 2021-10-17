@@ -21,6 +21,9 @@ void vm_init(VM* vm) {
     vm->stack_top = vm->stack;
     vm->open_upvalues = NULL;
 
+    vm->getSlot_string = NIL_VAL;
+    vm->setSlot_string = NIL_VAL;
+
     vm->ObjectProto = NULL;
     vm->FnProto = NULL;
     vm->NativeProto = NULL;
@@ -212,10 +215,9 @@ vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
 {
     int lookups = 0;
     do {
-        if (IS_OBJECT(src)) {
-            if (objobject_get(VAL_TO_OBJECT(src), slot_name, slot_value))
-                return true;
-        }
+        if (IS_OBJECT(src) &&
+                objobject_get(VAL_TO_OBJECT(src), slot_name, slot_value))
+            return true;
         src = vm_get_prototype(vm, src);
         lookups++;
     } while (!IS_NIL(src) && lookups < MAX_LOOKUPS);
@@ -411,7 +413,7 @@ static InterpretResult run(VM* vm, ObjClosure* top_level) {
                 ObjObject* object = VAL_TO_OBJECT(obj);
 
                 Value setSlot_slot;
-                if (!vm_get_string_slot(vm, obj, "setSlot", &setSlot_slot)) {
+                if (!vm_get_slot(vm, obj, vm->setSlot_string, &setSlot_slot)) {
                     vm_runtime_error(vm, "Object has no slot `setSlot`.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
@@ -440,7 +442,7 @@ static InterpretResult run(VM* vm, ObjClosure* top_level) {
                 // we have to resort to getSlot.
                 if (!vm_get_slot(vm, obj, key, &slot)) {
                     Value getSlot_slot;
-                    if (!vm_get_string_slot(vm, obj, "getSlot", &getSlot_slot)) {
+                    if (!vm_get_slot(vm, obj, vm->getSlot_string, &getSlot_slot)) {
                         vm_runtime_error(vm, "Object has no slot `getSlot`.");
                         return INTERPRET_RUNTIME_ERROR;
                     }

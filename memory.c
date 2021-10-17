@@ -88,6 +88,10 @@ static void mark_roots(VM* vm) {
     for (int i = 0; i < vm->roots_count; i++)
         mark_value(vm, vm->roots[i]);
 
+    // Mark the constants
+    mark_value(vm, vm->getSlot_string);
+    mark_value(vm, vm->setSlot_string);
+
     // Mark the *Protos
     mark_object(vm, (Obj*)vm->ObjectProto);
     mark_object(vm, (Obj*)vm->FnProto);

@@ -37,13 +37,19 @@ typedef struct VM {
     // stack_top to the 'bottom' of the stack.
     ObjUpvalue* open_upvalues;
 
-    // Globals
+    // ---- init'ed by core ----
+    // Constants needed by the VM
+    Value getSlot_string;
+    Value setSlot_string;
+
+    // Core Protos
     ObjObject* ObjectProto;
     ObjObject* FnProto;
     ObjObject* NativeProto;
     ObjObject* NumberProto;
     ObjObject* BooleanProto;
     ObjObject* StringProto;
+    // -------------------------
 
     // GC
     Obj* objects;

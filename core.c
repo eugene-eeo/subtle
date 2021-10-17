@@ -241,6 +241,9 @@ void core_init_vm(VM* vm)
 #define ADD_NATIVE(table, name, fn)  (ADD_OBJECT(table, name, objnative_new(vm, fn)))
 #define ADD_METHOD(PROTO, name, fn)  (ADD_NATIVE(&vm->PROTO->slots, name, fn))
 
+    vm->getSlot_string = OBJ_TO_VAL(objstring_copy(vm, "getSlot", 7));
+    vm->setSlot_string = OBJ_TO_VAL(objstring_copy(vm, "setSlot", 7));
+
     vm->ObjectProto = objobject_new(vm);
     ADD_METHOD(ObjectProto, "proto",      Object_proto);
     ADD_METHOD(ObjectProto, "setProto",   Object_setProto);

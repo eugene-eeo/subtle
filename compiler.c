@@ -580,21 +580,21 @@ static void unary(Compiler* compiler, bool can_assign) {
     TokenType operator = op_token.type;
     // Compile the operand.
     parse_precedence(compiler, PREC_UNARY);
-    uint16_t constant;
+    uint16_t method_constant;
     switch (operator) {
         case TOKEN_BANG:
-            constant = identifier_constant(compiler, &op_token);
+            method_constant = identifier_constant(compiler, &op_token);
             break;
         case TOKEN_MINUS:
         {
             Token synth = {.type = TOKEN_MINUS, .start = "neg", .length = 3, .line = 0};
-            constant = identifier_constant(compiler, &synth);
+            method_constant = identifier_constant(compiler, &synth);
             break;
         }
         default: UNREACHABLE();
     }
     emit_byte(compiler, OP_INVOKE);
-    emit_offset(compiler, constant);
+    emit_offset(compiler, method_constant);
     emit_byte(compiler, 0); // 0 arguments.
 }
 
@@ -605,8 +605,6 @@ static void binary(Compiler* compiler, bool can_assign) {
     parse_precedence(compiler, (Precedence)(rule->precedence + 1));
     uint16_t constant = identifier_constant(compiler, &op_token);
 
-    // TODO: implement OP_EQ and OP_NEQ, because those can
-    // handle nil, and need special treatment.
     switch (operator) {
         case TOKEN_PLUS:
         case TOKEN_MINUS:
