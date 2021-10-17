@@ -36,3 +36,18 @@ let outer = Fn.new {
 };
 
 assert outer.call().call() == "outside";
+
+# Upvalues close over references
+let outer = Fn.new {
+    let x = 0;
+    return {
+        add: Fn.new{ x = x + 1; },
+        get: Fn.new{ return x;  }
+    };
+};
+
+let obj = outer.call();
+obj.add();
+assert obj.get() == 1;
+obj.add();
+assert obj.get() == 2;

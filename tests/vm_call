@@ -9,7 +9,7 @@ let record = {};
 
 x.getSlot = Fn.new{|k|
     let rv = getSlot.callWithThis(this, k);
-    record.setSlot(k, rv);
+    record.setSlot(k, "seen");
     return rv;
 };
 
@@ -18,9 +18,11 @@ x.setSlot = Fn.new{|k, v|
     return v;
 };
 
-assert (x.u = 2) == 2; # This should call setSlot
-assert x.u == 2;       # This should call getSlot
-assert record.u == 2;
+assert x.z == nil;      # This should call getSlot
+assert record.z == "seen";
+assert (x.u = 2) == 2;  # This should call setSlot
+assert x.u == 2;        # This should not call getSlot
+assert record.u == nil;
 
 let custom_getSlot = Fn.new{ |k|
     if (k == "k") return record.k;
