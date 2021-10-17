@@ -216,6 +216,12 @@ objobject_set(ObjObject* obj, VM* vm, Value key, Value value)
     table_set(&obj->slots, vm, key, value);
 }
 
+bool
+objobject_delete(ObjObject* obj, Value key)
+{
+    return table_delete(&obj->slots, key);
+}
+
 static void
 objobject_free(VM* vm, Obj* obj)
 {
