@@ -120,6 +120,16 @@ DEFINE_NATIVE(Object, equal) {
 DEFINE_NATIVE(Object, notEqual) {
     if (num_args == 0)
         ERROR("Object_!= called with 0 arguments.");
+    Value equal_slot;
+    if (vm_get_string_slot(vm, args[0], "==", &equal_slot)) {
+        Value return_value;
+        InterpretResult rv;
+        vm_push(vm, args[0]);
+        vm_push(vm, args[1]);
+        if (!vm_call(vm, equal_slot, 1, &return_value, &rv))
+            return rv;
+        RETURN(BOOL_TO_VAL(!value_truthy(return_value)));
+    }
     RETURN(BOOL_TO_VAL(!value_equal(args[0],
                                     args[1])));
 }
