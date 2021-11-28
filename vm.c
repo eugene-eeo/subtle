@@ -195,18 +195,14 @@ vm_get_prototype(VM* vm, Value value)
         case VALUE_OBJ: {
             Obj* object = VAL_TO_OBJ(value);
             switch (object->type) {
-                case OBJ_STRING:
-                    return OBJ_TO_VAL(vm->StringProto);
-                case OBJ_NATIVE:
-                    return OBJ_TO_VAL(vm->NativeProto);
-                case OBJ_OBJECT:
-                    return ((ObjObject*)object)->proto;
-                case OBJ_CLOSURE:
-                    return OBJ_TO_VAL(vm->FnProto);
-                default:
-                    UNREACHABLE();
+                case OBJ_STRING:  return OBJ_TO_VAL(vm->StringProto);
+                case OBJ_NATIVE:  return OBJ_TO_VAL(vm->NativeProto);
+                case OBJ_OBJECT:  return ((ObjObject*)object)->proto;
+                case OBJ_CLOSURE: return OBJ_TO_VAL(vm->FnProto);
+                default: UNREACHABLE();
             }
         }
+        default: UNREACHABLE();
     }
 }
 
@@ -493,7 +489,6 @@ static InterpretResult run(VM* vm, ObjClosure* top_level) {
                     vm_runtime_error(vm, "Trying to set slot on non-object.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                ObjObject* object = VAL_TO_OBJECT(obj);
 
                 Value setSlot_slot;
                 if (!vm_get_slot(vm, obj, vm->setSlot_string, &setSlot_slot)) {

@@ -65,10 +65,6 @@ static bool is_alphanumeric(char ch) {
     return is_alpha(ch) || is_numeric(ch);
 }
 
-static bool is_whitespace(char ch) {
-    return ch == '\t' || ch == ' ' || ch == '\n' || ch == '\r';
-}
-
 static void skip_whitespace(Lexer* lexer) {
     for (;;) {
         char ch = peek(lexer);

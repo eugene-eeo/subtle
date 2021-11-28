@@ -2,7 +2,7 @@ cute:
 	gcc -DSUBTLE_DEBUG \
 		-DSUBTLE_DEBUG_TRACE_EXECUTION \
 		-DSUBTLE_DEBUG_PRINT_CODE \
-		-g -Og *.c -o subtle
+		-g -Og *.c -Wall -o subtle
 
 debug:
 	gcc -DSUBTLE_DEBUG \
@@ -18,6 +18,14 @@ stress:
 	gcc -DSUBTLE_DEBUG \
 		-DSUBTLE_DEBUG_STRESS_GC \
 		-g -Og *.c -o subtle
+
+DEPS=$(shell ls *.c | grep -v main.c)
+
+benchmark:
+	mkdir -p build
+	gcc -DSUBTLE_DEBUG_TABLE_STATS \
+		-O3 $(DEPS) \
+		bench/benchmark_table.c -o build/table_benchmark
 
 test: stress
 	valgrind -q ./subtle ./tests/operations

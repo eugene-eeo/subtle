@@ -10,6 +10,7 @@
 /* #define SUBTLE_DEBUG_PRINT_CODE */
 /* #define SUBTLE_DEBUG_TRACE_ALLOC */
 /* #define SUBTLE_DEBUG_STRESS_GC */
+/* #define SUBTLE_DEBUG_TABLE_STATS */
 
 #ifdef SUBTLE_DEBUG
     #include <stdio.h>

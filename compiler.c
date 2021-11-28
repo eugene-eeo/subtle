@@ -215,7 +215,7 @@ compiler_end(Compiler* compiler)
     emit_return(compiler);
     compiler->vm->compiler = compiler->enclosing;
 #ifdef SUBTLE_DEBUG_PRINT_CODE
-    if (!compiler->parser->had_error)
+    if (!compiler->parser->had_error) {
         printf("== ");
         if (compiler->type == FUNCTION_TYPE_SCRIPT) {
             printf("script");
@@ -224,6 +224,7 @@ compiler_end(Compiler* compiler)
         }
         printf(" ==\n");
         debug_print_chunk(current_chunk(compiler));
+    }
 #endif
     chunk_done(current_chunk(compiler), compiler->vm);
     return compiler->function;

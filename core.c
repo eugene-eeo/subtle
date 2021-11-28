@@ -106,22 +106,19 @@ DEFINE_NATIVE(Object, deleteSlot) {
 DEFINE_NATIVE(Object, same) {
     if (num_args < 2)
         ERROR("Object_same requires 2 arguments.");
-    RETURN(BOOL_TO_VAL(value_equal(args[1],
-                                   args[2])));
+    RETURN(BOOL_TO_VAL(value_equal(args[1], args[2])));
 }
 
 DEFINE_NATIVE(Object, equal) {
     if (num_args == 0)
         ERROR("Object_== called with 0 arguments.");
-    RETURN(BOOL_TO_VAL(value_equal(args[0],
-                                   args[1])));
+    RETURN(BOOL_TO_VAL(value_equal(args[0], args[1])));
 }
 
 DEFINE_NATIVE(Object, notEqual) {
     if (num_args == 0)
         ERROR("Object_!= called with 0 arguments.");
-    RETURN(BOOL_TO_VAL(!value_equal(args[0],
-                                    args[1])));
+    RETURN(BOOL_TO_VAL(!value_equal(args[0], args[1])));
 }
 
 DEFINE_NATIVE(Object, not) {
@@ -167,10 +164,14 @@ DEFINE_NATIVE(Fn, callWithThis) {
         return false;
     }
     // Shift the arguments, so that we set up the stack properly.
+    //            0    1         2      3            num_args
+    // We have: | fn | newThis | arg1 | arg2 | ... | arg_{num_args} |
+    // we want:      | newThis | arg1 | arg2 | ... | arg_{num_args} |
+    //                 0         1      2            num_args-1
     ObjClosure* closure = VAL_TO_CLOSURE(args[0]);
     for (int i = 0; i < num_args; i++)
         args[i] = args[i + 1];
-    vm_pop(vm);
+    vm_pop(vm); // this will be a duplicate
     return vm_push_frame(vm, closure, num_args - 1);
 }
 

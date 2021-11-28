@@ -47,7 +47,7 @@ typedef union {
     uint64_t bits64;
 } double_bits;
 
-uint64_t double_to_bits(double d) {
+static uint64_t double_to_bits(double d) {
     double_bits data;
     data.num = d;
     return data.bits64;
@@ -62,7 +62,7 @@ static uint32_t object_hash(Obj* obj)
         case OBJ_OBJECT:
         case OBJ_NATIVE:
             return hash_bits((uintptr_t)obj);
-        case OBJ_UPVALUE:  UNREACHABLE();
+        default: UNREACHABLE();
     }
 }
 
@@ -70,7 +70,7 @@ uint32_t value_hash(Value v) {
     switch (v.type) {
         case VALUE_NIL:    return 0;
         case VALUE_BOOL:   return VAL_TO_BOOL(v) ? 1 : 2;
-        case VALUE_NUMBER: return hash_bits(VAL_TO_NUMBER(v));
+        case VALUE_NUMBER: return hash_bits(double_to_bits(VAL_TO_NUMBER(v)));
         case VALUE_OBJ:    return object_hash(VAL_TO_OBJ(v));
         default: UNREACHABLE();
     }
@@ -82,7 +82,7 @@ bool value_equal(Value a, Value b) {
         case VALUE_NIL:    return true;
         case VALUE_BOOL:   return VAL_TO_BOOL(a) == VAL_TO_BOOL(b);
         case VALUE_NUMBER: return VAL_TO_NUMBER(a) == VAL_TO_NUMBER(b);
-        case VALUE_OBJ: return VAL_TO_OBJ(a) == VAL_TO_OBJ(b);
+        case VALUE_OBJ:    return VAL_TO_OBJ(a) == VAL_TO_OBJ(b);
         default: UNREACHABLE();
     }
 }
