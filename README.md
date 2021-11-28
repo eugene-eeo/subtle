@@ -32,4 +32,20 @@ features operator overloading!
   - this allows us to get rid of hacks in `OP_EQ`, `OP_NEQ`, `OP_NOT`
   - there is no reason why `nil` can't be a regular object
 - [ ] implement `super`
-  - [ ] `super` -> `OP_SUPER`, returns the prototype of `this`.
+  - this is trickier than expected. naively, one would think:
+    ```conf
+    obj.foo = Fn.new{|bar|
+        super.foo(bar) # <=> call this.proto.foo(bar) with the context being `this`
+    };
+    ```
+  but the issue arises when we do:
+    ```
+    let x = obj.clone;
+    x.foo(1); # <-- this will segfault the VM, because
+              # it will do x.proto.foo === obj.foo,
+              # and attempt to do x.proto.foo again...
+    ```
+  - currently the solution is to keep a `whence` field on the callframe, to keep track of where a function was found. this means that it won't work with a custom `getSlot`, as we can lose whence information if e.g. the slot was dynamically generated.
+  - we either have to:
+    1. bite the bullet and implement a best-effort `whence`.
+    2. not implement `super` at all.
