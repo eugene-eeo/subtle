@@ -142,10 +142,30 @@ DEFINE_NATIVE(Object, clone) {
     RETURN(OBJ_TO_VAL(obj));
 }
 
-/* // obj.hasAncestor(x) returns true if the obj has x anywhere */
-/* // on obj's prototype chain. */
-/* DEFINE_NATIVE(Object, hasAncestor) { */
-/* } */
+static bool
+has_ancestor(VM* vm, Value src, Value target)
+{
+    bool rv;
+    if (value_equal(src, target)) return true;
+    if (IS_OBJ(src)) {
+        Obj* obj = VAL_TO_OBJ(src);
+        if (obj->visited) return false;
+        obj->visited = true;
+    }
+    rv = has_ancestor(vm, vm_get_prototype(vm, src), target);
+    if (IS_OBJ(src))
+        VAL_TO_OBJ(src)->visited = false;
+    return rv;
+}
+
+// obj.hasAncestor(x) returns true if the obj has x anywhere
+// on obj's prototype chain (including obj itself, i.e.
+// obj.hasAncestor(obj) is always true).
+DEFINE_NATIVE(Object, hasAncestor) {
+    if (num_args == 0)
+        ERROR("Object_hasAncestor called with 0 arguments.");
+    RETURN(BOOL_TO_VAL(has_ancestor(vm, args[0], args[1])));
+}
 
 DEFINE_NATIVE(Fn, new) {
     if (num_args == 0)
@@ -265,18 +285,19 @@ void core_init_vm(VM* vm)
     vm->not_string      = OBJ_TO_VAL(objstring_copy(vm, "!", 1));
 
     vm->ObjectProto = objobject_new(vm);
-    ADD_METHOD(ObjectProto, "proto",      Object_proto);
-    ADD_METHOD(ObjectProto, "setProto",   Object_setProto);
-    ADD_METHOD(ObjectProto, "getSlot",    Object_getSlot);
-    ADD_METHOD(ObjectProto, "setSlot",    Object_setSlot);
-    ADD_METHOD(ObjectProto, "hasSlot",    Object_hasSlot);
-    ADD_METHOD(ObjectProto, "hasOwnSlot", Object_hasOwnSlot);
-    ADD_METHOD(ObjectProto, "deleteSlot", Object_deleteSlot);
-    ADD_METHOD(ObjectProto, "same",       Object_same);
-    ADD_METHOD(ObjectProto, "==",         Object_equal);
-    ADD_METHOD(ObjectProto, "!=",         Object_notEqual);
-    ADD_METHOD(ObjectProto, "!",          Object_not);
-    ADD_METHOD(ObjectProto, "clone",      Object_clone);
+    ADD_METHOD(ObjectProto, "proto",       Object_proto);
+    ADD_METHOD(ObjectProto, "setProto",    Object_setProto);
+    ADD_METHOD(ObjectProto, "getSlot",     Object_getSlot);
+    ADD_METHOD(ObjectProto, "setSlot",     Object_setSlot);
+    ADD_METHOD(ObjectProto, "hasSlot",     Object_hasSlot);
+    ADD_METHOD(ObjectProto, "hasOwnSlot",  Object_hasOwnSlot);
+    ADD_METHOD(ObjectProto, "deleteSlot",  Object_deleteSlot);
+    ADD_METHOD(ObjectProto, "same",        Object_same);
+    ADD_METHOD(ObjectProto, "==",          Object_equal);
+    ADD_METHOD(ObjectProto, "!=",          Object_notEqual);
+    ADD_METHOD(ObjectProto, "!",           Object_not);
+    ADD_METHOD(ObjectProto, "clone",       Object_clone);
+    ADD_METHOD(ObjectProto, "hasAncestor", Object_hasAncestor);
 
     // Note: allocating here is safe, because all *Protos are marked as
     // roots, and remaining *Protos are initialized to NULL. Thus we won't

@@ -20,6 +20,7 @@ Obj* object_allocate(VM* vm, ObjType type, size_t sz) {
     // again in this function.
     object->type = type;
     object->next = vm->objects;
+    object->visited = false;
     object->marked = false;
     vm->objects = object;
 #ifdef SUBTLE_DEBUG_TRACE_ALLOC

@@ -91,9 +91,6 @@ int debug_print_instruction(Chunk* chunk, int index) {
         case OP_TRUE:     return simple_instruction(index, "OP_TRUE");
         case OP_FALSE:    return simple_instruction(index, "OP_FALSE");
         case OP_NIL:      return simple_instruction(index, "OP_NIL");
-        case OP_EQ:       return simple_instruction(index, "OP_EQ");
-        case OP_NEQ:      return simple_instruction(index, "OP_NEQ");
-        case OP_NOT:      return simple_instruction(index, "OP_NOT");
         case OP_DEF_GLOBAL: return constant_instruction(chunk, index, "OP_DEF_GLOBAL");
         case OP_GET_GLOBAL: return constant_instruction(chunk, index, "OP_GET_GLOBAL");
         case OP_SET_GLOBAL: return constant_instruction(chunk, index, "OP_SET_GLOBAL");

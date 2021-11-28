@@ -189,7 +189,7 @@ vm_get_prototype(VM* vm, Value value)
 {
     switch (value.type) {
         case VALUE_UNDEFINED: UNREACHABLE();
-        case VALUE_NIL: return NIL_VAL;
+        case VALUE_NIL: return OBJ_TO_VAL(vm->ObjectProto);
         case VALUE_BOOL: return OBJ_TO_VAL(vm->BooleanProto);
         case VALUE_NUMBER: return OBJ_TO_VAL(vm->NumberProto);
         case VALUE_OBJ: {
@@ -209,13 +209,21 @@ vm_get_prototype(VM* vm, Value value)
 bool
 vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
 {
-    while (!IS_NIL(src)) {
-        if (IS_OBJECT(src) &&
-                objobject_get(VAL_TO_OBJECT(src), slot_name, slot_value))
+    // We don't mark non-Obj values as visited. This is because
+    // their prototypes are well-known, and can only be given
+    // by vm_get_prototype.
+    bool rv;
+    if (IS_OBJ(src)) {
+        Obj* obj = VAL_TO_OBJ(src);
+        if (obj->visited) return false;
+        if (obj->type == OBJ_OBJECT && objobject_get((ObjObject*)obj, slot_name, slot_value))
             return true;
-        src = vm_get_prototype(vm, src);
+        obj->visited = true;
     }
-    return false;
+    rv = vm_get_slot(vm, vm_get_prototype(vm, src), slot_name, slot_value);
+    if (IS_OBJ(src))
+        VAL_TO_OBJ(src)->visited = false;
+    return rv;
 }
 
 static inline bool
@@ -312,58 +320,6 @@ static InterpretResult run(VM* vm, ObjClosure* top_level) {
             case OP_TRUE:  vm_push(vm, BOOL_TO_VAL(true)); break;
             case OP_FALSE: vm_push(vm, BOOL_TO_VAL(false)); break;
             case OP_NIL:   vm_push(vm, NIL_VAL); break;
-            // OP_EQ, OP_NEQ, and OP_NOT are special cased here.
-            // The logic is as follows; if value_equal(a, b) (resp !value_equal(...)),
-            // then the answer is true. Otherwise, simulate OP_INVOKE with '==' (resp '!=').
-            // This hack is necessary as the semantics for nil is:
-            //    nil == nil
-            //    nil != x   (where x != nil)
-            //    !nil == true
-            // But nil is also the placeholder for "no prototype".
-            case OP_EQ: {
-                Value a = vm_peek(vm, 1);
-                Value b = vm_peek(vm, 0);
-                if (IS_NIL(a) || IS_NIL(b)) {
-                    vm_pop(vm);
-                    vm_pop(vm);
-                    vm_push(vm, BOOL_TO_VAL(value_equal(a, b)));
-                    break;
-                }
-                InterpretResult rv;
-                if (!invoke(vm, a, vm->equal_string, 1, &rv))
-                    return rv;
-                REFRESH_FRAME();
-                break;
-            }
-            case OP_NEQ: {
-                Value a = vm_peek(vm, 1);
-                Value b = vm_peek(vm, 0);
-                if (IS_NIL(a) || IS_NIL(b)) {
-                    vm_pop(vm);
-                    vm_pop(vm);
-                    vm_push(vm, BOOL_TO_VAL(!value_equal(a, b)));
-                    break;
-                }
-                InterpretResult rv;
-                if (!invoke(vm, a, vm->notEqual_string, 1, &rv))
-                    return rv;
-                REFRESH_FRAME();
-                break;
-            }
-            case OP_NOT: {
-                Value a = vm_peek(vm, 0);
-                if (IS_NIL(a)) {
-                    vm_pop(vm);
-                    vm_push(vm, BOOL_TO_VAL(true));
-                    break;
-                }
-                // Simulate an OP_INVOKE instead.
-                InterpretResult rv;
-                if (!invoke(vm, a, vm->not_string, 0, &rv))
-                    return rv;
-                REFRESH_FRAME();
-                break;
-            }
             case OP_DEF_GLOBAL: {
                 Value name = READ_CONSTANT();
                 table_set(&vm->globals, vm, name, vm_peek(vm, 0));

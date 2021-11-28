@@ -30,7 +30,6 @@ int main() {
     printf("Table benchmark (keys=%d)\n", MAX_VALUE);
     printf("---------------\n");
     struct timespec t1, t2, tdiff;
-    clock_gettime(CLOCK_MONOTONIC, &t1);
 
     VM vm;
     Table table;
@@ -41,6 +40,9 @@ int main() {
     table_init(&table);
     Value tmp;
     int ops = 0;
+
+    // Insertion benchmark
+    clock_gettime(CLOCK_MONOTONIC, &t1);
 
     for (int i = 0; i < MAX_VALUE; i++) {
         table_set(&table, &vm, NUMBER_TO_VAL(i), NUMBER_TO_VAL(i));

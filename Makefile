@@ -1,3 +1,5 @@
+ci: test release
+
 cute:
 	gcc -DSUBTLE_DEBUG \
 		-DSUBTLE_DEBUG_TRACE_EXECUTION \
@@ -12,7 +14,7 @@ debug:
 		-g -Og *.c -o subtle
 
 release:
-	gcc -O3 *.c -o subtle
+	gcc -O3 *.c -Wall -o subtle
 
 stress:
 	gcc -DSUBTLE_DEBUG \
@@ -26,6 +28,7 @@ benchmark:
 	gcc -DSUBTLE_DEBUG_TABLE_STATS \
 		-O3 -Wall $(DEPS) \
 		bench/benchmark_table.c -o build/table_benchmark
+	./build/table_benchmark
 
 test: stress
 	valgrind -q ./subtle ./tests/operations

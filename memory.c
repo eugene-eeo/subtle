@@ -46,6 +46,7 @@ void mark_object(VM* vm, Obj* obj) {
     printf("\n");
 #endif
 
+    ASSERT(!obj->visited, "obj->visited");
     obj->marked = true;
 
     // Make space in the gray stack.

@@ -585,20 +585,20 @@ static void unary(Compiler* compiler, bool can_assign) {
     switch (operator) {
         case TOKEN_BANG:
         {
-            emit_byte(compiler, OP_NOT);
-            return;
+            method_constant = identifier_constant(compiler, &op_token);
+            break;
         }
         case TOKEN_MINUS:
         {
             Token synth = {.type = TOKEN_MINUS, .start = "neg", .length = 3, .line = 0};
             method_constant = identifier_constant(compiler, &synth);
-            emit_byte(compiler, OP_INVOKE);
-            emit_offset(compiler, method_constant);
-            emit_byte(compiler, 0); // 0 arguments.
             break;
         }
         default: UNREACHABLE();
     }
+    emit_byte(compiler, OP_INVOKE);
+    emit_offset(compiler, method_constant);
+    emit_byte(compiler, 0); // 0 arguments.
 }
 
 static void binary(Compiler* compiler, bool can_assign) {
@@ -609,8 +609,8 @@ static void binary(Compiler* compiler, bool can_assign) {
     uint16_t constant = identifier_constant(compiler, &op_token);
 
     switch (operator) {
-        case TOKEN_EQ_EQ:   emit_byte(compiler, OP_EQ); break;
-        case TOKEN_BANG_EQ: emit_byte(compiler, OP_NEQ); break;
+        case TOKEN_EQ_EQ:
+        case TOKEN_BANG_EQ:
         case TOKEN_PLUS:
         case TOKEN_MINUS:
         case TOKEN_TIMES:
