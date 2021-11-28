@@ -25,32 +25,22 @@ void table_free(Table* table, VM* vm) {
 static Entry* table_find_entry(Entry* entries, size_t capacity, Value key) {
     size_t index = value_hash(key) & (capacity - 1);
     Entry* tombstone = NULL;
-#ifdef SUBTLE_DEBUG_TABLE_STATS
-    int probes = 0;
-#endif
     // As long as we keep TABLE_MAX_LOAD < 1, we will never have to
     // worry about wrapping around to index, because the table will
     // always have enough space for empty entries.
     for (;;) {
-#ifdef SUBTLE_DEBUG_TABLE_STATS
-        probes++;
-#endif
         Entry* entry = &entries[index];
         if (IS_UNDEFINED(entry->key)) {
             if (IS_NIL(entry->value)) {
-#ifdef SUBTLE_DEBUG_TABLE_STATS
-                UPDATE_TABLE_STATS(probes);
-#endif
+                // Empty entry
                 return tombstone == NULL ? entry : tombstone;
             } else {
+                // Tombstone entry
                 if (tombstone == NULL)
                     tombstone = entry;
             }
         } else if (value_equal(entry->key, key)) {
             // Found the key.
-#ifdef SUBTLE_DEBUG_TABLE_STATS
-            UPDATE_TABLE_STATS(probes);
-#endif
             return entry;
         }
         index = (index + 1) & (capacity - 1);
@@ -112,7 +102,9 @@ bool table_set(Table* table, VM* vm, Value key, Value value) {
     return is_new_key;
 }
 
-bool table_delete(Table* table, VM* vm, Value key) {
+// Just deletes a key from the table, without compaction
+static
+bool table_delete_key(Table* table, VM* vm, Value key) {
     if (table->valid == 0) return false;
 
     Entry* entry = table_find_entry(table->entries, table->capacity, key);
@@ -122,7 +114,11 @@ bool table_delete(Table* table, VM* vm, Value key) {
     entry->key = UNDEFINED_VAL;
     entry->value = UNDEFINED_VAL;
     table->valid--;
+    return true;
+}
 
+static
+void table_compact(Table* table, VM* vm) {
     // Compact the table if necessary.
     if (table->capacity > 8
             && table->valid * 2 < table->count) {
@@ -135,11 +131,17 @@ bool table_delete(Table* table, VM* vm, Value key) {
         //            ^-- new count       ^--- new capacity
         size_t new_capacity = SHRINK_CAPACITY(table->capacity);
         table_adjust_capacity(table, vm, new_capacity);
+        ASSERT(table->capacity >= 8, "capacity < min_capacity");
     }
 
     ASSERT(table->count >= table->valid, "count < valid");
     ASSERT(table->count <= table->capacity * TABLE_MAX_LOAD, "count < max_load");
-    return true;
+}
+
+bool table_delete(Table* table, VM* vm, Value key) {
+    bool rv = table_delete_key(table, vm, key);
+    table_compact(table, vm);
+    return rv;
 }
 
 ObjString*
@@ -180,6 +182,7 @@ table_remove_white(Table* table, VM* vm)
     for (size_t i = 0; i < table->capacity; i++) {
         Entry* entry = &table->entries[i];
         if (IS_OBJ(entry->key) && !VAL_TO_OBJ(entry->key)->marked)
-            table_delete(table, vm, entry->key);
+            table_delete_key(table, vm, entry->key);
     }
+    table_compact(table, vm);
 }

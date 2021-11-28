@@ -70,14 +70,6 @@ int main() {
     clock_gettime(CLOCK_MONOTONIC, &t2);
     timespec_diff(&t1, &t2, &tdiff);
     printf("inserts: %f s\n", (tdiff.tv_sec + tdiff.tv_nsec / 1000000000.0));
-#ifdef SUBTLE_DEBUG_TABLE_STATS
-    printf("---- table stats ----\n");
-    printf("min: %d\n", table_stats.min);
-    printf("max: %d\n", table_stats.max);
-    printf("avg: %f\n", table_stats.avg);
-    printf("---------------------\n");
-    RESET_TABLE_STATS();
-#endif
     clock_gettime(CLOCK_MONOTONIC, &t1);
 
     for (int i = MAX_VALUE - 1; i >= 0; i--) {
@@ -97,11 +89,4 @@ int main() {
     clock_gettime(CLOCK_MONOTONIC, &t2);
     timespec_diff(&t1, &t2, &tdiff);
     printf("deletes: %f s\n", (tdiff.tv_sec + tdiff.tv_nsec / 1000000000.0));
-#ifdef SUBTLE_DEBUG_TABLE_STATS
-    printf("---- table stats ----\n");
-    printf("min: %d\n", table_stats.min);
-    printf("max: %d\n", table_stats.max);
-    printf("avg: %f\n", table_stats.avg);
-    printf("---------------------\n");
-#endif
 }
