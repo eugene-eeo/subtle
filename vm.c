@@ -332,10 +332,10 @@ static InterpretResult run(VM* vm, ObjClosure* top_level) {
             case OP_EQ: {
                 Value a = vm_peek(vm, 1);
                 Value b = vm_peek(vm, 0);
-                if (value_equal(a, b)) {
+                if (IS_NIL(a) || IS_NIL(b)) {
                     vm_pop(vm);
                     vm_pop(vm);
-                    vm_push(vm, BOOL_TO_VAL(true));
+                    vm_push(vm, BOOL_TO_VAL(value_equal(a, b)));
                     break;
                 }
                 InterpretResult rv;
@@ -347,10 +347,10 @@ static InterpretResult run(VM* vm, ObjClosure* top_level) {
             case OP_NEQ: {
                 Value a = vm_peek(vm, 1);
                 Value b = vm_peek(vm, 0);
-                if (!value_equal(a, b)) {
+                if (IS_NIL(a) || IS_NIL(b)) {
                     vm_pop(vm);
                     vm_pop(vm);
-                    vm_push(vm, BOOL_TO_VAL(true));
+                    vm_push(vm, BOOL_TO_VAL(!value_equal(a, b)));
                     break;
                 }
                 InterpretResult rv;
