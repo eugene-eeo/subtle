@@ -189,7 +189,7 @@ vm_get_prototype(VM* vm, Value value)
 {
     switch (value.type) {
         case VALUE_UNDEFINED: UNREACHABLE();
-        case VALUE_NIL: return OBJ_TO_VAL(vm->ObjectProto);
+        case VALUE_NIL: return NIL_VAL;
         case VALUE_BOOL: return OBJ_TO_VAL(vm->BooleanProto);
         case VALUE_NUMBER: return OBJ_TO_VAL(vm->NumberProto);
         case VALUE_OBJ: {
@@ -246,7 +246,8 @@ invoke(VM* vm, Value obj, Value key, int num_args, InterpretResult* rv)
         Value getSlot_slot;
         if (!vm_get_slot(vm, obj, vm->getSlot_string, &getSlot_slot)) {
             vm_runtime_error(vm, "Object has no slot `getSlot`.");
-            return INTERPRET_RUNTIME_ERROR;
+            *rv = INTERPRET_RUNTIME_ERROR;
+            return false;
         }
 
         // Call <obj>.getSlot(<key>)
@@ -260,6 +261,7 @@ invoke(VM* vm, Value obj, Value key, int num_args, InterpretResult* rv)
     if (!is_activatable(slot)) {
         if (num_args != 0) {
             vm_runtime_error(vm, "Tried to call non-activatable slot with %d arguments.", num_args);
+            *rv = INTERPRET_RUNTIME_ERROR;
             return false;
         }
         vm_pop(vm); // The object.
@@ -268,8 +270,10 @@ invoke(VM* vm, Value obj, Value key, int num_args, InterpretResult* rv)
     }
     // The stack is already in the correct form for a method call.
     // We have `obj` followed by `num_args`.
-    if (!complete_call(vm, slot, num_args))
+    if (!complete_call(vm, slot, num_args)) {
         *rv = INTERPRET_RUNTIME_ERROR;
+        return false;
+    }
     return true;
 }
 
