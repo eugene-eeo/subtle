@@ -23,9 +23,12 @@ void timespec_diff(struct timespec *start, struct timespec *stop,
     return;
 }
 
-#define MAX_VALUE 8192 * 2
+#define MAX_VALUE 8192 * 4
 
 int main() {
+    printf("---------------\n");
+    printf("Table benchmark (keys=%d)\n", MAX_VALUE);
+    printf("---------------\n");
     struct timespec t1, t2, tdiff;
     clock_gettime(CLOCK_MONOTONIC, &t1);
 
@@ -34,27 +37,16 @@ int main() {
 
     // Init
     vm_init(&vm);
+    vm.next_gc = 5L * 1024 * 1024 * 1024;
     table_init(&table);
     Value tmp;
+    int ops = 0;
 
     for (int i = 0; i < MAX_VALUE; i++) {
         table_set(&table, &vm, NUMBER_TO_VAL(i), NUMBER_TO_VAL(i));
         assert(table_get(&table, NUMBER_TO_VAL(i), &tmp));
         assert(value_equal(tmp, NUMBER_TO_VAL(i)));
-
-        size_t old_count = table.count;
-
-        table_set(&table, &vm, NUMBER_TO_VAL(i), NUMBER_TO_VAL(i+1));
-        assert(table_get(&table, NUMBER_TO_VAL(i), &tmp));
-        assert(value_equal(tmp, NUMBER_TO_VAL(i+1)));
-
-        assert(table.count == old_count);
-
-        table_set(&table, &vm, NUMBER_TO_VAL(i), NUMBER_TO_VAL(i));
-        assert(table_get(&table, NUMBER_TO_VAL(i), &tmp));
-        assert(value_equal(tmp, NUMBER_TO_VAL(i)));
-
-        assert(table.count == old_count);
+        ops += 2;
 
         assert(table.count == table.valid);
         assert(table.valid == i + 1);
@@ -64,17 +56,25 @@ int main() {
         for (int j = 0; j < i; j++) {
             assert(table_get(&table, NUMBER_TO_VAL(j), &tmp));
             assert(value_equal(tmp, NUMBER_TO_VAL(j)));
+            ops += 1;
         }
     }
 
     clock_gettime(CLOCK_MONOTONIC, &t2);
     timespec_diff(&t1, &t2, &tdiff);
-    printf("inserts: %f s\n", (tdiff.tv_sec + tdiff.tv_nsec / 1000000000.0));
+    printf("[insert+read] ops: %d, total: %fs, ns/op: %f\n",
+           ops,
+           ((double) tdiff.tv_sec + (double) tdiff.tv_nsec / 1e9),
+           ((double) tdiff.tv_sec * 1e9 + (double) tdiff.tv_nsec) / (double)ops);
+
+    // Deletion Benchmark
+    ops = 0;
     clock_gettime(CLOCK_MONOTONIC, &t1);
 
     for (int i = MAX_VALUE - 1; i >= 0; i--) {
         table_delete(&table, &vm, NUMBER_TO_VAL(i));
         assert(!table_get(&table, NUMBER_TO_VAL(i), &tmp));
+        ops += 2;
 
         assert(table.count >= table.valid);
         assert(table.valid == i);
@@ -83,10 +83,14 @@ int main() {
         for (int j = 0; j < i; j++) {
             assert(table_get(&table, NUMBER_TO_VAL(j), &tmp));
             assert(value_equal(tmp, NUMBER_TO_VAL(j)));
+            ops += 1;
         }
     }
 
     clock_gettime(CLOCK_MONOTONIC, &t2);
     timespec_diff(&t1, &t2, &tdiff);
-    printf("deletes: %f s\n", (tdiff.tv_sec + tdiff.tv_nsec / 1000000000.0));
+    printf("[delete+read] ops: %d, total: %fs, ns/op: %f\n",
+           ops,
+           ((double) tdiff.tv_sec + (double) tdiff.tv_nsec / 1e9),
+           ((double) tdiff.tv_sec * 1e9 + (double) tdiff.tv_nsec) / (double)ops);
 }
