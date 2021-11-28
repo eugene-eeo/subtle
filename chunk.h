@@ -14,6 +14,7 @@ enum OpCode {
     OP_NIL,
     OP_EQ,
     OP_NEQ,
+    OP_NOT,
     OP_DEF_GLOBAL,
     OP_GET_GLOBAL,
     OP_SET_GLOBAL,

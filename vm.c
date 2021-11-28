@@ -14,8 +14,6 @@
 #include "debug.h"
 #endif
 
-#define MAX_LOOKUPS 64
-
 void vm_init(VM* vm) {
     vm->frame_count = 0;
     vm->stack_top = vm->stack;
@@ -23,6 +21,9 @@ void vm_init(VM* vm) {
 
     vm->getSlot_string = NIL_VAL;
     vm->setSlot_string = NIL_VAL;
+    vm->equal_string = NIL_VAL;
+    vm->notEqual_string = NIL_VAL;
+    vm->not_string = NIL_VAL;
 
     vm->ObjectProto = NULL;
     vm->FnProto = NULL;
@@ -213,14 +214,12 @@ vm_get_prototype(VM* vm, Value value)
 bool
 vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
 {
-    int lookups = 0;
-    do {
+    while (!IS_NIL(src)) {
         if (IS_OBJECT(src) &&
                 objobject_get(VAL_TO_OBJECT(src), slot_name, slot_value))
             return true;
         src = vm_get_prototype(vm, src);
-        lookups++;
-    } while (!IS_NIL(src) && lookups < MAX_LOOKUPS);
+    }
     return false;
 }
 
@@ -235,6 +234,43 @@ static inline bool
 is_activatable(Value value)
 {
     return IS_CLOSURE(value) || IS_NATIVE(value);
+}
+
+static inline bool
+invoke(VM* vm, Value obj, Value key, int num_args, InterpretResult* rv)
+{
+    Value slot;
+    // If the slot doesn't exist directly on the object, then
+    // we have to resort to getSlot.
+    if (!vm_get_slot(vm, obj, key, &slot)) {
+        Value getSlot_slot;
+        if (!vm_get_slot(vm, obj, vm->getSlot_string, &getSlot_slot)) {
+            vm_runtime_error(vm, "Object has no slot `getSlot`.");
+            return INTERPRET_RUNTIME_ERROR;
+        }
+
+        // Call <obj>.getSlot(<key>)
+        vm_push(vm, obj);
+        vm_push(vm, key);
+        if (!vm_call(vm, getSlot_slot, 1, &slot, rv))
+            return false;
+    }
+
+    // Check if the slot is activatable.
+    if (!is_activatable(slot)) {
+        if (num_args != 0) {
+            vm_runtime_error(vm, "Tried to call non-activatable slot with %d arguments.", num_args);
+            return false;
+        }
+        vm_pop(vm); // The object.
+        vm_push(vm, slot);
+        return true;
+    }
+    // The stack is already in the correct form for a method call.
+    // We have `obj` followed by `num_args`.
+    if (!complete_call(vm, slot, num_args))
+        *rv = INTERPRET_RUNTIME_ERROR;
+    return true;
 }
 
 static InterpretResult run(VM* vm, ObjClosure* top_level) {
@@ -285,6 +321,58 @@ static InterpretResult run(VM* vm, ObjClosure* top_level) {
             case OP_TRUE:  vm_push(vm, BOOL_TO_VAL(true)); break;
             case OP_FALSE: vm_push(vm, BOOL_TO_VAL(false)); break;
             case OP_NIL:   vm_push(vm, NIL_VAL); break;
+            // OP_EQ, OP_NEQ, and OP_NOT are special cased here.
+            // The logic is as follows; if value_equal(a, b) (resp !value_equal(...)),
+            // then the answer is true. Otherwise, simulate OP_INVOKE with '==' (resp '!=').
+            // This hack is necessary as the semantics for nil is:
+            //    nil == nil
+            //    nil != x   (where x != nil)
+            //    !nil == true
+            // But nil is also the placeholder for "no prototype".
+            case OP_EQ: {
+                Value a = vm_peek(vm, 1);
+                Value b = vm_peek(vm, 0);
+                if (value_equal(a, b)) {
+                    vm_pop(vm);
+                    vm_pop(vm);
+                    vm_push(vm, BOOL_TO_VAL(true));
+                    break;
+                }
+                InterpretResult rv;
+                if (!invoke(vm, a, vm->equal_string, 1, &rv))
+                    return rv;
+                REFRESH_FRAME();
+                break;
+            }
+            case OP_NEQ: {
+                Value a = vm_peek(vm, 1);
+                Value b = vm_peek(vm, 0);
+                if (!value_equal(a, b)) {
+                    vm_pop(vm);
+                    vm_pop(vm);
+                    vm_push(vm, BOOL_TO_VAL(true));
+                    break;
+                }
+                InterpretResult rv;
+                if (!invoke(vm, a, vm->notEqual_string, 1, &rv))
+                    return rv;
+                REFRESH_FRAME();
+                break;
+            }
+            case OP_NOT: {
+                Value a = vm_peek(vm, 0);
+                if (IS_NIL(a)) {
+                    vm_pop(vm);
+                    vm_push(vm, BOOL_TO_VAL(true));
+                    break;
+                }
+                // Simulate an OP_INVOKE instead.
+                InterpretResult rv;
+                if (!invoke(vm, a, vm->not_string, 0, &rv))
+                    return rv;
+                REFRESH_FRAME();
+                break;
+            }
             case OP_DEF_GLOBAL: {
                 Value name = READ_CONSTANT();
                 table_set(&vm->globals, vm, name, vm_peek(vm, 0));
@@ -436,39 +524,11 @@ static InterpretResult run(VM* vm, ObjClosure* top_level) {
                 Value key = READ_CONSTANT();
                 uint8_t num_args = READ_BYTE();
                 Value obj = vm_peek(vm, num_args);
-                Value slot;
-
-                // If the slot doesn't exist directly on the object, then
-                // we have to resort to getSlot.
-                if (!vm_get_slot(vm, obj, key, &slot)) {
-                    Value getSlot_slot;
-                    if (!vm_get_slot(vm, obj, vm->getSlot_string, &getSlot_slot)) {
-                        vm_runtime_error(vm, "Object has no slot `getSlot`.");
-                        return INTERPRET_RUNTIME_ERROR;
-                    }
-
-                    // Call <obj>.getSlot(<key>)
-                    InterpretResult rv;
-                    vm_push(vm, obj);
-                    vm_push(vm, key);
-                    if (!vm_call(vm, getSlot_slot, 1, &slot, &rv))
-                        return rv;
-                }
-
-                // Check if the slot is activatable.
-                if (!is_activatable(slot)) {
-                    if (num_args != 0) {
-                        vm_runtime_error(vm, "Tried to call non-activatable slot with %d arguments.", num_args);
-                        return INTERPRET_RUNTIME_ERROR;
-                    }
-                    vm_pop(vm); // The object.
-                    vm_push(vm, slot);
-                    break;
-                }
-                // The stack is already in the correct form for a method call.
-                // The object is above `num_args` values.
-                if (!complete_call(vm, slot, num_args))
-                    return INTERPRET_RUNTIME_ERROR;
+                InterpretResult rv;
+                // The stack is perfect for a method call; we have the
+                // object before `num_args`.
+                if (!invoke(vm, obj, key, num_args, &rv))
+                    return rv;
                 REFRESH_FRAME();
                 break;
             }

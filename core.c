@@ -120,16 +120,6 @@ DEFINE_NATIVE(Object, equal) {
 DEFINE_NATIVE(Object, notEqual) {
     if (num_args == 0)
         ERROR("Object_!= called with 0 arguments.");
-    Value equal_slot;
-    if (vm_get_string_slot(vm, args[0], "==", &equal_slot)) {
-        Value return_value;
-        InterpretResult rv;
-        vm_push(vm, args[0]);
-        vm_push(vm, args[1]);
-        if (!vm_call(vm, equal_slot, 1, &return_value, &rv))
-            return rv;
-        RETURN(BOOL_TO_VAL(!value_truthy(return_value)));
-    }
     RETURN(BOOL_TO_VAL(!value_equal(args[0],
                                     args[1])));
 }
@@ -143,6 +133,11 @@ DEFINE_NATIVE(Object, clone) {
     obj->proto = args[0];
     RETURN(OBJ_TO_VAL(obj));
 }
+
+/* // obj.hasAncestor(x) returns true if the obj has x anywhere */
+/* // on obj's prototype chain. */
+/* DEFINE_NATIVE(Object, hasAncestor) { */
+/* } */
 
 DEFINE_NATIVE(Fn, new) {
     if (num_args == 0)
@@ -251,8 +246,11 @@ void core_init_vm(VM* vm)
 #define ADD_NATIVE(table, name, fn)  (ADD_OBJECT(table, name, objnative_new(vm, fn)))
 #define ADD_METHOD(PROTO, name, fn)  (ADD_NATIVE(&vm->PROTO->slots, name, fn))
 
-    vm->getSlot_string = OBJ_TO_VAL(objstring_copy(vm, "getSlot", 7));
-    vm->setSlot_string = OBJ_TO_VAL(objstring_copy(vm, "setSlot", 7));
+    vm->getSlot_string  = OBJ_TO_VAL(objstring_copy(vm, "getSlot", 7));
+    vm->setSlot_string  = OBJ_TO_VAL(objstring_copy(vm, "setSlot", 7));
+    vm->equal_string    = OBJ_TO_VAL(objstring_copy(vm, "==", 2));
+    vm->notEqual_string = OBJ_TO_VAL(objstring_copy(vm, "!=", 2));
+    vm->not_string      = OBJ_TO_VAL(objstring_copy(vm, "!", 1));
 
     vm->ObjectProto = objobject_new(vm);
     ADD_METHOD(ObjectProto, "proto",      Object_proto);

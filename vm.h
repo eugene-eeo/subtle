@@ -41,6 +41,9 @@ typedef struct VM {
     // Constants needed by the VM
     Value getSlot_string;
     Value setSlot_string;
+    Value equal_string;
+    Value notEqual_string;
+    Value not_string;
 
     // Core Protos
     ObjObject* ObjectProto;
@@ -100,11 +103,11 @@ bool vm_get_string_slot(VM* vm, Value src, const char* slot_name, Value* slot_va
 // num_args argument should be the number of _actual_ arguments.
 // The stack should look like this:
 //
-//          | nargs |
-//   +------+-------+
-//   | this |  ...  |
-//   +------+-------|
-//                  ^-- stack_top
+//                | nargs |
+//   +-----+------+-------+
+//   | ... | this |  ...  |
+//   +-----+------+-------+
+//                        ^-- stack_top
 bool vm_push_frame(VM* vm, ObjClosure* closure, int num_args);
 
 // Runs the given slot, returning true if the call succeeded
