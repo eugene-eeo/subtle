@@ -94,7 +94,6 @@ InterpretResult vm_interpret(VM* vm, const char* source);
 // =============
 Value vm_get_prototype(VM* vm, Value value);
 bool vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value);
-bool vm_get_string_slot(VM* vm, Value src, const char* slot_name, Value* slot_value);
 
 // Function calls
 // ==============

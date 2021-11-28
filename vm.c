@@ -195,9 +195,6 @@ vm_get_prototype(VM* vm, Value value)
         case VALUE_OBJ: {
             Obj* object = VAL_TO_OBJ(value);
             switch (object->type) {
-                case OBJ_FUNCTION:
-                case OBJ_UPVALUE:
-                    UNREACHABLE();
                 case OBJ_STRING:
                     return OBJ_TO_VAL(vm->StringProto);
                 case OBJ_NATIVE:
@@ -206,6 +203,8 @@ vm_get_prototype(VM* vm, Value value)
                     return ((ObjObject*)object)->proto;
                 case OBJ_CLOSURE:
                     return OBJ_TO_VAL(vm->FnProto);
+                default:
+                    UNREACHABLE();
             }
         }
     }
@@ -223,13 +222,6 @@ vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
     return false;
 }
 
-bool
-vm_get_string_slot(VM* vm, Value src, const char* slot_name, Value* slot_value)
-{
-    ObjString* slot_name_str = objstring_copy(vm, slot_name, strlen(slot_name));
-    return vm_get_slot(vm, src, OBJ_TO_VAL(slot_name_str), slot_value);
-}
-
 static inline bool
 is_activatable(Value value)
 {
@@ -240,8 +232,7 @@ static inline bool
 invoke(VM* vm, Value obj, Value key, int num_args, InterpretResult* rv)
 {
     Value slot;
-    // If the slot doesn't exist directly on the object, then
-    // we have to resort to getSlot.
+    // If the slot doesn't exist directly on the object, then resort to getSlot.
     if (!vm_get_slot(vm, obj, key, &slot)) {
         Value getSlot_slot;
         if (!vm_get_slot(vm, obj, vm->getSlot_string, &getSlot_slot)) {
@@ -260,7 +251,7 @@ invoke(VM* vm, Value obj, Value key, int num_args, InterpretResult* rv)
     // Check if the slot is activatable.
     if (!is_activatable(slot)) {
         if (num_args != 0) {
-            vm_runtime_error(vm, "Tried to call non-activatable slot with %d arguments.", num_args);
+            vm_runtime_error(vm, "Tried to call non-activatable slot with %d > 0 arguments.", num_args);
             *rv = INTERPRET_RUNTIME_ERROR;
             return false;
         }
