@@ -24,7 +24,7 @@ DEPS=$(shell ls *.c | grep -v main.c)
 benchmark:
 	mkdir -p build
 	gcc -DSUBTLE_DEBUG_TABLE_STATS \
-		-O3 $(DEPS) \
+		-O3 -Wall $(DEPS) \
 		bench/benchmark_table.c -o build/table_benchmark
 
 test: stress
@@ -37,3 +37,4 @@ test: stress
 	valgrind -q ./subtle ./tests/this
 	valgrind -q ./subtle ./tests/vm_call
 	valgrind -q ./subtle ./tests/compact
+	valgrind -q ./subtle ./tests/table

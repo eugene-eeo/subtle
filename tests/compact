@@ -1,7 +1,7 @@
 # test table compaction.
 let x = {};
 let i;
-let MAX = 4096;
+let MAX = 256;
 
 i = 0;
 while (i < MAX) {
