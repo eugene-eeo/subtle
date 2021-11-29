@@ -102,6 +102,17 @@ DEFINE_NATIVE(Object, getOwnSlot) {
     RETURN(BOOL_TO_VAL(objobject_has(this, args[1])));
 }
 
+DEFINE_NATIVE(Object, setOwnSlot) {
+    if (num_args != 2)
+        ERROR("Object_setOwnSlot requires 2 arguments.");
+
+    if (!IS_OBJECT(args[0]))
+        RETURN(NIL_VAL);
+
+    objobject_set(VAL_TO_OBJECT(args[0]), vm, args[1], args[2]);
+    RETURN(args[2]);
+}
+
 DEFINE_NATIVE(Object, hasOwnSlot) {
     if (num_args == 0)
         ERROR("Object_hasOwnSlot called with 0 arguments.");
@@ -302,6 +313,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "rawSetSlot",  Object_rawSetSlot);
     ADD_METHOD(ObjectProto, "hasSlot",     Object_hasSlot);
     ADD_METHOD(ObjectProto, "getOwnSlot",  Object_getOwnSlot);
+    ADD_METHOD(ObjectProto, "setOwnSlot",  Object_setOwnSlot);
     ADD_METHOD(ObjectProto, "hasOwnSlot",  Object_hasOwnSlot);
     ADD_METHOD(ObjectProto, "deleteSlot",  Object_deleteSlot);
     ADD_METHOD(ObjectProto, "same",        Object_same);
