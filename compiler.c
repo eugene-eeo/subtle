@@ -161,6 +161,27 @@ static void consume(Compiler* compiler, TokenType type, const char* message) {
         error_at_current(compiler, message);
 }
 
+static bool match_slot(Compiler* compiler) {
+    if (check(compiler, TOKEN_VARIABLE)
+            || check(compiler, TOKEN_PLUS)  || check(compiler, TOKEN_MINUS)
+            || check(compiler, TOKEN_TIMES) || check(compiler, TOKEN_SLASH)
+            || check(compiler, TOKEN_PIPE)
+            || check(compiler, TOKEN_AMP)
+            || check(compiler, TOKEN_BANG)
+            || check(compiler, TOKEN_EQ_EQ) || check(compiler, TOKEN_BANG_EQ)
+            || check(compiler, TOKEN_LT)    || check(compiler, TOKEN_LEQ)
+            || check(compiler, TOKEN_GT)    || check(compiler, TOKEN_GEQ)) {
+        advance(compiler);
+        return true;
+    }
+    return false;
+}
+
+static void consume_slot(Compiler* compiler, const char* message) {
+    if (!match_slot(compiler))
+        error_at_current(compiler, message);
+}
+
 // Bytecode utilities
 // ==================
 
@@ -525,7 +546,7 @@ static void block_argument(Compiler* compiler) {
 }
 
 static void dot(Compiler* compiler, bool can_assign) {
-    consume(compiler, TOKEN_VARIABLE, "Expect slot name after '.'.");
+    consume_slot(compiler, "Expect slot name after '.'.");
     uint16_t slot_name = identifier_constant(compiler, &compiler->parser->previous);
 
     if (can_assign && match(compiler, TOKEN_EQ)) {

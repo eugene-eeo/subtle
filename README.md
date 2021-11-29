@@ -6,7 +6,7 @@ features operator overloading!
 ```cfg
 # Comments start with '#'
 let Point = {};
-Point.setSlot("+") {|other|
+Point.+ = Fn.new {|other|  # yes, this is allowed
     return {x: this.x + other.x,
             y: this.y + other.y};
 };
