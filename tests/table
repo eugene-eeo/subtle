@@ -1,11 +1,9 @@
 # tests objects (specifically, the table implementation)
 
 let x = {};
-x.setSlot("abc", 1);
-x.setSlot("def", 2);
+x.abc = 1;
+x.def = 2;
 
-assert x.rawGetSlot("abc") == 1;
-assert x.rawGetSlot("def") == 2;
 assert x.abc == 1;
 assert x.def == 2;
 
@@ -15,8 +13,8 @@ assert x.ab == nil;
 assert x.abc == nil;
 assert !x.hasOwnSlot("abc");
 
-x.setSlot("ghi", 3);
-x.setSlot("jkl", 4);
+x.ghi = 3;
+x.jkl = 4;
 assert x.def == 2;
 assert x.ghi == 3;
 assert x.jkl == 4;
