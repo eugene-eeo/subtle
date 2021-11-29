@@ -60,9 +60,9 @@ DEFINE_NATIVE(Object, setProto) {
     RETURN(NIL_VAL);
 }
 
-DEFINE_NATIVE(Object, getSlot) {
+DEFINE_NATIVE(Object, rawGetSlot) {
     if (num_args == 0)
-        ERROR("Object_getSlot called with 0 arguments.");
+        ERROR("Object_rawGetSlot called with 0 arguments.");
 
     Value this = args[0];
     Value slot;
@@ -83,12 +83,35 @@ DEFINE_NATIVE(Object, setSlot) {
     RETURN(NIL_VAL);
 }
 
+DEFINE_NATIVE(Object, rawSetSlot) {
+    if (num_args < 2)
+        ERROR("Object_rawSetSlot called with %d arguments, need 2.", num_args);
+
+    if (!IS_OBJECT(args[0]))
+        ERROR("Object_rawSetSlot called on a non-object.");
+
+    ObjObject* this = VAL_TO_OBJECT(args[0]);
+    objobject_set(this, vm, args[1], args[2]);
+    RETURN(NIL_VAL);
+}
+
 DEFINE_NATIVE(Object, hasSlot) {
     if (num_args == 0)
         ERROR("Object_hasSlot called with 0 arguments.");
     Value slot;
     bool has_slot = vm_get_slot(vm, args[0], args[1], &slot);
     RETURN(BOOL_TO_VAL(has_slot));
+}
+
+DEFINE_NATIVE(Object, getOwnSlot) {
+    if (num_args == 0)
+        ERROR("Object_getOwnSlot called with 0 arguments.");
+
+    if (!IS_OBJECT(args[0]))
+        RETURN(NIL_VAL);
+
+    ObjObject* this = VAL_TO_OBJECT(args[0]);
+    RETURN(BOOL_TO_VAL(objobject_has(this, args[1])));
 }
 
 DEFINE_NATIVE(Object, hasOwnSlot) {
@@ -236,9 +259,9 @@ DEFINE_NATIVE(Native, callWithThis) {
 #define DEFINE_ARITHMETIC_METHOD(name, op, return_type) \
     DEFINE_NATIVE(Number, name) {\
         if (!IS_NUMBER(args[0])) \
-            ERROR("Expected to be called on a number."); \
+            ERROR("%s expected to be called on a number.", __func__); \
         if (num_args == 0 || !IS_NUMBER(args[1])) \
-            ERROR("Expected a number."); \
+            ERROR("%s called with a non-number.", __func__); \
         Value this = args[0]; \
         RETURN(return_type(VAL_TO_NUMBER(this) op VAL_TO_NUMBER(args[1]))); \
     }
@@ -287,9 +310,11 @@ void core_init_vm(VM* vm)
     vm->ObjectProto = objobject_new(vm);
     ADD_METHOD(ObjectProto, "proto",       Object_proto);
     ADD_METHOD(ObjectProto, "setProto",    Object_setProto);
-    ADD_METHOD(ObjectProto, "getSlot",     Object_getSlot);
+    ADD_METHOD(ObjectProto, "rawGetSlot",  Object_rawGetSlot);
+    ADD_METHOD(ObjectProto, "rawSetSlot",  Object_rawSetSlot);
     ADD_METHOD(ObjectProto, "setSlot",     Object_setSlot);
     ADD_METHOD(ObjectProto, "hasSlot",     Object_hasSlot);
+    ADD_METHOD(ObjectProto, "getOwnSlot",  Object_getOwnSlot);
     ADD_METHOD(ObjectProto, "hasOwnSlot",  Object_hasOwnSlot);
     ADD_METHOD(ObjectProto, "deleteSlot",  Object_deleteSlot);
     ADD_METHOD(ObjectProto, "same",        Object_same);

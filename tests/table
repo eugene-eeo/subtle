@@ -4,8 +4,8 @@ let x = {};
 x.setSlot("abc", 1);
 x.setSlot("def", 2);
 
-assert x.getSlot("abc") == 1;
-assert x.getSlot("def") == 2;
+assert x.rawGetSlot("abc") == 1;
+assert x.rawGetSlot("def") == 2;
 assert x.abc == 1;
 assert x.def == 2;
 

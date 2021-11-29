@@ -1,8 +1,8 @@
 # Currently getSlot and setSlot use vm_call.
 # We stress-test them below...
 
-let setSlot = Object.getSlot("setSlot");
-let getSlot = Object.getSlot("getSlot");
+let setSlot = Object.rawGetSlot("setSlot");
+let getSlot = Object.rawGetSlot("rawGetSlot");
 
 let x = {};
 let record = {};

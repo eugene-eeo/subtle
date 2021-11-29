@@ -216,8 +216,11 @@ vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
     if (IS_OBJ(src)) {
         Obj* obj = VAL_TO_OBJ(src);
         if (obj->visited) return false;
-        if (obj->type == OBJ_OBJECT && objobject_get((ObjObject*)obj, slot_name, slot_value))
-            return true;
+        if (obj->type == OBJ_OBJECT) {
+            // Try to do a dictionary lookup
+            if (objobject_get((ObjObject*)obj, slot_name, slot_value))
+                return true;
+        }
         obj->visited = true;
     }
     rv = vm_get_slot(vm, vm_get_prototype(vm, src), slot_name, slot_value);
@@ -235,37 +238,32 @@ is_activatable(Value value)
 static inline bool
 invoke(VM* vm, Value obj, Value key, int num_args, InterpretResult* rv)
 {
-    Value slot;
-    // If the slot doesn't exist directly on the object, then resort to getSlot.
-    if (!vm_get_slot(vm, obj, key, &slot)) {
-        Value getSlot_slot;
-        if (!vm_get_slot(vm, obj, vm->getSlot_string, &getSlot_slot)) {
-            vm_runtime_error(vm, "Object has no slot `getSlot`.");
-            *rv = INTERPRET_RUNTIME_ERROR;
-            return false;
+    Value slot_value = NIL_VAL;
+    if (!vm_get_slot(vm, obj, key, &slot_value)) {
+        // Try the getSlot method
+        Value getSlot_value;
+        if (vm_get_slot(vm, obj, vm->getSlot_string, &getSlot_value)) {
+            vm_push(vm, obj);
+            vm_push(vm, key);
+            if (!vm_call(vm, getSlot_value, 1, &slot_value, rv))
+                return false;
         }
-
-        // Call <obj>.getSlot(<key>)
-        vm_push(vm, obj);
-        vm_push(vm, key);
-        if (!vm_call(vm, getSlot_slot, 1, &slot, rv))
-            return false;
     }
 
-    // Check if the slot is activatable.
-    if (!is_activatable(slot)) {
-        if (num_args != 0) {
-            vm_runtime_error(vm, "Tried to call non-activatable slot with %d > 0 arguments.", num_args);
+    if (!is_activatable(slot_value)) {
+        if (num_args > 0) {
+            vm_runtime_error(vm, "Expect non-activatable slot to be 0 args, got %d instead.", num_args);
             *rv = INTERPRET_RUNTIME_ERROR;
             return false;
         }
         vm_pop(vm); // The object.
-        vm_push(vm, slot);
+        vm_push(vm, slot_value);
         return true;
     }
+
     // The stack is already in the correct form for a method call.
     // We have `obj` followed by `num_args`.
-    if (!complete_call(vm, slot, num_args)) {
+    if (!complete_call(vm, slot_value, num_args)) {
         *rv = INTERPRET_RUNTIME_ERROR;
         return false;
     }
