@@ -107,7 +107,7 @@ DEFINE_NATIVE(Object, setOwnSlot) {
         ERROR("Object_setOwnSlot requires 2 arguments.");
 
     if (!IS_OBJECT(args[0]))
-        RETURN(NIL_VAL);
+        ERROR("Object_setOwnSlot called on a non-object.");
 
     objobject_set(VAL_TO_OBJECT(args[0]), vm, args[1], args[2]);
     RETURN(args[2]);
