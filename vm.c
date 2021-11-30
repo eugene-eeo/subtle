@@ -443,7 +443,7 @@ static InterpretResult run(VM* vm, ObjClosure* top_level) {
                     vm_runtime_error(vm, "Trying to set slot on non-object.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                Value return_value = value;
+                Value return_value;
                 // Call <obj>.setSlot(<key>, <value>) if it exists.
                 Value setSlot_slot;
                 if (vm_get_slot(vm, obj, vm->setSlot_string, &setSlot_slot)) {
@@ -456,6 +456,7 @@ static InterpretResult run(VM* vm, ObjClosure* top_level) {
                     // vm_call should've popped them out.
                 } else {
                     objobject_set(VAL_TO_OBJECT(obj), vm, key, value);
+                    return_value = value;
                 }
                 vm_pop(vm); // value
                 vm_pop(vm); // object

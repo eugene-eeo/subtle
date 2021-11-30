@@ -67,6 +67,8 @@ typedef enum {
     PREC_ASSIGNMENT, // =
     PREC_OR,         // ||
     PREC_AND,        // &&
+    PREC_BITWISE_OR, // |
+    PREC_BITWISE_AND,// &
     PREC_EQ,         // ==, !=
     PREC_CMP,        // <, >, <=, >=
     PREC_TERM,       // + -
@@ -670,9 +672,9 @@ static ParseRule rules[] = {
     [TOKEN_LEQ]       = {NULL,     binary, PREC_CMP},
     [TOKEN_GT]        = {NULL,     binary, PREC_CMP},
     [TOKEN_GEQ]       = {NULL,     binary, PREC_CMP},
-    [TOKEN_AMP]       = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_AMP]       = {NULL,     binary, PREC_BITWISE_AND},
     [TOKEN_AMP_AMP]   = {NULL,     and_,   PREC_AND},
-    [TOKEN_PIPE]      = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_PIPE]      = {NULL,     binary, PREC_BITWISE_OR},
     [TOKEN_PIPE_PIPE] = {NULL,     or_,    PREC_OR},
     [TOKEN_NUMBER]    = {number,   NULL,   PREC_NONE},
     [TOKEN_STRING]    = {string,   NULL,   PREC_NONE},
