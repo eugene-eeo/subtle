@@ -57,6 +57,8 @@ void vm_free(VM* vm) {
     table_free(&vm->strings, vm);
     table_free(&vm->globals, vm);
     free(vm->gray_stack);
+    // Check that our memory accounting is correct.
+    ASSERT(vm->bytes_allocated == 0, "bytes_allocated != 0");
     vm_init(vm);
 }
 
