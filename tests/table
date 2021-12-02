@@ -18,3 +18,21 @@ x.jkl = 4;
 assert x.def == 2;
 assert x.ghi == 3;
 assert x.jkl == 4;
+
+# also test more exotic stuff
+x.+ = 1;      assert x.+ == 1;
+x.- = 2;      assert x.- == 2;
+x./ = 3;      assert x./ == 3;
+x.* = 4;      assert x.* == 4;
+x.| = 5;      assert x.| == 5;
+x.& = 6;      assert x.& == 6;
+x.== = 7;     assert x.== == 7;
+x.!= = 8;     assert x.!= == 8;
+x.<= = 9;     assert x.<= == 9;
+x.>= = 10;    assert x.>= == 10;
+x.< = 11;     assert x.< == 11;
+x.> = 12;     assert x.> == 12;
+x.true = 13;  assert x.true == 13;
+x.false = 14; assert x.false == 14;
+x.nil = 15;   assert x.nil == 15;
+x.this = 16;  assert x.this == 16;

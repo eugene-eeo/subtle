@@ -165,6 +165,8 @@ static void consume(Compiler* compiler, TokenType type, const char* message) {
 
 static bool match_slot(Compiler* compiler) {
     if (check(compiler, TOKEN_VARIABLE)
+            || check(compiler, TOKEN_TRUE)   || check(compiler, TOKEN_FALSE) || check(compiler, TOKEN_NIL)
+            || check(compiler, TOKEN_THIS)
             || check(compiler, TOKEN_PLUS)  || check(compiler, TOKEN_MINUS)
             || check(compiler, TOKEN_TIMES) || check(compiler, TOKEN_SLASH)
             || check(compiler, TOKEN_PIPE)
@@ -642,6 +644,8 @@ static void binary(Compiler* compiler, bool can_assign) {
         case TOKEN_LEQ:
         case TOKEN_GT:
         case TOKEN_GEQ:
+        case TOKEN_AMP:
+        case TOKEN_PIPE:
         {
             emit_byte(compiler, OP_INVOKE);
             emit_offset(compiler, constant);
