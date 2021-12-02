@@ -241,21 +241,36 @@ is_activatable(Value value)
     return IS_CLOSURE(value) || IS_NATIVE(value);
 }
 
+// An Invoke is split into two sections:
+//  1) a pre-invoke, which fetches the slot (and calls getSlot if necessary).
+//  2) activating the slot's value, if necessary.
 static inline bool
-invoke(VM* vm, Value obj, Value key, int num_args, InterpretResult* rv)
+pre_invoke(VM* vm, Value obj, Value key, Value* slot_value, InterpretResult* rv)
 {
-    Value slot_value = NIL_VAL;
-    if (!vm_get_slot(vm, obj, key, &slot_value)) {
-        // Try the getSlot method
+    if (!vm_get_slot(vm, obj, key, slot_value)) {
+        // If there is no such slot following a recursive proto search,
+        // we consult the getSlot method.
         Value getSlot_value;
         if (vm_get_slot(vm, obj, vm->getSlot_string, &getSlot_value)) {
             vm_push(vm, obj);
             vm_push(vm, key);
-            if (!vm_call(vm, getSlot_value, 1, &slot_value, rv))
+            // slot_value will hold the result of getSlot
+            if (!vm_call(vm, getSlot_value, 1, slot_value, rv))
                 return false;
+        } else {
+            // slot-value is nil.
+            *slot_value = NIL_VAL;
         }
     }
+    // otherwise, we've found it directly on the protos.
+    return true;
+}
 
+static inline bool
+invoke(VM* vm, Value obj, Value key, int num_args, InterpretResult* rv)
+{
+    Value slot_value;
+    if (!pre_invoke(vm, obj, key, &slot_value, rv)) return false;
     if (!is_activatable(slot_value)) {
         if (num_args > 0) {
             vm_runtime_error(vm, "Tried to call non-activatable slot with %d > 0 args.", num_args);
@@ -279,24 +294,17 @@ invoke(VM* vm, Value obj, Value key, int num_args, InterpretResult* rv)
 bool
 vm_invoke(VM* vm, Value obj, Value key, int num_args, Value* return_value, InterpretResult* rv)
 {
-    Value slot_value = NIL_VAL;
-    if (!vm_get_slot(vm, obj, key, &slot_value)) {
-        // Try the getSlot method
-        Value getSlot_value;
-        if (vm_get_slot(vm, obj, vm->getSlot_string, &getSlot_value)) {
-            vm_push(vm, obj);
-            vm_push(vm, key);
-            if (!vm_call(vm, getSlot_value, 1, &slot_value, rv))
-                return false;
-        }
-    }
-
+    Value slot_value;
+    if (!pre_invoke(vm, obj, key, &slot_value, rv)) return false;
     if (!is_activatable(slot_value)) {
         if (num_args > 0) {
             vm_runtime_error(vm, "Tried to call non-activatable slot with %d > 0 args.", num_args);
             *rv = INTERPRET_RUNTIME_ERROR;
             return false;
         }
+        // Since this function is expected to have 0 stack impact, we need
+        // to pop the `this` off the stack.
+        vm_pop(vm); // The object.
         *return_value = slot_value;
         return true;
     }

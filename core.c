@@ -81,8 +81,7 @@ DEFINE_NATIVE(Object, rawSetSlot) {
     if (!IS_OBJECT(args[0]))
         ERROR("Object_rawSetSlot called on a non-object.");
 
-    ObjObject* this = VAL_TO_OBJECT(args[0]);
-    objobject_set(this, vm, args[1], args[2]);
+    objobject_set(VAL_TO_OBJECT(args[0]), vm, args[1], args[2]);
     RETURN(NIL_VAL);
 }
 
@@ -103,17 +102,6 @@ DEFINE_NATIVE(Object, getOwnSlot) {
 
     ObjObject* this = VAL_TO_OBJECT(args[0]);
     RETURN(BOOL_TO_VAL(objobject_has(this, args[1])));
-}
-
-DEFINE_NATIVE(Object, setOwnSlot) {
-    if (num_args != 2)
-        ERROR("Object_setOwnSlot requires 2 arguments.");
-
-    if (!IS_OBJECT(args[0]))
-        ERROR("Object_setOwnSlot called on a non-object.");
-
-    objobject_set(VAL_TO_OBJECT(args[0]), vm, args[1], args[2]);
-    RETURN(args[2]);
 }
 
 DEFINE_NATIVE(Object, hasOwnSlot) {
@@ -198,19 +186,17 @@ DEFINE_NATIVE(Object, print) {
         fprintf(stdout, "nil");
         goto done;
     }
-    if (!IS_OBJ(this))
-        ERROR("Object_print called on non-object.");
 
-    Value type_slot;
+    Value name_slot;
     InterpretResult rv;
     vm_push(vm, this);
-    if (!vm_invoke(vm, args[0], OBJ_TO_VAL(objstring_copy(vm, "type", 4)), 0, &type_slot, &rv))
+    if (!vm_invoke(vm, args[0], OBJ_TO_VAL(objstring_copy(vm, "name", 4)), 0, &name_slot, &rv))
         return rv;
 
-    if (!IS_STRING(type_slot))
-        ERROR("Object_print: expected .type to be a string.");
+    if (!IS_STRING(name_slot))
+        ERROR("Object_print: expected .name to be a string.");
     fprintf(stdout, "%s_%p",
-            VAL_TO_STRING(type_slot)->chars,
+            VAL_TO_STRING(name_slot)->chars,
             VAL_TO_OBJ(this));
 done:
     fflush(stdout);
@@ -386,20 +372,20 @@ void core_init_vm(VM* vm)
 #define ADD_OBJECT(table, name, obj) (define_on_table(vm, table, name, OBJ_TO_VAL(obj)))
 #define ADD_NATIVE(table, name, fn)  (ADD_OBJECT(table, name, objnative_new(vm, fn)))
 #define ADD_METHOD(PROTO, name, fn)  (ADD_NATIVE(&vm->PROTO->slots, name, fn))
-#define ADD_TYPE(PROTO, type)        (ADD_OBJECT(&vm->PROTO->slots, "type", objstring_copy(vm, type, strlen(type))))
+#define ADD_NAME(PROTO, name)        (ADD_OBJECT(&vm->PROTO->slots, "name", objstring_copy(vm, name, strlen(name))))
 
     vm->getSlot_string = OBJ_TO_VAL(objstring_copy(vm, "getSlot", 7));
     vm->setSlot_string = OBJ_TO_VAL(objstring_copy(vm, "setSlot", 7));
 
     vm->ObjectProto = objobject_new(vm);
-    ADD_TYPE(ObjectProto, "Object");
+    ADD_NAME(ObjectProto, "Object");
     ADD_METHOD(ObjectProto, "proto",       Object_proto);
     ADD_METHOD(ObjectProto, "setProto",    Object_setProto);
     ADD_METHOD(ObjectProto, "rawGetSlot",  Object_rawGetSlot);
     ADD_METHOD(ObjectProto, "rawSetSlot",  Object_rawSetSlot);
     ADD_METHOD(ObjectProto, "hasSlot",     Object_hasSlot);
     ADD_METHOD(ObjectProto, "getOwnSlot",  Object_getOwnSlot);
-    ADD_METHOD(ObjectProto, "setOwnSlot",  Object_setOwnSlot);
+    ADD_METHOD(ObjectProto, "setOwnSlot",  Object_rawSetSlot);
     ADD_METHOD(ObjectProto, "hasOwnSlot",  Object_hasOwnSlot);
     ADD_METHOD(ObjectProto, "deleteSlot",  Object_deleteSlot);
     ADD_METHOD(ObjectProto, "same",        Object_same);
@@ -416,14 +402,14 @@ void core_init_vm(VM* vm)
     // potentially free ObjectProto.
     vm->FnProto = objobject_new(vm);
     vm->FnProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    ADD_TYPE(FnProto, "Fn");
+    ADD_NAME(FnProto, "Fn");
     ADD_METHOD(FnProto, "new",          Fn_new);
     ADD_METHOD(FnProto, "call",         Fn_call);
     ADD_METHOD(FnProto, "callWithThis", Fn_callWithThis);
 
     vm->NativeProto = objobject_new(vm);
     vm->NativeProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    ADD_TYPE(NativeProto, "Native");
+    ADD_NAME(NativeProto, "Native");
     ADD_METHOD(NativeProto, "call",         Native_call);
     ADD_METHOD(NativeProto, "callWithThis", Native_callWithThis);
 
@@ -461,4 +447,5 @@ void core_init_vm(VM* vm)
 #undef ADD_OBJECT
 #undef ADD_NATIVE
 #undef ADD_METHOD
+#undef ADD_NAME
 }
