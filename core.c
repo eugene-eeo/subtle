@@ -309,6 +309,18 @@ DEFINE_NATIVE(Native, callWithThis) {
         RETURN(return_type(VAL_TO_NUMBER(this) op VAL_TO_NUMBER(args[1]))); \
     }
 
+#define DEFINE_BITWISE_METHOD(name, op) \
+    DEFINE_NATIVE(Number, name) {\
+        if (!IS_NUMBER(args[0])) \
+            ERROR("%s called on a non-number.", __func__); \
+        if (num_args == 0 || !IS_NUMBER(args[1])) \
+            ERROR("%s called with a non-number.", __func__); \
+        Value this = args[0]; \
+        int32_t left = (int32_t) VAL_TO_NUMBER(this); \
+        int32_t right = (int32_t) VAL_TO_NUMBER(args[1]); \
+        RETURN(NUMBER_TO_VAL(left op right)); \
+    }
+
 DEFINE_ARITHMETIC_METHOD(plus,     +,  NUMBER_TO_VAL);
 DEFINE_ARITHMETIC_METHOD(minus,    -,  NUMBER_TO_VAL);
 DEFINE_ARITHMETIC_METHOD(multiply, *,  NUMBER_TO_VAL);
@@ -317,8 +329,11 @@ DEFINE_ARITHMETIC_METHOD(lt,       <,  BOOL_TO_VAL);
 DEFINE_ARITHMETIC_METHOD(gt,       >,  BOOL_TO_VAL);
 DEFINE_ARITHMETIC_METHOD(leq,      <=, BOOL_TO_VAL);
 DEFINE_ARITHMETIC_METHOD(geq,      >=, BOOL_TO_VAL);
+DEFINE_BITWISE_METHOD(lor,  |);
+DEFINE_BITWISE_METHOD(land, &);
 
 #undef DEFINE_ARITHMETIC_METHOD
+#undef DEFINE_BITWISE_METHOD
 
 DEFINE_NATIVE(Number, negate) {
     if (!IS_NUMBER(args[0]))
@@ -424,6 +439,8 @@ void core_init_vm(VM* vm)
     ADD_METHOD(NumberProto, ">=",    Number_geq);
     ADD_METHOD(NumberProto, "neg",   Number_negate);
     ADD_METHOD(NumberProto, "print", Number_print);
+    ADD_METHOD(NumberProto, "|",     Number_lor);
+    ADD_METHOD(NumberProto, "&",     Number_land);
 
     vm->BooleanProto = objobject_new(vm);
     vm->BooleanProto->proto = OBJ_TO_VAL(vm->ObjectProto);
