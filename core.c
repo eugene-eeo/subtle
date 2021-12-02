@@ -3,7 +3,9 @@
 #include "object.h"
 #include "table.h"
 #include "vm.h"
+
 #include <string.h>
+#include <stdio.h>
 
 static inline void
 define_on_table(VM* vm, Table* table, const char* name, Value value) {
@@ -42,6 +44,7 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
 #define DEFINE_NATIVE(proto, name) \
     static bool proto##_##name(VM* vm, Value* args, int num_args)
 
+// ============================= Object =============================
 
 DEFINE_NATIVE(Object, proto) {
     Value proto = vm_get_prototype(vm, args[0]);
@@ -189,6 +192,48 @@ DEFINE_NATIVE(Object, hasAncestor) {
     RETURN(BOOL_TO_VAL(has_ancestor(vm, args[0], args[1])));
 }
 
+DEFINE_NATIVE(Object, print) {
+    Value this = args[0];
+    if (IS_NIL(this)) {
+        fprintf(stdout, "nil");
+        goto done;
+    }
+    if (!IS_OBJ(this))
+        ERROR("Object_print called on non-object.");
+
+    Value type_slot;
+    InterpretResult rv;
+    vm_push(vm, this);
+    if (!vm_invoke(vm, args[0], OBJ_TO_VAL(objstring_copy(vm, "type", 4)), 0, &type_slot, &rv))
+        return rv;
+
+    if (!IS_STRING(type_slot))
+        ERROR("Object_print: expected .type to be a string.");
+    fprintf(stdout, "%s_%p",
+            VAL_TO_STRING(type_slot)->chars,
+            VAL_TO_OBJ(this));
+done:
+    fflush(stdout);
+    RETURN(NIL_VAL);
+}
+
+DEFINE_NATIVE(Object, println) {
+    Value print_slot;
+    if (!vm_get_string_slot(vm, args[0], "print", &print_slot))
+        ERROR("Object_println called on object with no 'print' slot.");
+
+    Value tmp;
+    InterpretResult rv;
+    if (!vm_call(vm, print_slot, 0, &tmp, &rv)) {
+        return rv;
+    }
+    fprintf(stdout, "\n");
+    fflush(stdout);
+    RETURN(NIL_VAL);
+}
+
+// ============================= Fn =============================
+
 DEFINE_NATIVE(Fn, new) {
     if (num_args == 0)
         ERROR("Fn_new called with 0 arguments.");
@@ -228,6 +273,8 @@ DEFINE_NATIVE(Fn, callWithThis) {
     return vm_push_frame(vm, closure, num_args - 1);
 }
 
+// ============================= Native =============================
+
 DEFINE_NATIVE(Native, call) {
     if (!IS_NATIVE(args[0])) {
         vm_runtime_error(vm, "Native_call called on a non-native.");
@@ -253,12 +300,12 @@ DEFINE_NATIVE(Native, callWithThis) {
     return native->fn(vm, args, num_args - 1);
 }
 
-// Define the methods for Number
+// ============================= Number =============================
 
 #define DEFINE_ARITHMETIC_METHOD(name, op, return_type) \
     DEFINE_NATIVE(Number, name) {\
         if (!IS_NUMBER(args[0])) \
-            ERROR("%s expected to be called on a number.", __func__); \
+            ERROR("%s called on a non-number.", __func__); \
         if (num_args == 0 || !IS_NUMBER(args[1])) \
             ERROR("%s called with a non-number.", __func__); \
         Value this = args[0]; \
@@ -274,13 +321,33 @@ DEFINE_ARITHMETIC_METHOD(gt,       >,  BOOL_TO_VAL);
 DEFINE_ARITHMETIC_METHOD(leq,      <=, BOOL_TO_VAL);
 DEFINE_ARITHMETIC_METHOD(geq,      >=, BOOL_TO_VAL);
 
+#undef DEFINE_ARITHMETIC_METHOD
+
 DEFINE_NATIVE(Number, negate) {
     if (!IS_NUMBER(args[0]))
-        ERROR("Expected to be called on a number.");
+        ERROR("Number_neg called on a non-number.");
     RETURN(NUMBER_TO_VAL(-VAL_TO_NUMBER(args[0])));
 }
 
-#undef DEFINE_ARITHMETIC_METHOD
+DEFINE_NATIVE(Number, print) {
+    if (!IS_NUMBER(args[0]))
+        ERROR("Number_print called on a non-number.");
+    fprintf(stdout, "%g", VAL_TO_NUMBER(args[0]));
+    fflush(stdout);
+    RETURN(NIL_VAL);
+}
+
+// ============================= Boolean =============================
+
+DEFINE_NATIVE(Boolean, print) {
+    if (!IS_BOOL(args[0]))
+        ERROR("Boolean_print called on a non-boolean.");
+    fprintf(stdout, VAL_TO_BOOL(args[0]) ? "true" : "false");
+    fflush(stdout);
+    RETURN(NIL_VAL);
+}
+
+// ============================= String =============================
 
 DEFINE_NATIVE(String, plus) {
     Value this = args[0];
@@ -294,19 +361,26 @@ DEFINE_NATIVE(String, plus) {
         )));
 }
 
+DEFINE_NATIVE(String, print) {
+    if (!IS_STRING(args[0]))
+        ERROR("String_print called on a non-string.");
+    fprintf(stdout, "%s", VAL_TO_STRING(args[0])->chars);
+    fflush(stdout);
+    RETURN(NIL_VAL);
+}
+
 void core_init_vm(VM* vm)
 {
 #define ADD_OBJECT(table, name, obj) (define_on_table(vm, table, name, OBJ_TO_VAL(obj)))
 #define ADD_NATIVE(table, name, fn)  (ADD_OBJECT(table, name, objnative_new(vm, fn)))
 #define ADD_METHOD(PROTO, name, fn)  (ADD_NATIVE(&vm->PROTO->slots, name, fn))
+#define ADD_TYPE(PROTO, type)        (ADD_OBJECT(&vm->PROTO->slots, "type", objstring_copy(vm, type, strlen(type))))
 
-    vm->getSlot_string  = OBJ_TO_VAL(objstring_copy(vm, "getSlot", 7));
-    vm->setSlot_string  = OBJ_TO_VAL(objstring_copy(vm, "setSlot", 7));
-    vm->equal_string    = OBJ_TO_VAL(objstring_copy(vm, "==", 2));
-    vm->notEqual_string = OBJ_TO_VAL(objstring_copy(vm, "!=", 2));
-    vm->not_string      = OBJ_TO_VAL(objstring_copy(vm, "!", 1));
+    vm->getSlot_string = OBJ_TO_VAL(objstring_copy(vm, "getSlot", 7));
+    vm->setSlot_string = OBJ_TO_VAL(objstring_copy(vm, "setSlot", 7));
 
     vm->ObjectProto = objobject_new(vm);
+    ADD_TYPE(ObjectProto, "Object");
     ADD_METHOD(ObjectProto, "proto",       Object_proto);
     ADD_METHOD(ObjectProto, "setProto",    Object_setProto);
     ADD_METHOD(ObjectProto, "rawGetSlot",  Object_rawGetSlot);
@@ -322,39 +396,46 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "!",           Object_not);
     ADD_METHOD(ObjectProto, "clone",       Object_clone);
     ADD_METHOD(ObjectProto, "hasAncestor", Object_hasAncestor);
+    ADD_METHOD(ObjectProto, "print",       Object_print);
+    ADD_METHOD(ObjectProto, "println",     Object_println);
 
     // Note: allocating here is safe, because all *Protos are marked as
     // roots, and remaining *Protos are initialized to NULL. Thus we won't
     // potentially free ObjectProto.
     vm->FnProto = objobject_new(vm);
     vm->FnProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    ADD_TYPE(FnProto, "Fn");
     ADD_METHOD(FnProto, "new",          Fn_new);
     ADD_METHOD(FnProto, "call",         Fn_call);
     ADD_METHOD(FnProto, "callWithThis", Fn_callWithThis);
 
     vm->NativeProto = objobject_new(vm);
     vm->NativeProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    ADD_TYPE(NativeProto, "Native");
     ADD_METHOD(NativeProto, "call",         Native_call);
     ADD_METHOD(NativeProto, "callWithThis", Native_callWithThis);
 
     vm->NumberProto = objobject_new(vm);
     vm->NumberProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    ADD_METHOD(NumberProto, "+",   Number_plus);
-    ADD_METHOD(NumberProto, "-",   Number_minus);
-    ADD_METHOD(NumberProto, "*",   Number_multiply);
-    ADD_METHOD(NumberProto, "/",   Number_divide);
-    ADD_METHOD(NumberProto, "<",   Number_lt);
-    ADD_METHOD(NumberProto, ">",   Number_gt);
-    ADD_METHOD(NumberProto, "<=",  Number_leq);
-    ADD_METHOD(NumberProto, ">=",  Number_geq);
-    ADD_METHOD(NumberProto, "neg", Number_negate);
+    ADD_METHOD(NumberProto, "+",     Number_plus);
+    ADD_METHOD(NumberProto, "-",     Number_minus);
+    ADD_METHOD(NumberProto, "*",     Number_multiply);
+    ADD_METHOD(NumberProto, "/",     Number_divide);
+    ADD_METHOD(NumberProto, "<",     Number_lt);
+    ADD_METHOD(NumberProto, ">",     Number_gt);
+    ADD_METHOD(NumberProto, "<=",    Number_leq);
+    ADD_METHOD(NumberProto, ">=",    Number_geq);
+    ADD_METHOD(NumberProto, "neg",   Number_negate);
+    ADD_METHOD(NumberProto, "print", Number_print);
 
     vm->BooleanProto = objobject_new(vm);
     vm->BooleanProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    ADD_METHOD(BooleanProto, "print", Boolean_print);
 
     vm->StringProto = objobject_new(vm);
     vm->StringProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    ADD_METHOD(StringProto, "+", String_plus);
+    ADD_METHOD(StringProto, "+",     String_plus);
+    ADD_METHOD(StringProto, "print", String_print);
 
     ADD_OBJECT(&vm->globals, "Object",  vm->ObjectProto);
     ADD_OBJECT(&vm->globals, "Fn",      vm->FnProto);

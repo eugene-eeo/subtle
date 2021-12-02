@@ -94,6 +94,7 @@ InterpretResult vm_interpret(VM* vm, const char* source);
 // =============
 Value vm_get_prototype(VM* vm, Value value);
 bool vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value);
+bool vm_get_string_slot(VM* vm, Value src, const char* name, Value* slot_value);
 
 // Function calls
 // ==============
@@ -115,8 +116,9 @@ bool vm_push_frame(VM* vm, ObjClosure* closure, int num_args);
 bool vm_call(VM* vm, Value callable, int num_args,
              Value* return_value, InterpretResult* rv);
 
-// Runtime helpers.
-Value get_prototype(VM*, Value);
-bool get_slot(VM* vm, Value src, Value key, Value* slot);
-
+// Runs the usual invoke path. This uses vm_call internally.
+bool vm_invoke(VM* vm,
+               Value obj, Value slot_name,
+               int num_args,
+               Value* slot_value, InterpretResult* rv);
 #endif

@@ -1,6 +1,7 @@
 #include "common.h"
 #include "core.h"
 #include "vm.h"
+#include "vendor/linenoise.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -11,20 +12,14 @@
 
 // Takes an already-inited VM and runs a REPL.
 static void repl(VM* vm) {
-    FILE* stream = stdin;
-    char* line = NULL;
-    size_t len = 0;
+    linenoiseSetMultiLine(1);
+    linenoiseHistorySetMaxLen(100);
 
-    for (;;) {
-        printf("> ");
-        ssize_t n_read = getline(&line, &len, stream);
-        if (n_read == -1) {
-            printf("\n");
-            if (line != NULL)
-                free(line);
-            return;
-        }
+    char* line = NULL;
+    while ((line = linenoise("> ")) != NULL) {
+        linenoiseHistoryAdd(line);
         vm_interpret(vm, line);
+        linenoiseFree(line);
     }
 }
 

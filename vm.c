@@ -21,9 +21,6 @@ void vm_init(VM* vm) {
 
     vm->getSlot_string = NIL_VAL;
     vm->setSlot_string = NIL_VAL;
-    vm->equal_string = NIL_VAL;
-    vm->notEqual_string = NIL_VAL;
-    vm->not_string = NIL_VAL;
 
     vm->ObjectProto = NULL;
     vm->FnProto = NULL;
@@ -231,6 +228,13 @@ vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
     return rv;
 }
 
+bool
+vm_get_string_slot(VM* vm, Value src, const char* name, Value* slot_value)
+{
+    ObjString* str = objstring_copy(vm, name, strlen(name));
+    return vm_get_slot(vm, src, OBJ_TO_VAL(str), slot_value);
+}
+
 static inline bool
 is_activatable(Value value)
 {
@@ -254,7 +258,7 @@ invoke(VM* vm, Value obj, Value key, int num_args, InterpretResult* rv)
 
     if (!is_activatable(slot_value)) {
         if (num_args > 0) {
-            vm_runtime_error(vm, "Expect non-activatable slot to be 0 args, got %d instead.", num_args);
+            vm_runtime_error(vm, "Tried to call non-activatable slot with %d > 0 args.", num_args);
             *rv = INTERPRET_RUNTIME_ERROR;
             return false;
         }
@@ -270,6 +274,34 @@ invoke(VM* vm, Value obj, Value key, int num_args, InterpretResult* rv)
         return false;
     }
     return true;
+}
+
+bool
+vm_invoke(VM* vm, Value obj, Value key, int num_args, Value* return_value, InterpretResult* rv)
+{
+    Value slot_value = NIL_VAL;
+    if (!vm_get_slot(vm, obj, key, &slot_value)) {
+        // Try the getSlot method
+        Value getSlot_value;
+        if (vm_get_slot(vm, obj, vm->getSlot_string, &getSlot_value)) {
+            vm_push(vm, obj);
+            vm_push(vm, key);
+            if (!vm_call(vm, getSlot_value, 1, &slot_value, rv))
+                return false;
+        }
+    }
+
+    if (!is_activatable(slot_value)) {
+        if (num_args > 0) {
+            vm_runtime_error(vm, "Tried to call non-activatable slot with %d > 0 args.", num_args);
+            *rv = INTERPRET_RUNTIME_ERROR;
+            return false;
+        }
+        *return_value = slot_value;
+        return true;
+    }
+
+    return vm_call(vm, slot_value, num_args, return_value, rv);
 }
 
 static InterpretResult run(VM* vm, ObjClosure* top_level) {
