@@ -31,6 +31,22 @@ $ ./subtle
 >
 ```
 
+## hacking
+
+```sh
+$ make cute
+$ ./subtle
+> 1 + 1;
+== script ==
+0000    1 OP_CONSTANT         0 1
+0003    | OP_CONSTANT         0 1
+0006    | OP_INVOKE           1 "+" (1 args)
+0010    | OP_POP
+0011    | OP_NIL
+0012    | OP_RETURN
+...
+```
+
 ## todo
 
 - [x] benchmark hashtable implementation -- performance is good enough
