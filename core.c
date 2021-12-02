@@ -218,15 +218,12 @@ done:
 }
 
 DEFINE_NATIVE(Object, println) {
-    Value print_slot;
-    if (!vm_get_string_slot(vm, args[0], "print", &print_slot))
-        ERROR("Object_println called on object with no 'print' slot.");
-
     Value tmp;
     InterpretResult rv;
-    if (!vm_call(vm, print_slot, 0, &tmp, &rv)) {
+    vm_push(vm, args[0]);
+    if (!vm_invoke(vm, args[0], OBJ_TO_VAL(objstring_copy(vm, "print", 5)), 0, &tmp, &rv))
         return rv;
-    }
+
     fprintf(stdout, "\n");
     fflush(stdout);
     RETURN(NIL_VAL);
