@@ -34,13 +34,14 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
     } while(false)
 
 #define ARG_CHECK_SINGLE(ch, idx) do { \
+    Value arg = args[idx]; \
     switch (ch) { \
-        case 'O': if (!IS_OBJECT(args[idx])) ARG_ERROR(idx, "an Object"); break; \
-        case 'S': if (!IS_STRING(args[idx])) ARG_ERROR(idx, "a String"); break; \
-        case 'N': if (!IS_NUMBER(args[idx])) ARG_ERROR(idx, "a Number"); break; \
-        case 'B': if (!IS_BOOL(args[idx])) ARG_ERROR(idx, "a Boolean"); break; \
-        case 'n': if (!IS_NATIVE(args[idx])) ARG_ERROR(idx, "a Native"); break; \
-        case 'F': if (!IS_CLOSURE(args[idx])) ARG_ERROR(idx, "an Fn"); break; \
+        case 'O': if (!IS_OBJECT(arg)) ARG_ERROR(idx, "an Object"); break; \
+        case 'S': if (!IS_STRING(arg)) ARG_ERROR(idx, "a String"); break; \
+        case 'N': if (!IS_NUMBER(arg)) ARG_ERROR(idx, "a Number"); break; \
+        case 'B': if (!IS_BOOL(arg)) ARG_ERROR(idx, "a Boolean"); break; \
+        case 'n': if (!IS_NATIVE(arg)) ARG_ERROR(idx, "a Native"); break; \
+        case 'F': if (!IS_CLOSURE(arg)) ARG_ERROR(idx, "an Fn"); break; \
         case '*': if (num_args < idx) ERROR("%s expected %d args, got %d instead.", __func__, idx, num_args); break; \
         default: UNREACHABLE(); \
     } \
