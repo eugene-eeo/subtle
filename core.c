@@ -22,15 +22,13 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
     do { \
         if (arg_idx == 0) \
             ERROR("%s: expected 'this' to be an %s.", __func__, msg); \
-        ERROR("%s: expected args[%d] to be %s.", __func__, arg_idx, msg); \
+        else \
+            ERROR("%s: expected args[%d] to be %s.", __func__, arg_idx, msg); \
     } while (false)
 
 #define ARGSPEC(spec) do { \
-        int __arg_idx = 0; \
-        for (int i=0; i < strlen(spec); i++) { \
-            ARG_CHECK_SINGLE(spec[i], __arg_idx); \
-            __arg_idx++; \
-        } \
+        for (int i=0; i < strlen(spec); i++) \
+            ARG_CHECK_SINGLE(spec[i], i); \
     } while(false)
 
 #define ARG_CHECK_SINGLE(ch, idx) do { \
