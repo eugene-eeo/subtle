@@ -18,12 +18,39 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
     vm_pop_root(vm);
 }
 
+#define ARG_ERROR(arg_idx, msg) \
+    do { \
+        if (arg_idx == 0) \
+            ERROR("%s: expected 'this' to be an %s.", __func__, msg); \
+        ERROR("%s: expected args[%d] to be %s.", __func__, arg_idx, msg); \
+    } while (false)
+
+#define ARGSPEC(spec) do { \
+        int __arg_idx = 0; \
+        for (int i=0; i < strlen(spec); i++) { \
+            ARG_CHECK_SINGLE(spec[i], __arg_idx); \
+            __arg_idx++; \
+        } \
+    } while(false)
+
+#define ARG_CHECK_SINGLE(ch, idx) do { \
+    switch (ch) { \
+        case 'O': if (!IS_OBJECT(args[idx])) ARG_ERROR(idx, "an Object"); break; \
+        case 'S': if (!IS_STRING(args[idx])) ARG_ERROR(idx, "a String"); break; \
+        case 'N': if (!IS_NUMBER(args[idx])) ARG_ERROR(idx, "a Number"); break; \
+        case 'B': if (!IS_BOOL(args[idx])) ARG_ERROR(idx, "a Boolean"); break; \
+        case 'n': if (!IS_NATIVE(args[idx])) ARG_ERROR(idx, "a Native"); break; \
+        case 'F': if (!IS_CLOSURE(args[idx])) ARG_ERROR(idx, "an Fn"); break; \
+        case '*': if (num_args < idx) ERROR("%s expected %d args, got %d instead.", __func__, idx, num_args); break; \
+        default: UNREACHABLE(); \
+    } \
+    } while(false)
+
 #define POP_ARGS(num_args) \
     do { \
         for (int i = 0; i < num_args; i++) \
             vm_pop(vm); \
     } while (false)
-
 
 #define ERROR(...) \
     do { \
@@ -31,7 +58,6 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
         POP_ARGS(num_args); \
         return false; \
     } while (false)
-
 
 #define RETURN(v) \
     do { \
@@ -52,11 +78,7 @@ DEFINE_NATIVE(Object, proto) {
 }
 
 DEFINE_NATIVE(Object, setProto) {
-    if (num_args == 0)
-        ERROR("Object_setProto called with 0 arguments.");
-
-    if (!IS_OBJECT(args[0]))
-        ERROR("Object_setProto called on a non-object.");
+    ARGSPEC("O*");
 
     ObjObject* object = VAL_TO_OBJECT(args[0]);
     object->proto = args[1];
@@ -64,8 +86,7 @@ DEFINE_NATIVE(Object, setProto) {
 }
 
 DEFINE_NATIVE(Object, rawGetSlot) {
-    if (num_args == 0)
-        ERROR("Object_rawGetSlot called with 0 arguments.");
+    ARGSPEC("**");
 
     Value this = args[0];
     Value slot;
@@ -75,27 +96,22 @@ DEFINE_NATIVE(Object, rawGetSlot) {
 }
 
 DEFINE_NATIVE(Object, rawSetSlot) {
-    if (num_args < 2)
-        ERROR("Object_rawSetSlot called with %d arguments, need 2.", num_args);
-
-    if (!IS_OBJECT(args[0]))
-        ERROR("Object_rawSetSlot called on a non-object.");
+    ARGSPEC("O**");
 
     objobject_set(VAL_TO_OBJECT(args[0]), vm, args[1], args[2]);
     RETURN(NIL_VAL);
 }
 
 DEFINE_NATIVE(Object, hasSlot) {
-    if (num_args == 0)
-        ERROR("Object_hasSlot called with 0 arguments.");
+    ARGSPEC("**");
+
     Value slot;
     bool has_slot = vm_get_slot(vm, args[0], args[1], &slot);
     RETURN(BOOL_TO_VAL(has_slot));
 }
 
 DEFINE_NATIVE(Object, getOwnSlot) {
-    if (num_args == 0)
-        ERROR("Object_getOwnSlot called with 0 arguments.");
+    ARGSPEC("**");
 
     if (!IS_OBJECT(args[0]))
         RETURN(NIL_VAL);
@@ -105,8 +121,7 @@ DEFINE_NATIVE(Object, getOwnSlot) {
 }
 
 DEFINE_NATIVE(Object, hasOwnSlot) {
-    if (num_args == 0)
-        ERROR("Object_hasOwnSlot called with 0 arguments.");
+    ARGSPEC("**");
 
     if (!IS_OBJECT(args[0]))
         return false;
@@ -116,11 +131,7 @@ DEFINE_NATIVE(Object, hasOwnSlot) {
 }
 
 DEFINE_NATIVE(Object, deleteSlot) {
-    if (num_args == 0)
-        ERROR("Object_deleteSlot called with 0 arguments.");
-
-    if (!IS_OBJECT(args[0]))
-        ERROR("Object_deleteSlot called on a non-object.");
+    ARGSPEC("O*");
 
     ObjObject* this = VAL_TO_OBJECT(args[0]);
     bool has_slot = objobject_delete(this, vm, args[1]);
@@ -128,20 +139,17 @@ DEFINE_NATIVE(Object, deleteSlot) {
 }
 
 DEFINE_NATIVE(Object, same) {
-    if (num_args < 2)
-        ERROR("Object_same requires 2 arguments.");
+    ARGSPEC("***");
     RETURN(BOOL_TO_VAL(value_equal(args[1], args[2])));
 }
 
 DEFINE_NATIVE(Object, equal) {
-    if (num_args == 0)
-        ERROR("Object_== called with 0 arguments.");
+    ARGSPEC("**");
     RETURN(BOOL_TO_VAL(value_equal(args[0], args[1])));
 }
 
 DEFINE_NATIVE(Object, notEqual) {
-    if (num_args == 0)
-        ERROR("Object_!= called with 0 arguments.");
+    ARGSPEC("**");
     RETURN(BOOL_TO_VAL(!value_equal(args[0], args[1])));
 }
 
@@ -175,8 +183,7 @@ has_ancestor(VM* vm, Value src, Value target)
 // on obj's prototype chain (including obj itself, i.e.
 // obj.hasAncestor(obj) is always true).
 DEFINE_NATIVE(Object, hasAncestor) {
-    if (num_args == 0)
-        ERROR("Object_hasAncestor called with 0 arguments.");
+    ARGSPEC("**");
     RETURN(BOOL_TO_VAL(has_ancestor(vm, args[0], args[1])));
 }
 
@@ -218,32 +225,17 @@ DEFINE_NATIVE(Object, println) {
 // ============================= Fn =============================
 
 DEFINE_NATIVE(Fn, new) {
-    if (num_args == 0)
-        ERROR("Fn_new called with 0 arguments.");
-
-    if (!IS_CLOSURE(args[1]))
-        ERROR("Fn_new called with non function.");
-
+    ARGSPEC("*F");
     RETURN(args[1]);
 }
 
 DEFINE_NATIVE(Fn, call) {
-    if (!IS_CLOSURE(args[0])) {
-        vm_runtime_error(vm, "Fn_call called on a non-closure.");
-        return false;
-    }
+    ARGSPEC("F");
     return vm_push_frame(vm, VAL_TO_CLOSURE(args[0]), num_args);
 }
 
 DEFINE_NATIVE(Fn, callWithThis) {
-    if (!IS_CLOSURE(args[0])) {
-        vm_runtime_error(vm, "Fn_callWithThis called on a non-closure.");
-        return false;
-    }
-    if (num_args == 0) {
-        vm_runtime_error(vm, "Fn_callWithThis called with no arguments.");
-        return false;
-    }
+    ARGSPEC("F*");
     // Shift the arguments, so that we set up the stack properly.
     //            0    1         2      3            num_args
     // We have: | fn | newThis | arg1 | arg2 | ... | arg_{num_args} |
@@ -259,23 +251,15 @@ DEFINE_NATIVE(Fn, callWithThis) {
 // ============================= Native =============================
 
 DEFINE_NATIVE(Native, call) {
-    if (!IS_NATIVE(args[0])) {
-        vm_runtime_error(vm, "Native_call called on a non-native.");
-        return false;
-    }
+    ARGSPEC("n");
+
     ObjNative* native = VAL_TO_NATIVE(args[0]);
     return native->fn(vm, args, num_args);
 }
 
 DEFINE_NATIVE(Native, callWithThis) {
-    if (!IS_NATIVE(args[0])) {
-        vm_runtime_error(vm, "Native_callWithThis called on a non-native.");
-        return false;
-    }
-    if (num_args == 0) {
-        vm_runtime_error(vm, "Native_callWithThis called with no arguments.");
-        return false;
-    }
+    ARGSPEC("n*");
+
     ObjNative* native = VAL_TO_NATIVE(args[0]);
     for (int i = 0; i < num_args; i++)
         args[i] = args[i + 1];
@@ -287,20 +271,14 @@ DEFINE_NATIVE(Native, callWithThis) {
 
 #define DEFINE_ARITHMETIC_METHOD(name, op, return_type) \
     DEFINE_NATIVE(Number, name) {\
-        if (!IS_NUMBER(args[0])) \
-            ERROR("%s called on a non-number.", __func__); \
-        if (num_args == 0 || !IS_NUMBER(args[1])) \
-            ERROR("%s called with a non-number.", __func__); \
+        ARGSPEC("NN"); \
         Value this = args[0]; \
         RETURN(return_type(VAL_TO_NUMBER(this) op VAL_TO_NUMBER(args[1]))); \
     }
 
 #define DEFINE_BITWISE_METHOD(name, op) \
     DEFINE_NATIVE(Number, name) {\
-        if (!IS_NUMBER(args[0])) \
-            ERROR("%s called on a non-number.", __func__); \
-        if (num_args == 0 || !IS_NUMBER(args[1])) \
-            ERROR("%s called with a non-number.", __func__); \
+        ARGSPEC("NN"); \
         Value this = args[0]; \
         int32_t left = (int32_t) VAL_TO_NUMBER(this); \
         int32_t right = (int32_t) VAL_TO_NUMBER(args[1]); \
@@ -322,14 +300,14 @@ DEFINE_BITWISE_METHOD(land, &);
 #undef DEFINE_BITWISE_METHOD
 
 DEFINE_NATIVE(Number, negate) {
-    if (!IS_NUMBER(args[0]))
-        ERROR("Number_neg called on a non-number.");
+    ARGSPEC("N");
+
     RETURN(NUMBER_TO_VAL(-VAL_TO_NUMBER(args[0])));
 }
 
 DEFINE_NATIVE(Number, print) {
-    if (!IS_NUMBER(args[0]))
-        ERROR("Number_print called on a non-number.");
+    ARGSPEC("N");
+
     fprintf(stdout, "%g", VAL_TO_NUMBER(args[0]));
     fflush(stdout);
     RETURN(NIL_VAL);
@@ -338,8 +316,8 @@ DEFINE_NATIVE(Number, print) {
 // ============================= Boolean =============================
 
 DEFINE_NATIVE(Boolean, print) {
-    if (!IS_BOOL(args[0]))
-        ERROR("Boolean_print called on a non-boolean.");
+    ARGSPEC("B");
+
     fprintf(stdout, VAL_TO_BOOL(args[0]) ? "true" : "false");
     fflush(stdout);
     RETURN(NIL_VAL);
@@ -348,20 +326,15 @@ DEFINE_NATIVE(Boolean, print) {
 // ============================= String =============================
 
 DEFINE_NATIVE(String, plus) {
-    Value this = args[0];
-    if (!IS_STRING(this))
-        ERROR("Expected to be called on a string.");
-    if (num_args == 0 || !IS_STRING(args[1]))
-        ERROR("Expected a string.");
+    ARGSPEC("SS");
     RETURN(OBJ_TO_VAL(objstring_concat(vm,
-        VAL_TO_STRING(this),
+        VAL_TO_STRING(args[0]),
         VAL_TO_STRING(args[1])
         )));
 }
 
 DEFINE_NATIVE(String, print) {
-    if (!IS_STRING(args[0]))
-        ERROR("String_print called on a non-string.");
+    ARGSPEC("S");
     fprintf(stdout, "%s", VAL_TO_STRING(args[0])->chars);
     fflush(stdout);
     RETURN(NIL_VAL);
