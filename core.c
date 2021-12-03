@@ -21,9 +21,9 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
 #define ARG_ERROR(arg_idx, msg) \
     do { \
         if (arg_idx == 0) \
-            ERROR("%s: expected 'this' to be an %s.", __func__, msg); \
+            ERROR("%s: expected 'this' to be %s.", __func__, msg); \
         else \
-            ERROR("%s: expected args[%d] to be %s.", __func__, arg_idx, msg); \
+            ERROR("%s: expected arg %d to be %s.", __func__, arg_idx-1, msg); \
     } while (false)
 
 #define ARGSPEC(spec) do { \
@@ -32,6 +32,8 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
     } while(false)
 
 #define ARG_CHECK_SINGLE(ch, idx) do { \
+    if (num_args < idx) \
+        ERROR("%s expected %d args, got %d instead.", __func__, idx, num_args); \
     Value arg = args[idx]; \
     switch (ch) { \
         case 'O': if (!IS_OBJECT(arg)) ARG_ERROR(idx, "an Object"); break; \
@@ -40,7 +42,7 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
         case 'B': if (!IS_BOOL(arg)) ARG_ERROR(idx, "a Boolean"); break; \
         case 'n': if (!IS_NATIVE(arg)) ARG_ERROR(idx, "a Native"); break; \
         case 'F': if (!IS_CLOSURE(arg)) ARG_ERROR(idx, "an Fn"); break; \
-        case '*': if (num_args < idx) ERROR("%s expected %d args, got %d instead.", __func__, idx, num_args); break; \
+        case '*': break; \
         default: UNREACHABLE(); \
     } \
     } while(false)
