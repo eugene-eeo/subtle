@@ -23,7 +23,7 @@ release:
 stress:
 	gcc -DSUBTLE_DEBUG \
 		-DSUBTLE_DEBUG_STRESS_GC \
-		-g -Og $(MAIN) -o subtle
+		-g -Og $(MAIN) $(CCFLAGS) -o subtle
 
 benchmark:
 	mkdir -p build
