@@ -14,13 +14,12 @@
 void* memory_realloc(VM* vm, void* ptr, size_t old_size, size_t new_size) {
     vm->bytes_allocated += new_size - old_size;
 
-    if (new_size > old_size) {
 #ifdef SUBTLE_DEBUG_STRESS_GC
+    if (new_size > old_size)
         memory_collect(vm);
 #endif
-        if (vm->bytes_allocated > vm->next_gc)
-            memory_collect(vm);
-    }
+    if (vm->bytes_allocated > vm->next_gc)
+        memory_collect(vm);
 
     if (new_size == 0) {
         // free() never fails
