@@ -1,3 +1,4 @@
+#include "common.h"
 #include "compiler.h"
 #include "memory.h"
 #include "object.h"
@@ -313,7 +314,6 @@ static InterpretResult run(VM* vm, int top_level) {
     REFRESH_FRAME();
 
     for (;;) {
-        uint8_t instruction;
 #ifdef SUBTLE_DEBUG_TRACE_EXECUTION
         // Trace the stack.
         for (Value* vptr = vm->stack; vptr != vm->stack_top; vptr++) {
@@ -326,7 +326,7 @@ static InterpretResult run(VM* vm, int top_level) {
         debug_print_instruction(&frame->closure->function->chunk,
                                 (int)(frame->ip - frame->closure->function->chunk.code));
 #endif
-        switch (instruction = READ_BYTE()) {
+        switch (READ_BYTE()) {
             case OP_RETURN: {
                 Value result = vm_pop(vm);
                 close_upvalues(vm, frame->slots);
@@ -535,6 +535,8 @@ vm_call(VM* vm, Value slot, int num_args,
         *res = native->fn(vm, &vm->stack_top[-num_args - 1], num_args)
             ? INTERPRET_OK
             : INTERPRET_RUNTIME_ERROR;
+    } else {
+        UNREACHABLE();
     }
 
     if (*res == INTERPRET_OK) {

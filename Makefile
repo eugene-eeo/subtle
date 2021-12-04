@@ -1,5 +1,6 @@
-ci: test release
+ci: lint test release
 
+CCFLAGS=-Wall -pedantic
 DEPS=$(shell ls *.c vendor/*.c | grep -v main.c)
 MAIN=$(DEPS) main.c
 
@@ -7,17 +8,17 @@ cute:
 	gcc -DSUBTLE_DEBUG \
 		-DSUBTLE_DEBUG_TRACE_EXECUTION \
 		-DSUBTLE_DEBUG_PRINT_CODE \
-		-g -Og $(MAIN) -Wall -o subtle
+		-g -Og $(MAIN) $(CCFLAGS) -o subtle
 
 debug:
 	gcc -DSUBTLE_DEBUG \
 		-DSUBTLE_DEBUG_TRACE_EXECUTION \
 		-DSUBTLE_DEBUG_PRINT_CODE \
 		-DSUBTLE_DEBUG_TRACE_ALLOC \
-		-g -Og $(MAIN) -o subtle
+		-g -Og $(MAIN) $(CCFLAGS) -o subtle
 
 release:
-	gcc -O3 $(MAIN) -Wall -o subtle
+	gcc -O3 $(MAIN) $(CCFLAGS) -o subtle
 
 stress:
 	gcc -DSUBTLE_DEBUG \
@@ -27,9 +28,13 @@ stress:
 benchmark:
 	mkdir -p build
 	gcc -DSUBTLE_DEBUG_TABLE_STATS \
-		-O3 -Wall $(DEPS) \
+		-O3 $(CCFLAGS) $(DEPS) \
 		bench/benchmark_table.c -o build/table_benchmark
 	./build/table_benchmark
+
+lint:
+	cppcheck *.c
+	clang-tidy *.c -checks=performance-*,clang-analyzer-*,-clang-analyzer-cplusplus*
 
 test: stress
 	valgrind -q ./subtle ./tests/operations

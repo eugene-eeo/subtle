@@ -38,11 +38,13 @@ static char* read_file(const char* filename)
     char* source = malloc(size + 1);
     if (source == NULL) {
         perror("malloc");
+        fclose(fp);
         return NULL;
     }
 
     if (fread((void*)source, sizeof(char), size, fp) < size) {
         perror("fread");
+        fclose(fp);
         free(source);
         return NULL;
     }

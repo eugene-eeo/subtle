@@ -205,7 +205,7 @@ DEFINE_NATIVE(Object, print) {
         ERROR("Object_print: expected .name to be a string.");
     fprintf(stdout, "%s_%p",
             VAL_TO_STRING(name_slot)->chars,
-            VAL_TO_OBJ(this));
+            (void*) VAL_TO_OBJ(this));
 done:
     fflush(stdout);
     RETURN(NIL_VAL);
@@ -278,16 +278,16 @@ DEFINE_NATIVE(Native, callWithThis) {
         RETURN(return_type(a op b)); \
     }
 
-DEFINE_NUMBER_METHOD(plus,     double, +,  NUMBER_TO_VAL);
-DEFINE_NUMBER_METHOD(minus,    double, -,  NUMBER_TO_VAL);
-DEFINE_NUMBER_METHOD(multiply, double, *,  NUMBER_TO_VAL);
-DEFINE_NUMBER_METHOD(divide,   double, /,  NUMBER_TO_VAL);
-DEFINE_NUMBER_METHOD(lt,       double, <,  BOOL_TO_VAL);
-DEFINE_NUMBER_METHOD(gt,       double, >,  BOOL_TO_VAL);
-DEFINE_NUMBER_METHOD(leq,      double, <=, BOOL_TO_VAL);
-DEFINE_NUMBER_METHOD(geq,      double, >=, BOOL_TO_VAL);
-DEFINE_NUMBER_METHOD(lor,      int32_t, |, NUMBER_TO_VAL);
-DEFINE_NUMBER_METHOD(land,     int32_t, &, NUMBER_TO_VAL);
+DEFINE_NUMBER_METHOD(plus,     double, +,  NUMBER_TO_VAL)
+DEFINE_NUMBER_METHOD(minus,    double, -,  NUMBER_TO_VAL)
+DEFINE_NUMBER_METHOD(multiply, double, *,  NUMBER_TO_VAL)
+DEFINE_NUMBER_METHOD(divide,   double, /,  NUMBER_TO_VAL)
+DEFINE_NUMBER_METHOD(lt,       double, <,  BOOL_TO_VAL)
+DEFINE_NUMBER_METHOD(gt,       double, >,  BOOL_TO_VAL)
+DEFINE_NUMBER_METHOD(leq,      double, <=, BOOL_TO_VAL)
+DEFINE_NUMBER_METHOD(geq,      double, >=, BOOL_TO_VAL)
+DEFINE_NUMBER_METHOD(lor,      int32_t, |, NUMBER_TO_VAL)
+DEFINE_NUMBER_METHOD(land,     int32_t, &, NUMBER_TO_VAL)
 #undef DEFINE_NUMBER_METHOD
 
 DEFINE_NATIVE(Number, negate) {
