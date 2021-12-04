@@ -26,7 +26,7 @@ static Token error_token(Lexer* lexer, const char* message) {
     return tok;
 }
 
-static char is_at_end(Lexer* lexer) {
+static bool is_at_end(Lexer* lexer) {
     return *lexer->current == '\0';
 }
 

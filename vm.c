@@ -31,7 +31,7 @@ void vm_init(VM* vm) {
 
     vm->objects = NULL;
     vm->bytes_allocated = 0;
-    vm->next_gc = 1024 * 1024;
+    vm->next_gc = (ssize_t) 1024 * 1024;
     vm->gray_capacity = 0;
     vm->gray_count = 0;
     vm->gray_stack = NULL;

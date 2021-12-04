@@ -20,19 +20,19 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
 
 #define ARG_ERROR(arg_idx, msg) \
     do { \
-        if (arg_idx == 0) \
+        if ((arg_idx) == 0) \
             ERROR("%s: expected 'this' to be %s.", __func__, msg); \
         else \
-            ERROR("%s: expected arg %d to be %s.", __func__, arg_idx-1, msg); \
+            ERROR("%s: expected arg %d to be %s.", __func__, (arg_idx)-1, msg); \
     } while (false)
 
 #define ARGSPEC(spec) do { \
         for (int i=0; i < strlen(spec); i++) \
-            ARG_CHECK_SINGLE(spec[i], i); \
+            ARG_CHECK_SINGLE((spec)[i], i); \
     } while(false)
 
 #define ARG_CHECK_SINGLE(ch, idx) do { \
-    if (num_args < idx) \
+    if (num_args < (idx)) \
         ERROR("%s expected %d args, got %d instead.", __func__, idx, num_args); \
     Value arg = args[idx]; \
     switch (ch) { \
@@ -49,7 +49,7 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
 
 #define POP_ARGS(num_args) \
     do { \
-        for (int i = 0; i < num_args; i++) \
+        for (int i = 0; i < (num_args); i++) \
             vm_pop(vm); \
     } while (false)
 
