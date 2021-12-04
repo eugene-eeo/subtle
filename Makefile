@@ -1,34 +1,35 @@
 ci: lint test release
 
 CCFLAGS=-Wall -pedantic
+CC=gcc $(CCFLAGS)
 DEPS=$(shell ls *.c vendor/*.c | grep -v main.c)
 MAIN=$(DEPS) main.c
 
 cute:
-	gcc -DSUBTLE_DEBUG \
+	$(CC) -DSUBTLE_DEBUG \
 		-DSUBTLE_DEBUG_TRACE_EXECUTION \
 		-DSUBTLE_DEBUG_PRINT_CODE \
-		-g -Og $(MAIN) $(CCFLAGS) -o subtle
+		-g -Og $(MAIN) -o subtle
 
 debug:
-	gcc -DSUBTLE_DEBUG \
+	$(CC) -DSUBTLE_DEBUG \
 		-DSUBTLE_DEBUG_TRACE_EXECUTION \
 		-DSUBTLE_DEBUG_PRINT_CODE \
 		-DSUBTLE_DEBUG_TRACE_ALLOC \
-		-g -Og $(MAIN) $(CCFLAGS) -o subtle
+		-g -Og $(MAIN) -o subtle
 
 release:
-	gcc -O3 $(MAIN) $(CCFLAGS) -o subtle
+	$(CC) -O3 $(MAIN) -o subtle
 
 stress:
-	gcc -DSUBTLE_DEBUG \
+	$(CC) -DSUBTLE_DEBUG \
 		-DSUBTLE_DEBUG_STRESS_GC \
-		-g -Og $(MAIN) $(CCFLAGS) -o subtle
+		-g -Og $(MAIN) -o subtle
 
 benchmark:
 	mkdir -p build
-	gcc -DSUBTLE_DEBUG_TABLE_STATS \
-		-O3 $(CCFLAGS) $(DEPS) \
+	$(CC) -DSUBTLE_DEBUG_TABLE_STATS \
+		-O3 $(DEPS) \
 		bench/benchmark_table.c -o build/table_benchmark
 	./build/table_benchmark
 
