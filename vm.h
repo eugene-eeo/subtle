@@ -54,7 +54,7 @@ typedef struct VM {
     ObjObject* StringProto;
     // -------------------------
 
-    // GC
+    // ---- GC ----
     Obj* objects;
     ssize_t bytes_allocated;
     ssize_t next_gc;
@@ -71,6 +71,7 @@ typedef struct VM {
     // Temporary stack for roots.
     Value roots[MAX_ROOTS];
     int roots_count;
+    // ------------
 
     Table strings; // String interning
     Table globals; // Globals
@@ -95,9 +96,6 @@ InterpretResult vm_interpret(VM* vm, const char* source);
 Value vm_get_prototype(VM* vm, Value value);
 bool vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value);
 
-// Function calls
-// ==============
-
 // Pushes the given closure onto the call stack. Note that the
 // num_args argument should be the number of _actual_ arguments.
 // The stack should look like this:
@@ -117,7 +115,6 @@ bool vm_call(VM* vm, Value callable, int num_args,
 
 // Runs the usual invoke path. This uses vm_call internally.
 bool vm_invoke(VM* vm,
-               Value obj, Value slot_name,
-               int num_args,
-               Value* slot_value, InterpretResult* rv);
+               Value obj, Value slot_name, int num_args,
+               Value* return_value, InterpretResult* rv);
 #endif

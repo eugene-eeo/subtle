@@ -299,7 +299,7 @@ vm_invoke(VM* vm, Value obj, Value key, int num_args, Value* return_value, Inter
     return vm_call(vm, slot_value, num_args, return_value, rv);
 }
 
-static InterpretResult run(VM* vm, ObjClosure* top_level) {
+static InterpretResult run(VM* vm, int top_level) {
     CallFrame* frame;
 
 #define REFRESH_FRAME() (frame = &vm->frames[vm->frame_count - 1])
@@ -333,7 +333,7 @@ static InterpretResult run(VM* vm, ObjClosure* top_level) {
                 vm->frame_count--;
                 vm->stack_top = frame->slots;
                 vm_push(vm, result);
-                if (frame->closure == top_level)
+                if (vm->frame_count == top_level)
                     return INTERPRET_OK;
                 ASSERT(vm->frame_count > 0, "vm->frame_count == 0");
                 REFRESH_FRAME();
@@ -523,23 +523,18 @@ vm_call(VM* vm, Value slot, int num_args,
         return false;
     }
 
-    switch (VAL_TO_OBJ(slot)->type) {
-        case OBJ_CLOSURE: {
-            ObjClosure* closure = VAL_TO_CLOSURE(slot);
-            vm_push_frame(vm, closure, num_args);
-            *res = run(vm, closure);
-            break;
+    if (IS_CLOSURE(slot)) {
+        ObjClosure* closure = VAL_TO_CLOSURE(slot);
+        if (vm_push_frame(vm, closure, num_args)) {
+            *res = run(vm, vm->frame_count - 1);
+        } else {
+            *res = INTERPRET_RUNTIME_ERROR;
         }
-        case OBJ_NATIVE: {
-            ObjNative* native = VAL_TO_NATIVE(slot);
-            if (native->fn(vm, &vm->stack_top[-num_args - 1], num_args)) {
-                *res = INTERPRET_OK;
-            } else {
-                *res = INTERPRET_RUNTIME_ERROR;
-            }
-            break;
-        }
-        default: UNREACHABLE();
+    } else if (IS_NATIVE(slot)) {
+        ObjNative* native = VAL_TO_NATIVE(slot);
+        *res = native->fn(vm, &vm->stack_top[-num_args - 1], num_args)
+            ? INTERPRET_OK
+            : INTERPRET_RUNTIME_ERROR;
     }
 
     if (*res == INTERPRET_OK) {
@@ -559,7 +554,7 @@ InterpretResult vm_interpret(VM* vm, const char* source) {
     vm_push(vm, OBJ_TO_VAL(closure));
     vm_push_frame(vm, closure, 0);
 
-    InterpretResult result = run(vm, closure);
+    InterpretResult result = run(vm, 0);
     vm_reset_stack(vm);
     return result;
 }
