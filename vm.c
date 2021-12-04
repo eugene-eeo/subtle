@@ -1,4 +1,3 @@
-#include "common.h"
 #include "compiler.h"
 #include "memory.h"
 #include "object.h"
@@ -129,17 +128,13 @@ vm_push_frame(VM* vm, ObjClosure* closure, int args)
 static bool
 complete_call(VM* vm, Value callee, int args)
 {
-    if (IS_OBJ(callee)) {
-        switch(VAL_TO_OBJ(callee)->type) {
-            case OBJ_CLOSURE:
-                return vm_push_frame(vm, VAL_TO_CLOSURE(callee), args);
-            case OBJ_NATIVE: {
-                ObjNative* native = VAL_TO_NATIVE(callee);
-                Value* args_start = &vm->stack_top[-args - 1];
-                return native->fn(vm, args_start, args);
-            }
-            default: ; // It's an error.
-        }
+    if (IS_CLOSURE(callee)) {
+        return vm_push_frame(vm, VAL_TO_CLOSURE(callee), args);
+    }
+    if (IS_NATIVE(callee)) {
+        ObjNative* native = VAL_TO_NATIVE(callee);
+        Value* args_start = &vm->stack_top[-args - 1];
+        return native->fn(vm, args_start, args);
     }
     vm_runtime_error(vm, "Tried to call non-callable value.");
     return false;
@@ -187,7 +182,6 @@ Value
 vm_get_prototype(VM* vm, Value value)
 {
     switch (value.type) {
-        case VALUE_UNDEFINED: UNREACHABLE();
         case VALUE_NIL: return OBJ_TO_VAL(vm->ObjectProto);
         case VALUE_BOOL: return OBJ_TO_VAL(vm->BooleanProto);
         case VALUE_NUMBER: return OBJ_TO_VAL(vm->NumberProto);
@@ -211,7 +205,6 @@ vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
     // We don't mark non-Obj values as visited. This is because
     // their prototypes are well-known, and can only be given
     // by vm_get_prototype.
-    bool rv;
     if (IS_OBJ(src)) {
         Obj* obj = VAL_TO_OBJ(src);
         if (obj->visited) return false;
@@ -222,17 +215,10 @@ vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
         }
         obj->visited = true;
     }
-    rv = vm_get_slot(vm, vm_get_prototype(vm, src), slot_name, slot_value);
+    bool rv = vm_get_slot(vm, vm_get_prototype(vm, src), slot_name, slot_value);
     if (IS_OBJ(src))
         VAL_TO_OBJ(src)->visited = false;
     return rv;
-}
-
-bool
-vm_get_string_slot(VM* vm, Value src, const char* name, Value* slot_value)
-{
-    ObjString* str = objstring_copy(vm, name, strlen(name));
-    return vm_get_slot(vm, src, OBJ_TO_VAL(str), slot_value);
 }
 
 static inline bool
@@ -258,8 +244,9 @@ pre_invoke(VM* vm, Value obj, Value key, Value* slot_value, InterpretResult* rv)
             if (!vm_call(vm, getSlot_value, 1, slot_value, rv))
                 return false;
         } else {
-            // slot-value is nil.
+            // slot_value is nil.
             *slot_value = NIL_VAL;
+            return true;
         }
     }
     // otherwise, we've found it directly on the protos.
@@ -388,11 +375,10 @@ static InterpretResult run(VM* vm, ObjClosure* top_level) {
                 break;
             }
             case OP_ASSERT: {
-                if (!value_truthy(vm_peek(vm, 0))) {
+                if (!value_truthy(vm_pop(vm))) {
                     vm_runtime_error(vm, "Assertion failed.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                vm_pop(vm);
                 break;
             }
             case OP_GET_LOCAL: {

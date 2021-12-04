@@ -56,8 +56,9 @@ static uint64_t double_to_bits(double d) {
 static uint32_t object_hash(Obj* obj)
 {
     switch (obj->type) {
-        case OBJ_STRING:   return ((ObjString*)obj)->hash;
-        case OBJ_CLOSURE:  return object_hash((Obj*) ((ObjClosure*)obj)->function);
+        case OBJ_STRING:
+            return ((ObjString*)obj)->hash;
+        case OBJ_CLOSURE:
         case OBJ_FUNCTION:
         case OBJ_OBJECT:
         case OBJ_NATIVE:
