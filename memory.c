@@ -12,7 +12,7 @@
 #define GC_HEAP_GROW_FACTOR 2
 
 void* memory_realloc(VM* vm, void* ptr, size_t old_size, size_t new_size) {
-    vm->bytes_allocated += (ssize_t)new_size - (ssize_t)old_size;
+    vm->bytes_allocated += new_size - old_size;
 
     if (new_size > old_size) {
 #ifdef SUBTLE_DEBUG_STRESS_GC
@@ -169,7 +169,7 @@ static void sweep(VM* vm) {
 
 void memory_collect(VM* vm) {
 #ifdef SUBTLE_DEBUG_TRACE_ALLOC
-    ssize_t before = vm->bytes_allocated;
+    size_t before = vm->bytes_allocated;
     printf("-- gc begin\n");
 #endif
 

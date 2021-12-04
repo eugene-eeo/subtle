@@ -43,7 +43,7 @@ void chunk_write_offset(Chunk* chunk, VM* vm, uint16_t offset, size_t line) {
     chunk_write_byte(chunk, vm, (offset)      & 0xFF, line);
 }
 
-size_t chunk_get_line(Chunk* chunk, int offset) {
+size_t chunk_get_line(Chunk* chunk, size_t offset) {
     return chunk->lines[offset];
 }
 

@@ -31,7 +31,7 @@ void vm_init(VM* vm) {
 
     vm->objects = NULL;
     vm->bytes_allocated = 0;
-    vm->next_gc = (ssize_t) 1024 * 1024;
+    vm->next_gc = 1024 * 1024;
     vm->gray_capacity = 0;
     vm->gray_count = 0;
     vm->gray_stack = NULL;
@@ -324,7 +324,7 @@ static InterpretResult run(VM* vm, int top_level) {
         printf("\n");
         // Trace the about-to-be-executed instruction.
         debug_print_instruction(&frame->closure->function->chunk,
-                                (int)(frame->ip - frame->closure->function->chunk.code));
+                                (size_t)(frame->ip - frame->closure->function->chunk.code));
 #endif
         switch (READ_BYTE()) {
             case OP_RETURN: {

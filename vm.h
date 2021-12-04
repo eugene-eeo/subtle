@@ -56,8 +56,8 @@ typedef struct VM {
 
     // ---- GC ----
     Obj* objects;
-    ssize_t bytes_allocated;
-    ssize_t next_gc;
+    size_t bytes_allocated;
+    size_t next_gc;
     // The gray_* information encodes the gray stack used by the GC.
     // The mark-sweep GC uses a tricolour abstraction:
     //   1. Black objects are marked, and already processed.

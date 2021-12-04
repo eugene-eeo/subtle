@@ -12,9 +12,6 @@ enum OpCode {
     OP_TRUE,
     OP_FALSE,
     OP_NIL,
-    /* OP_EQ, */
-    /* OP_NEQ, */
-    /* OP_NOT, */
     OP_DEF_GLOBAL,
     OP_GET_GLOBAL,
     OP_SET_GLOBAL,
@@ -51,7 +48,7 @@ void chunk_done(Chunk* chunk, VM* vm);
 void chunk_free(Chunk* chunk, VM* vm);
 void chunk_write_byte(Chunk* chunk, VM* vm, uint8_t byte, size_t line);
 void chunk_write_offset(Chunk* chunk, VM* vm, uint16_t offset, size_t line);
-size_t chunk_get_line(Chunk* chunk, int offset);
+size_t chunk_get_line(Chunk* chunk, size_t offset);
 size_t chunk_write_constant(Chunk* chunk, VM* vm, Value v);
 void chunk_mark(Chunk* chunk, VM* vm);
 

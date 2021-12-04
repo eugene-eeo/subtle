@@ -47,12 +47,12 @@ void debug_print_chunk(Chunk* chunk) {
     }
 }
 
-static int simple_instruction(int index, const char* name) {
+static size_t simple_instruction(size_t index, const char* name) {
     printf("%-16s\n", name);
     return index + 1;
 }
 
-static int constant_instruction(Chunk* chunk, int index, const char* name) {
+static size_t constant_instruction(Chunk* chunk, size_t index, const char* name) {
     uint16_t offset = (uint16_t)(chunk->code[index + 1] << 8);
     offset |= chunk->code[index + 2];
     printf("%-16s %4d ", name, offset);
@@ -61,24 +61,24 @@ static int constant_instruction(Chunk* chunk, int index, const char* name) {
     return index + 3;
 }
 
-static int byte_instruction(Chunk* chunk, int index, const char* name) {
+static size_t byte_instruction(Chunk* chunk, size_t index, const char* name) {
     uint8_t byte = (uint8_t)(chunk->code[index + 1]);
     printf("%-16s %4d\n", name, byte);
     return index + 2;
 }
 
-static int
-jump_instruction(Chunk* chunk, int index, int direction, const char* name)
+static size_t
+jump_instruction(Chunk* chunk, size_t index, int direction, const char* name)
 {
     uint16_t jump = (uint16_t)(chunk->code[index + 1] << 8);
     jump |= chunk->code[index + 2];
-    printf("%-16s %4d -> %d\n", name, index,
-           index + 3 + direction * jump);
+    printf("%-16s %4zu -> %zu\n", name, index,
+           index + 3 + (long) direction * jump);
     return index + 3;
 }
 
-int debug_print_instruction(Chunk* chunk, int index) {
-    printf("%04d ", index);
+size_t debug_print_instruction(Chunk* chunk, size_t index) {
+    printf("%04zu ", index);
     if (index > 0 && chunk_get_line(chunk, index-1) == chunk_get_line(chunk, index)) {
         printf("   | ");
     } else {
@@ -105,7 +105,7 @@ int debug_print_instruction(Chunk* chunk, int index) {
             index++;
             uint16_t offset = (uint16_t)(chunk->code[index++] << 8);
             offset |= chunk->code[index++];
-            printf("%-16s %4d ", "OP_CLOSURE", offset);
+            printf("%-16s %4u ", "OP_CLOSURE", offset);
             debug_print_value(chunk->constants.values[offset]);
             printf("\n");
 
@@ -113,7 +113,7 @@ int debug_print_instruction(Chunk* chunk, int index) {
             for (int j = 0; j < fn->upvalue_count; j++) {
                 uint8_t is_local = chunk->code[index++];
                 uint8_t upvalue_idx = chunk->code[index++];
-                printf("%04d    |                     %s %d\n",
+                printf("%04zu    |                     %s %u\n",
                        index - 2, (is_local == 1) ? "local" : "upvalue", upvalue_idx);
             }
             return index;
@@ -131,7 +131,7 @@ int debug_print_instruction(Chunk* chunk, int index) {
             printf("%-16s %4d ", "OP_INVOKE", constant);
             debug_print_value(chunk->constants.values[constant]);
             uint8_t num_args = chunk->code[index++];
-            printf(" (%d args)", num_args);
+            printf(" (%u args)", num_args);
             printf("\n");
             return index;
         }
