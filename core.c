@@ -21,9 +21,9 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
 #define ARG_ERROR(arg_idx, msg) \
     do { \
         if ((arg_idx) == 0) \
-            ERROR("%s: expected 'this' to be %s.", __func__, msg); \
+            ERROR("%s expected 'this' to be %s.", __func__, msg); \
         else \
-            ERROR("%s: expected arg %d to be %s.", __func__, (arg_idx)-1, msg); \
+            ERROR("%s expected arg %d to be %s.", __func__, (arg_idx)-1, msg); \
     } while (false)
 
 #define ARGSPEC(spec) do { \
@@ -202,7 +202,7 @@ DEFINE_NATIVE(Object, print) {
         return rv;
 
     if (!IS_STRING(name_slot))
-        ERROR("Object_print: expected .name to be a string.");
+        ERROR("Object_print expected .name to be a string.");
     fprintf(stdout, "%s_%p",
             VAL_TO_STRING(name_slot)->chars,
             (void*) VAL_TO_OBJ(this));

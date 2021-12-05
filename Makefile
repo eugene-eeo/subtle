@@ -35,7 +35,7 @@ benchmark:
 
 lint:
 	cppcheck *.c
-	clang-tidy *.c -checks=performance-*,clang-analyzer-*,-clang-analyzer-cplusplus*
+	# clang-tidy *.c -checks=performance-*,clang-analyzer-*,-clang-analyzer-cplusplus*
 
 test: stress
 	valgrind -q ./subtle ./tests/operations
