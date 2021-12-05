@@ -517,29 +517,26 @@ bool
 vm_call(VM* vm, Value slot, int num_args,
         Value* return_value, InterpretResult* res)
 {
-    if (!is_activatable(slot)) {
-        vm_runtime_error(vm, "Tried to call a non-activatable slot.");
-        *res = INTERPRET_RUNTIME_ERROR;
-        return false;
-    }
-
+    InterpretResult result;
     if (IS_CLOSURE(slot)) {
         ObjClosure* closure = VAL_TO_CLOSURE(slot);
         if (vm_push_frame(vm, closure, num_args)) {
-            *res = run(vm, vm->frame_count - 1);
+            result = run(vm, vm->frame_count - 1);
         } else {
-            *res = INTERPRET_RUNTIME_ERROR;
+            result = INTERPRET_RUNTIME_ERROR;
         }
     } else if (IS_NATIVE(slot)) {
         ObjNative* native = VAL_TO_NATIVE(slot);
-        *res = native->fn(vm, &vm->stack_top[-num_args - 1], num_args)
+        result = native->fn(vm, &vm->stack_top[-num_args - 1], num_args)
             ? INTERPRET_OK
             : INTERPRET_RUNTIME_ERROR;
     } else {
-        UNREACHABLE();
+        vm_runtime_error(vm, "Tried to call a non-activatable slot.");
+        result = INTERPRET_RUNTIME_ERROR;
     }
 
-    if (*res == INTERPRET_OK) {
+    *res = result;
+    if (result == INTERPRET_OK) {
         *return_value = vm_pop(vm);
         return true;
     }
