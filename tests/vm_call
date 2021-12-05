@@ -38,3 +38,19 @@ record.k = 2;
 assert x.k == 2;
 
 assert x.getSlot("getSlot") == custom_getSlot;
+
+# this is actually a since-fixed bug in run() that broke from
+# the bytecode interpreter loop based on the function, not the
+# stack frame depth.
+let recursive;
+recursive = Fn.new{|s, n|
+    if (n == 1) return s;
+    return s + recursive.call(s, n - 1);
+};
+let u = {};
+u.getSlot = Fn.new{|s|
+    return recursive.call(s, 3);
+};
+
+assert u.a == "aaa";
+assert u.ab == "ababab";

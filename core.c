@@ -60,10 +60,14 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
         return false; \
     } while (false)
 
-#define RETURN(v) \
+// NOTE: The order in which the following operations happen is important;
+// We first assign to the return value BEFORE popping arguments off the
+// stack. This is so that if v triggers a GC, which is dependent on the
+// stack, then we don't pop the arguments off too early.
+#define RETURN(EXPR) \
     do { \
+        args[0] = EXPR; \
         POP_ARGS(num_args); \
-        args[0] = v; \
         return true; \
     } while (false)
 
