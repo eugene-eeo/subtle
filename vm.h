@@ -68,7 +68,7 @@ typedef struct VM {
     int gray_capacity;
     int gray_count;
     Obj** gray_stack;
-    // Temporary stack for roots.
+    // Stack to temporarily treat values as roots.
     Value roots[MAX_ROOTS];
     int roots_count;
     // ------------
@@ -86,6 +86,9 @@ void vm_free(VM* vm);
 void vm_push(VM* vm, Value value);
 Value vm_pop(VM* vm);
 Value vm_peek(VM* vm, int distance);
+// vm_drop is similar to vm_pop, but doesn't return the value, and
+// also can drop multiple items at once.
+void vm_drop(VM* vm, int count);
 void vm_push_root(VM* vm, Value value);
 void vm_pop_root(VM* vm);
 void vm_runtime_error(VM* vm, const char* format, ...);

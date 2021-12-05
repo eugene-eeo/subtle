@@ -47,11 +47,7 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
     } \
     } while(false)
 
-#define POP_ARGS(num_args) \
-    do { \
-        for (int i = 0; i < (num_args); i++) \
-            vm_pop(vm); \
-    } while (false)
+#define POP_ARGS(num_args) vm_drop(vm, num_args)
 
 #define ERROR(...) \
     do { \

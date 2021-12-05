@@ -73,6 +73,10 @@ Value vm_peek(VM* vm, int distance) {
     return vm->stack_top[-1 - distance];
 }
 
+void vm_drop(VM* vm, int count) {
+    vm->stack_top -= count;
+}
+
 void vm_push_root(VM* vm, Value value) {
     ASSERT(vm->roots_count < MAX_ROOTS, "vm->roots_count == MAX_ROOTS");
     vm->roots[vm->roots_count] = value;
@@ -121,7 +125,8 @@ vm_push_frame(VM* vm, ObjClosure* closure, int args)
     // Since -1 arity means a script, we ignore that here.
     if (function->arity != -1) {
         for (int i = 0; i < function->arity - args; i++) vm_push(vm, NIL_VAL);
-        for (int i = 0; i < args - function->arity; i++) vm_pop(vm);
+        if (args > function->arity)
+            vm_drop(vm, args - function->arity);
     }
     return true;
 }
@@ -343,7 +348,7 @@ static InterpretResult run(VM* vm, int top_level) {
                 vm_push(vm, READ_CONSTANT());
                 break;
             }
-            case OP_POP: vm_pop(vm); break;
+            case OP_POP:   vm_pop(vm); break;
             case OP_TRUE:  vm_push(vm, BOOL_TO_VAL(true)); break;
             case OP_FALSE: vm_push(vm, BOOL_TO_VAL(false)); break;
             case OP_NIL:   vm_push(vm, NIL_VAL); break;
