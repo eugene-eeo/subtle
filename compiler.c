@@ -506,9 +506,9 @@ static void object(Compiler* compiler, bool can_assign) {
     emit_byte(compiler, OP_OBJECT);
     if (!check(compiler, TOKEN_RBRACE)) {
         do {
-            consume(compiler, TOKEN_VARIABLE, "Expect an identifier as key.");
+            consume_slot(compiler, "Expect a slot name.");
             uint16_t constant = identifier_constant(compiler, &compiler->parser->previous);
-            consume(compiler, TOKEN_COLON, "Expect ':' after key.");
+            consume(compiler, TOKEN_COLON, "Expect ':' after slot name.");
             expression(compiler);
             emit_byte(compiler, OP_OBJLIT_SET);
             emit_offset(compiler, constant);
