@@ -14,10 +14,6 @@
 
 Obj* object_allocate(VM* vm, ObjType type, size_t sz) {
     Obj* object = memory_realloc(vm, NULL, 0, sz);
-    // It is safe to make ->marked = false here, because
-    // the GC only happens ``inside'' the memory_realloc
-    // call. After the previous line, the GC won't run
-    // again in this function.
     object->type = type;
     object->next = vm->objects;
     object->visited = false;

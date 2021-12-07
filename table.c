@@ -180,8 +180,4 @@ table_remove_white(Table* table, VM* vm)
         if (IS_OBJ(entry->key) && !VAL_TO_OBJ(entry->key)->marked)
             table_delete_key(table, vm, entry->key);
     }
-    // This is safe to do here, even though this is called from the
-    // GC, as a GC is only triggered if there is an increase in the
-    // memory allocated; table_compact() can only decrease.
-    table_compact(table, vm);
 }
