@@ -38,21 +38,22 @@ lint:
 	# clang-tidy *.c -checks=performance-*,clang-analyzer-*,-clang-analyzer-cplusplus*
 
 run_test:
-	valgrind -q ./subtle ./tests/operations
-	valgrind -q ./subtle ./tests/globals
-	valgrind -q ./subtle ./tests/locals
-	valgrind -q ./subtle ./tests/jumps
-	valgrind -q ./subtle ./tests/functions
-	valgrind -q ./subtle ./tests/closures
-	valgrind -q ./subtle ./tests/this
-	valgrind -q ./subtle ./tests/vm_call
-	valgrind -q ./subtle ./tests/compact
-	valgrind -q ./subtle ./tests/table
+	$(RUNNER) ./subtle ./tests/operations
+	$(RUNNER) ./subtle ./tests/globals
+	$(RUNNER) ./subtle ./tests/locals
+	$(RUNNER) ./subtle ./tests/jumps
+	$(RUNNER) ./subtle ./tests/functions
+	$(RUNNER) ./subtle ./tests/closures
+	$(RUNNER) ./subtle ./tests/this
+	$(RUNNER) ./subtle ./tests/vm_call
+	$(RUNNER) ./subtle ./tests/compact
+	$(RUNNER) ./subtle ./tests/table
 
 test:
 	make stress
-	make run_test
+	make run_test RUNNER="valgrind -q"
 	make release
+	make run_test RUNNER="valgrind -q"
 	make run_test
 
 vendor_deps:
