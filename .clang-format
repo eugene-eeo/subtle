@@ -1,0 +1,20 @@
+---
+BasedOnStyle: WebKit
+IndentWidth: 4
+# AlignArrayOfStructures: Right
+# AlignConsecutiveAssignments: AcrossEmptyLines
+# AlignConsecutiveDeclarations: None
+AlignConsecutiveMacros: AcrossEmptyLines
+AlignTrailingComments: true
+DerivePointerAlignment: false
+PointerAlignment: Left
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortIfStatementsOnASingleLine: OnlyFirstIf
+AllowShortLoopsOnASingleLine: true
+AllowShortBlocksOnASingleLine: true
+AlignAfterOpenBracket: Align
+BraceWrapping:
+  AfterControlStatement: Never
+BreakBeforeBraces: Linux
+ColumnLimit: 0
+IncludeBlocks: Regroup

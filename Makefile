@@ -1,4 +1,4 @@
-ci: lint test release
+ci: lint test
 
 CCFLAGS=-Wall -pedantic
 CC=gcc $(CCFLAGS)
@@ -37,7 +37,7 @@ lint:
 	cppcheck *.c
 	# clang-tidy *.c -checks=performance-*,clang-analyzer-*,-clang-analyzer-cplusplus*
 
-test: stress
+run_test:
 	valgrind -q ./subtle ./tests/operations
 	valgrind -q ./subtle ./tests/globals
 	valgrind -q ./subtle ./tests/locals
@@ -48,6 +48,12 @@ test: stress
 	valgrind -q ./subtle ./tests/vm_call
 	valgrind -q ./subtle ./tests/compact
 	valgrind -q ./subtle ./tests/table
+
+test:
+	make stress
+	make run_test
+	make release
+	make run_test
 
 vendor_deps:
 	mkdir -p vendor
