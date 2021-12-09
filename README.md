@@ -11,7 +11,8 @@ Point init = Fn new {|x, y|
     this y = y;
     return this;
 };
-Point + = Fn new {|other|  # yes, this is allowed
+# Invocation accepts blocks as the last argument
+Point.rawSetSlot("+") {|other|
     return Point clone init(this x + other x, this y + other y);
 };
 let p1 = Point clone init(1, 2);
