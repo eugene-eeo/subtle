@@ -6,19 +6,19 @@ features operator overloading!
 ```cfg
 # Comments start with '#'
 let Point = {};
-Point.init = Fn.new{|x, y|
-    this.x = x;
-    this.y = y;
+Point init = Fn new {|x, y|
+    this x = x;
+    this y = y;
     return this;
 };
-Point.+ = Fn.new {|other|  # yes, this is allowed
-    return Point.clone.init(this.x + other.x, this.y + other.y);
+Point + = Fn new {|other|  # yes, this is allowed
+    return Point clone init(this x + other x, this y + other y);
 };
-let p1 = Point.clone.init(1, 2);  # <-- Object literals
-let p2 = Point.clone.init(3, 4);
+let p1 = Point clone init(1, 2);
+let p2 = Point clone init(3, 4);
 let result = p1 + p2;
-assert result.x == 4;
-assert result.y == 6;
+assert result x == 4;
+assert result y == 6;
 ```
 
 ## running
@@ -55,16 +55,16 @@ $ ./subtle
   - there is no reason why `nil` can't be a regular object
 - [ ] implement `super`: this is trickier than expected. naively, one would think:
   ```cfg
-  obj.foo = Fn.new{|bar|
-    super.foo(bar) # <=> call this.proto.foo(bar) with the context being `this`
+  obj foo = Fn new{|bar|
+    super foo(bar) # <=> call this.proto.foo(bar) with the context being `this`
   };
   ```
   but the issue arises when we do:
   ```cfg
-  let x = obj.clone;
-  x.foo(1); # <-- this will segfault the VM, because
-            # it will do x.proto.foo === obj.foo,
-            # and attempt to do x.proto.foo again...
+  let x = obj clone;
+  x foo(1); # <-- this will segfault the VM, because
+            # it will do x proto foo === obj foo,
+            # and attempt to do x proto foo again...
   ```
   currently the solution is to keep a `whence` field on the callframe, to keep track of where a function was found. this means that it won't work with a custom `getSlot`, as we can lose whence information if e.g. the slot was dynamically generated. we either have to:
   1. bite the bullet and implement a best-effort `whence`.
