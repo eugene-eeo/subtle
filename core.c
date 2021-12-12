@@ -118,7 +118,11 @@ DEFINE_NATIVE(Object, getOwnSlot) {
         RETURN(NIL_VAL);
 
     ObjObject* this = VAL_TO_OBJECT(args[0]);
-    RETURN(BOOL_TO_VAL(objobject_has(this, args[1])));
+    Value rv;
+    if (objobject_get(this, args[1], &rv)) {
+        RETURN(rv);
+    }
+    RETURN(NIL_VAL);
 }
 
 DEFINE_NATIVE(Object, hasOwnSlot) {
