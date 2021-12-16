@@ -7,6 +7,26 @@
 #include <string.h>
 #include <stdio.h>
 
+// Type checks
+// ===========
+// These helpers check if Values can be converted into other kinds of Values.
+// For instance, because Number (vm->NumberProto) needs to be treated as a 0,
+// we will do the conversions here.
+
+static inline bool
+virt_is_number(VM* vm, Value val)
+{
+    return IS_NUMBER(val) || (IS_OBJECT(val) && VAL_TO_OBJECT(val) == vm->NumberProto);
+}
+
+static inline double
+virt_to_number(VM* vm, Value val)
+{
+    if (IS_OBJECT(val) && VAL_TO_OBJECT(val) == vm->NumberProto)
+        return 0;
+    return VAL_TO_NUMBER(val);
+}
+
 static inline void
 define_on_table(VM* vm, Table* table, const char* name, Value value) {
     vm_push_root(vm, value);
@@ -18,6 +38,9 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
     vm_pop_root(vm);
 }
 
+#define DEFINE_NATIVE(proto, name) \
+    static bool proto##_##name(VM* vm, Value* args, int num_args)
+
 #define ARG_ERROR(arg_idx, msg) \
     do { \
         if ((arg_idx) == 0) \
@@ -28,17 +51,17 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
 
 #define ARGSPEC(spec) do { \
         for (int i=0; i < strlen(spec); i++) \
-            ARG_CHECK_SINGLE((spec)[i], i); \
+            ARG_CHECK_SINGLE(vm, (spec)[i], i); \
     } while(false)
 
-#define ARG_CHECK_SINGLE(ch, idx) do { \
+#define ARG_CHECK_SINGLE(vm, ch, idx) do { \
     if (num_args < (idx)) \
         ERROR("%s expected %d args, got %d instead.", __func__, idx, num_args); \
     Value arg = args[idx]; \
     switch (ch) { \
         case 'O': if (!IS_OBJECT(arg)) ARG_ERROR(idx, "an Object"); break; \
         case 'S': if (!IS_STRING(arg)) ARG_ERROR(idx, "a String"); break; \
-        case 'N': if (!IS_NUMBER(arg)) ARG_ERROR(idx, "a Number"); break; \
+        case 'N': if (!virt_is_number(vm, arg)) ARG_ERROR(idx, "a Number"); break; \
         case 'B': if (!IS_BOOL(arg)) ARG_ERROR(idx, "a Boolean"); break; \
         case 'n': if (!IS_NATIVE(arg)) ARG_ERROR(idx, "a Native"); break; \
         case 'F': if (!IS_CLOSURE(arg)) ARG_ERROR(idx, "an Fn"); break; \
@@ -67,9 +90,6 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
         return true; \
     } while (false)
 
-
-#define DEFINE_NATIVE(proto, name) \
-    static bool proto##_##name(VM* vm, Value* args, int num_args)
 
 // ============================= Object =============================
 
@@ -273,11 +293,13 @@ DEFINE_NATIVE(Native, callWithThis) {
 #define DEFINE_NUMBER_METHOD(name, cast_to, op, return_type) \
     DEFINE_NATIVE(Number, name) {\
         ARGSPEC("NN"); \
-        cast_to a = (cast_to) VAL_TO_NUMBER(args[0]); \
-        cast_to b = (cast_to) VAL_TO_NUMBER(args[1]); \
+        cast_to a = (cast_to) virt_to_number(vm, args[0]); \
+        cast_to b = (cast_to) virt_to_number(vm, args[1]); \
         RETURN(return_type(a op b)); \
     }
 
+DEFINE_NUMBER_METHOD(eq,       double, ==, BOOL_TO_VAL)
+DEFINE_NUMBER_METHOD(neq,      double, !=, BOOL_TO_VAL)
 DEFINE_NUMBER_METHOD(plus,     double, +,  NUMBER_TO_VAL)
 DEFINE_NUMBER_METHOD(minus,    double, -,  NUMBER_TO_VAL)
 DEFINE_NUMBER_METHOD(multiply, double, *,  NUMBER_TO_VAL)
@@ -293,13 +315,13 @@ DEFINE_NUMBER_METHOD(land,     int32_t, &, NUMBER_TO_VAL)
 DEFINE_NATIVE(Number, negate) {
     ARGSPEC("N");
 
-    RETURN(NUMBER_TO_VAL(-VAL_TO_NUMBER(args[0])));
+    RETURN(NUMBER_TO_VAL(-virt_to_number(vm, args[0])));
 }
 
 DEFINE_NATIVE(Number, print) {
     ARGSPEC("N");
 
-    fprintf(stdout, "%g", VAL_TO_NUMBER(args[0]));
+    fprintf(stdout, "%g", virt_to_number(vm, args[0]));
     fflush(stdout);
     RETURN(NIL_VAL);
 }
@@ -379,6 +401,8 @@ void core_init_vm(VM* vm)
 
     vm->NumberProto = objobject_new(vm);
     vm->NumberProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    ADD_METHOD(NumberProto, "==",    Number_eq);
+    ADD_METHOD(NumberProto, "!=",    Number_neq);
     ADD_METHOD(NumberProto, "+",     Number_plus);
     ADD_METHOD(NumberProto, "-",     Number_minus);
     ADD_METHOD(NumberProto, "*",     Number_multiply);
