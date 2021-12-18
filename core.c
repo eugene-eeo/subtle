@@ -7,8 +7,8 @@
 #include <string.h>
 #include <stdio.h>
 
-// Type checks
-// ===========
+// Type checks / Conversion
+// ========================
 // These helpers check if Values can be converted into other kinds of Values.
 // For instance, because Number (vm->NumberProto) needs to be treated as a 0,
 // we will do the conversions here.
@@ -212,21 +212,21 @@ DEFINE_NATIVE(Object, print) {
     Value this = args[0];
     if (IS_NIL(this)) {
         fprintf(stdout, "nil");
-        goto done;
+    } else if (IS_BOOL(this)) {
+        fprintf(stdout, VAL_TO_BOOL(this) ? "true" : "false");
+    } else {
+        Value name_slot;
+        InterpretResult rv;
+        vm_push(vm, this);
+        if (!vm_invoke(vm, args[0], OBJ_TO_VAL(objstring_copy(vm, "name", 4)), 0, &name_slot, &rv))
+            return rv;
+
+        if (!IS_STRING(name_slot))
+            ERROR("Object_print expected .name to be a string.");
+        fprintf(stdout, "%s_%p",
+                VAL_TO_STRING(name_slot)->chars,
+                (void*) VAL_TO_OBJ(this));
     }
-
-    Value name_slot;
-    InterpretResult rv;
-    vm_push(vm, this);
-    if (!vm_invoke(vm, args[0], OBJ_TO_VAL(objstring_copy(vm, "name", 4)), 0, &name_slot, &rv))
-        return rv;
-
-    if (!IS_STRING(name_slot))
-        ERROR("Object_print expected .name to be a string.");
-    fprintf(stdout, "%s_%p",
-            VAL_TO_STRING(name_slot)->chars,
-            (void*) VAL_TO_OBJ(this));
-done:
     fflush(stdout);
     RETURN(NIL_VAL);
 }
@@ -326,16 +326,6 @@ DEFINE_NATIVE(Number, print) {
     RETURN(NIL_VAL);
 }
 
-// ============================= Boolean =============================
-
-DEFINE_NATIVE(Boolean, print) {
-    ARGSPEC("B");
-
-    fprintf(stdout, VAL_TO_BOOL(args[0]) ? "true" : "false");
-    fflush(stdout);
-    RETURN(NIL_VAL);
-}
-
 // ============================= String =============================
 
 DEFINE_NATIVE(String, plus) {
@@ -416,10 +406,6 @@ void core_init_vm(VM* vm)
     ADD_METHOD(NumberProto, "|",     Number_lor);
     ADD_METHOD(NumberProto, "&",     Number_land);
 
-    vm->BooleanProto = objobject_new(vm);
-    vm->BooleanProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    ADD_METHOD(BooleanProto, "print", Boolean_print);
-
     vm->StringProto = objobject_new(vm);
     vm->StringProto->proto = OBJ_TO_VAL(vm->ObjectProto);
     ADD_METHOD(StringProto, "+",     String_plus);
@@ -429,7 +415,6 @@ void core_init_vm(VM* vm)
     ADD_OBJECT(&vm->globals, "Fn",      vm->FnProto);
     ADD_OBJECT(&vm->globals, "Native",  vm->NativeProto);
     ADD_OBJECT(&vm->globals, "Number",  vm->NumberProto);
-    ADD_OBJECT(&vm->globals, "Boolean", vm->BooleanProto);
     ADD_OBJECT(&vm->globals, "String",  vm->StringProto);
 
 #undef ADD_OBJECT
