@@ -373,9 +373,6 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "print",       Object_print);
     ADD_METHOD(ObjectProto, "println",     Object_println);
 
-    // Note: allocating here is safe, because all *Protos are marked as
-    // roots, and remaining *Protos are initialized to NULL. Thus we won't
-    // potentially free ObjectProto.
     vm->FnProto = objobject_new(vm);
     vm->FnProto->proto = OBJ_TO_VAL(vm->ObjectProto);
     ADD_NAME(FnProto, "Fn");
