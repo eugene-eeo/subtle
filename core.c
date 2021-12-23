@@ -227,10 +227,10 @@ DEFINE_NATIVE(Object, print) {
         if (!vm_invoke(vm, args[0], OBJ_TO_VAL(objstring_copy(vm, "name", 4)), 0, &name_slot, &rv))
             return rv;
 
-        if (!IS_STRING(name_slot))
+        if (!virt_is_string(name_slot))
             ERROR("Object_print expected .name to be a string.");
         fprintf(stdout, "%s_%p",
-                VAL_TO_STRING(name_slot)->chars,
+                virt_to_string(name_slot)->chars,
                 (void*) VAL_TO_OBJ(this));
     }
     fflush(stdout);
