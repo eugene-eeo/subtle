@@ -304,7 +304,6 @@ DEFINE_NATIVE(Native, callWithThis) {
         RETURN(return_type(a op b)); \
     }
 
-DEFINE_NUMBER_METHOD(eq,       double, ==, BOOL_TO_VAL)
 DEFINE_NUMBER_METHOD(neq,      double, !=, BOOL_TO_VAL)
 DEFINE_NUMBER_METHOD(plus,     double, +,  NUMBER_TO_VAL)
 DEFINE_NUMBER_METHOD(minus,    double, -,  NUMBER_TO_VAL)
@@ -317,6 +316,15 @@ DEFINE_NUMBER_METHOD(geq,      double, >=, BOOL_TO_VAL)
 DEFINE_NUMBER_METHOD(lor,      int32_t, |, NUMBER_TO_VAL)
 DEFINE_NUMBER_METHOD(land,     int32_t, &, NUMBER_TO_VAL)
 #undef DEFINE_NUMBER_METHOD
+
+DEFINE_NATIVE(Number, eq) {
+    ARGSPEC("N*");
+    if (!virt_is_number(args[1]))
+        RETURN(BOOL_TO_VAL(false));
+    double lhs = virt_to_number(args[0]);
+    double rhs = virt_to_number(args[1]);
+    RETURN(BOOL_TO_VAL(lhs == rhs));
+}
 
 DEFINE_NATIVE(Number, negate) {
     ARGSPEC("N");
@@ -335,7 +343,9 @@ DEFINE_NATIVE(Number, print) {
 // ============================= String =============================
 
 DEFINE_NATIVE(String, eq) {
-    ARGSPEC("SS");
+    ARGSPEC("S*");
+    if (!virt_is_string(args[1]))
+        RETURN(BOOL_TO_VAL(false));
     ObjString* lhs = virt_to_string(args[0]);
     ObjString* rhs = virt_to_string(args[1]);
     RETURN(BOOL_TO_VAL(lhs == rhs));
