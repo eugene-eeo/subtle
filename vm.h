@@ -50,7 +50,6 @@ typedef struct VM {
     ObjObject* FnProto;
     ObjObject* NativeProto;
     ObjObject* NumberProto;
-    ObjObject* BooleanProto;
     ObjObject* StringProto;
     // -------------------------
 

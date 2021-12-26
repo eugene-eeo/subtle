@@ -14,7 +14,7 @@ Point.init = Fn.new{|x, y|
 Point.+ = Fn.new {|other|  # yes, this is allowed
     return Point.clone.init(this.x + other.x, this.y + other.y);
 };
-let p1 = Point.clone.init(1, 2);  # <-- Object literals
+let p1 = Point.clone.init(1, 2);
 let p2 = Point.clone.init(3, 4);
 let result = p1 + p2;
 assert result.x == 4;
@@ -63,8 +63,8 @@ $ ./subtle
   ```cfg
   let x = obj.clone;
   x.foo(1); # <-- this will segfault the VM, because
-            # it will do x.proto.foo === obj.foo,
-            # and attempt to do x.proto.foo again...
+            # it will do x proto foo === obj foo,
+            # and attempt to do x proto foo again...
   ```
   currently the solution is to keep a `whence` field on the callframe, to keep track of where a function was found. this means that it won't work with a custom `getSlot`, as we can lose whence information if e.g. the slot was dynamically generated. we either have to:
   1. bite the bullet and implement a best-effort `whence`.

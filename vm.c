@@ -26,7 +26,6 @@ void vm_init(VM* vm) {
     vm->FnProto = NULL;
     vm->NativeProto = NULL;
     vm->NumberProto = NULL;
-    vm->BooleanProto = NULL;
     vm->StringProto = NULL;
 
     vm->objects = NULL;
@@ -189,7 +188,7 @@ vm_get_prototype(VM* vm, Value value)
 {
     switch (value.type) {
         case VALUE_NIL: return OBJ_TO_VAL(vm->ObjectProto);
-        case VALUE_BOOL: return OBJ_TO_VAL(vm->BooleanProto);
+        case VALUE_BOOL: return OBJ_TO_VAL(vm->ObjectProto);
         case VALUE_NUMBER: return OBJ_TO_VAL(vm->NumberProto);
         case VALUE_OBJ: {
             Obj* object = VAL_TO_OBJ(value);

@@ -73,7 +73,7 @@ typedef enum {
     PREC_CMP,        // <, >, <=, >=
     PREC_TERM,       // + -
     PREC_FACTOR,     // * /
-    PREC_UNARY,      // ! -
+    PREC_PREFIX,     // ! -
     PREC_CALL,       // (), .
     PREC_LITERAL,    // literals
 } Precedence;
@@ -245,7 +245,7 @@ compiler_end(Compiler* compiler)
         if (compiler->type == FUNCTION_TYPE_SCRIPT) {
             printf("script");
         } else {
-            printf("fn_%p", compiler->function);
+            printf("fn_%p", (void*)compiler->function);
         }
         printf(" ==\n");
         debug_print_chunk(current_chunk(compiler));
@@ -605,7 +605,7 @@ static void unary(Compiler* compiler, bool can_assign) {
     Token op_token = compiler->parser->previous;
     TokenType operator = op_token.type;
     // Compile the operand.
-    parse_precedence(compiler, PREC_UNARY);
+    parse_precedence(compiler, PREC_PREFIX);
     uint16_t method_constant;
     switch (operator) {
         case TOKEN_BANG:

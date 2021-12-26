@@ -95,7 +95,6 @@ static void mark_roots(VM* vm) {
     mark_object(vm, (Obj*)vm->FnProto);
     mark_object(vm, (Obj*)vm->NativeProto);
     mark_object(vm, (Obj*)vm->NumberProto);
-    mark_object(vm, (Obj*)vm->BooleanProto);
     mark_object(vm, (Obj*)vm->StringProto);
 
     table_mark(&vm->globals, vm);
@@ -129,6 +128,7 @@ static void blacken_object(VM* vm, Obj* obj) {
         }
         case OBJ_OBJECT: {
             ObjObject* object = (ObjObject*)obj;
+            mark_value(vm, object->data);
             mark_value(vm, object->proto);
             table_mark(&object->slots, vm);
             break;

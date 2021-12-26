@@ -7,6 +7,32 @@
 #include <string.h>
 #include <stdio.h>
 
+// Type checks / Conversion
+// ------------------------
+
+#define DEFINE_TYPECHECK_WITH_DATA(name, raw_check) \
+    static inline bool \
+    name(Value val) \
+    { \
+        if (IS_OBJECT(val)) \
+            val = VAL_TO_OBJECT(val)->data; \
+        return raw_check(val); \
+    }
+#define DEFINE_CONVERSION_WITH_DATA(name, type, raw_convert) \
+    static inline type \
+    name(Value val) \
+    { \
+        if (IS_OBJECT(val)) \
+            val = VAL_TO_OBJECT(val)->data; \
+        return raw_convert(val); \
+    }
+
+DEFINE_TYPECHECK_WITH_DATA(virt_is_number, IS_NUMBER)
+DEFINE_TYPECHECK_WITH_DATA(virt_is_string, IS_STRING)
+
+DEFINE_CONVERSION_WITH_DATA(virt_to_number, double, VAL_TO_NUMBER)
+DEFINE_CONVERSION_WITH_DATA(virt_to_string, ObjString*, VAL_TO_STRING)
+
 static inline void
 define_on_table(VM* vm, Table* table, const char* name, Value value) {
     vm_push_root(vm, value);
@@ -18,6 +44,9 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
     vm_pop_root(vm);
 }
 
+#define DEFINE_NATIVE(proto, name) \
+    static bool proto##_##name(VM* vm, Value* args, int num_args)
+
 #define ARG_ERROR(arg_idx, msg) \
     do { \
         if ((arg_idx) == 0) \
@@ -28,17 +57,17 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
 
 #define ARGSPEC(spec) do { \
         for (int i=0; i < strlen(spec); i++) \
-            ARG_CHECK_SINGLE((spec)[i], i); \
+            ARG_CHECK_SINGLE(vm, (spec)[i], i); \
     } while(false)
 
-#define ARG_CHECK_SINGLE(ch, idx) do { \
+#define ARG_CHECK_SINGLE(vm, ch, idx) do { \
     if (num_args < (idx)) \
         ERROR("%s expected %d args, got %d instead.", __func__, idx, num_args); \
     Value arg = args[idx]; \
     switch (ch) { \
         case 'O': if (!IS_OBJECT(arg)) ARG_ERROR(idx, "an Object"); break; \
-        case 'S': if (!IS_STRING(arg)) ARG_ERROR(idx, "a String"); break; \
-        case 'N': if (!IS_NUMBER(arg)) ARG_ERROR(idx, "a Number"); break; \
+        case 'S': if (!virt_is_string(arg)) ARG_ERROR(idx, "a String"); break; \
+        case 'N': if (!virt_is_number(arg)) ARG_ERROR(idx, "a Number"); break; \
         case 'B': if (!IS_BOOL(arg)) ARG_ERROR(idx, "a Boolean"); break; \
         case 'n': if (!IS_NATIVE(arg)) ARG_ERROR(idx, "a Native"); break; \
         case 'F': if (!IS_CLOSURE(arg)) ARG_ERROR(idx, "an Fn"); break; \
@@ -67,9 +96,6 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
         return true; \
     } while (false)
 
-
-#define DEFINE_NATIVE(proto, name) \
-    static bool proto##_##name(VM* vm, Value* args, int num_args)
 
 // ============================= Object =============================
 
@@ -196,21 +222,21 @@ DEFINE_NATIVE(Object, print) {
     Value this = args[0];
     if (IS_NIL(this)) {
         fprintf(stdout, "nil");
-        goto done;
+    } else if (IS_BOOL(this)) {
+        fprintf(stdout, VAL_TO_BOOL(this) ? "true" : "false");
+    } else {
+        Value name_slot;
+        InterpretResult rv;
+        vm_push(vm, this);
+        if (!vm_invoke(vm, args[0], OBJ_TO_VAL(objstring_copy(vm, "name", 4)), 0, &name_slot, &rv))
+            return rv;
+
+        if (!virt_is_string(name_slot))
+            ERROR("Object_print expected .name to be a string.");
+        fprintf(stdout, "%s_%p",
+                virt_to_string(name_slot)->chars,
+                (void*) VAL_TO_OBJ(this));
     }
-
-    Value name_slot;
-    InterpretResult rv;
-    vm_push(vm, this);
-    if (!vm_invoke(vm, args[0], OBJ_TO_VAL(objstring_copy(vm, "name", 4)), 0, &name_slot, &rv))
-        return rv;
-
-    if (!IS_STRING(name_slot))
-        ERROR("Object_print expected .name to be a string.");
-    fprintf(stdout, "%s_%p",
-            VAL_TO_STRING(name_slot)->chars,
-            (void*) VAL_TO_OBJ(this));
-done:
     fflush(stdout);
     RETURN(NIL_VAL);
 }
@@ -277,11 +303,12 @@ DEFINE_NATIVE(Native, callWithThis) {
 #define DEFINE_NUMBER_METHOD(name, cast_to, op, return_type) \
     DEFINE_NATIVE(Number, name) {\
         ARGSPEC("NN"); \
-        cast_to a = (cast_to) VAL_TO_NUMBER(args[0]); \
-        cast_to b = (cast_to) VAL_TO_NUMBER(args[1]); \
+        cast_to a = (cast_to) virt_to_number(args[0]); \
+        cast_to b = (cast_to) virt_to_number(args[1]); \
         RETURN(return_type(a op b)); \
     }
 
+DEFINE_NUMBER_METHOD(neq,      double, !=, BOOL_TO_VAL)
 DEFINE_NUMBER_METHOD(plus,     double, +,  NUMBER_TO_VAL)
 DEFINE_NUMBER_METHOD(minus,    double, -,  NUMBER_TO_VAL)
 DEFINE_NUMBER_METHOD(multiply, double, *,  NUMBER_TO_VAL)
@@ -294,45 +321,58 @@ DEFINE_NUMBER_METHOD(lor,      int32_t, |, NUMBER_TO_VAL)
 DEFINE_NUMBER_METHOD(land,     int32_t, &, NUMBER_TO_VAL)
 #undef DEFINE_NUMBER_METHOD
 
+DEFINE_NATIVE(Number, eq) {
+    ARGSPEC("N*");
+    if (!virt_is_number(args[1]))
+        RETURN(BOOL_TO_VAL(false));
+    double lhs = virt_to_number(args[0]);
+    double rhs = virt_to_number(args[1]);
+    RETURN(BOOL_TO_VAL(lhs == rhs));
+}
+
 DEFINE_NATIVE(Number, negate) {
     ARGSPEC("N");
 
-    RETURN(NUMBER_TO_VAL(-VAL_TO_NUMBER(args[0])));
+    RETURN(NUMBER_TO_VAL(-virt_to_number(args[0])));
 }
 
 DEFINE_NATIVE(Number, print) {
     ARGSPEC("N");
 
-    fprintf(stdout, "%g", VAL_TO_NUMBER(args[0]));
-    fflush(stdout);
-    RETURN(NIL_VAL);
-}
-
-// ============================= Boolean =============================
-
-DEFINE_NATIVE(Boolean, print) {
-    ARGSPEC("B");
-
-    fprintf(stdout, VAL_TO_BOOL(args[0]) ? "true" : "false");
+    fprintf(stdout, "%g", virt_to_number(args[0]));
     fflush(stdout);
     RETURN(NIL_VAL);
 }
 
 // ============================= String =============================
 
+DEFINE_NATIVE(String, eq) {
+    ARGSPEC("S*");
+    if (!virt_is_string(args[1]))
+        RETURN(BOOL_TO_VAL(false));
+    ObjString* lhs = virt_to_string(args[0]);
+    ObjString* rhs = virt_to_string(args[1]);
+    RETURN(BOOL_TO_VAL(lhs == rhs));
+}
+
 DEFINE_NATIVE(String, plus) {
     ARGSPEC("SS");
     RETURN(OBJ_TO_VAL(objstring_concat(vm,
-        VAL_TO_STRING(args[0]),
-        VAL_TO_STRING(args[1])
+        virt_to_string(args[0]),
+        virt_to_string(args[1])
         )));
 }
 
 DEFINE_NATIVE(String, print) {
     ARGSPEC("S");
-    fprintf(stdout, "%s", VAL_TO_STRING(args[0])->chars);
+    fprintf(stdout, "%s", virt_to_string(args[0])->chars);
     fflush(stdout);
     RETURN(NIL_VAL);
+}
+
+DEFINE_NATIVE(String, length) {
+    ARGSPEC("S");
+    RETURN(NUMBER_TO_VAL(virt_to_string(args[0])->length));
 }
 
 void core_init_vm(VM* vm)
@@ -365,9 +405,6 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "print",       Object_print);
     ADD_METHOD(ObjectProto, "println",     Object_println);
 
-    // Note: allocating here is safe, because all *Protos are marked as
-    // roots, and remaining *Protos are initialized to NULL. Thus we won't
-    // potentially free ObjectProto.
     vm->FnProto = objobject_new(vm);
     vm->FnProto->proto = OBJ_TO_VAL(vm->ObjectProto);
     ADD_NAME(FnProto, "Fn");
@@ -382,7 +419,10 @@ void core_init_vm(VM* vm)
     ADD_METHOD(NativeProto, "callWithThis", Native_callWithThis);
 
     vm->NumberProto = objobject_new(vm);
+    vm->NumberProto->data = NUMBER_TO_VAL(0);
     vm->NumberProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    ADD_METHOD(NumberProto, "==",    Number_eq);
+    ADD_METHOD(NumberProto, "!=",    Number_neq);
     ADD_METHOD(NumberProto, "+",     Number_plus);
     ADD_METHOD(NumberProto, "-",     Number_minus);
     ADD_METHOD(NumberProto, "*",     Number_multiply);
@@ -396,20 +436,18 @@ void core_init_vm(VM* vm)
     ADD_METHOD(NumberProto, "|",     Number_lor);
     ADD_METHOD(NumberProto, "&",     Number_land);
 
-    vm->BooleanProto = objobject_new(vm);
-    vm->BooleanProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    ADD_METHOD(BooleanProto, "print", Boolean_print);
-
     vm->StringProto = objobject_new(vm);
+    vm->StringProto->data = OBJ_TO_VAL(objstring_copy(vm, "", 0));
     vm->StringProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    ADD_METHOD(StringProto, "+",     String_plus);
-    ADD_METHOD(StringProto, "print", String_print);
+    ADD_METHOD(StringProto, "==",     String_eq);
+    ADD_METHOD(StringProto, "+",      String_plus);
+    ADD_METHOD(StringProto, "print",  String_print);
+    ADD_METHOD(StringProto, "length", String_length);
 
     ADD_OBJECT(&vm->globals, "Object",  vm->ObjectProto);
     ADD_OBJECT(&vm->globals, "Fn",      vm->FnProto);
     ADD_OBJECT(&vm->globals, "Native",  vm->NativeProto);
     ADD_OBJECT(&vm->globals, "Number",  vm->NumberProto);
-    ADD_OBJECT(&vm->globals, "Boolean", vm->BooleanProto);
     ADD_OBJECT(&vm->globals, "String",  vm->StringProto);
 
 #undef ADD_OBJECT
