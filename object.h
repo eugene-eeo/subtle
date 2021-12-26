@@ -1,10 +1,10 @@
 #ifndef SUBTLE_OBJECT_H
 #define SUBTLE_OBJECT_H
 
-#include "common.h"
-#include "value.h"
 #include "chunk.h"
+#include "common.h"
 #include "table.h"
+#include "value.h"
 
 // Forward declarations
 // --------------------
@@ -12,14 +12,14 @@ typedef struct VM VM;
 
 // Macros
 // ------
-#define IS_STRING(value)     (is_object_type(value, OBJ_STRING))
-#define IS_FUNCTION(value)   (is_object_type(value, OBJ_FUNCTION))
-#define IS_UPVALUE(value)    (is_object_type(value, OBJ_UPVALUE))
-#define IS_CLOSURE(value)    (is_object_type(value, OBJ_CLOSURE))
-#define IS_OBJECT(value)     (is_object_type(value, OBJ_OBJECT))
-#define IS_NATIVE(value)     (is_object_type(value, OBJ_NATIVE))
+#define IS_STRING(value)       (is_object_type(value, OBJ_STRING))
+#define IS_FUNCTION(value)     (is_object_type(value, OBJ_FUNCTION))
+#define IS_UPVALUE(value)      (is_object_type(value, OBJ_UPVALUE))
+#define IS_CLOSURE(value)      (is_object_type(value, OBJ_CLOSURE))
+#define IS_OBJECT(value)       (is_object_type(value, OBJ_OBJECT))
+#define IS_NATIVE(value)       (is_object_type(value, OBJ_NATIVE))
 
-#define OBJ_TYPE(value)      (VAL_TO_OBJ(value)->type)
+#define OBJ_TYPE(value)        (VAL_TO_OBJ(value)->type)
 
 #define VAL_TO_STRING(value)   ((ObjString*)VAL_TO_OBJ(value))
 #define VAL_TO_FUNCTION(value) ((ObjFunction*)VAL_TO_OBJ(value))
@@ -47,14 +47,15 @@ typedef struct Obj {
     struct Obj* next;
 } Obj;
 
-static inline bool is_object_type(Value value, ObjType type) {
+static inline bool is_object_type(Value value, ObjType type)
+{
     return IS_OBJ(value) && VAL_TO_OBJ(value)->type == type;
 }
 
 typedef struct ObjString {
     Obj obj;
     size_t length;
-    char*  chars;
+    char* chars;
     uint32_t hash;
 } ObjString;
 

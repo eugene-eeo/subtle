@@ -1,7 +1,8 @@
 #include "object.h"
+
 #include "memory.h"
-#include "vm.h"
 #include "table.h"
+#include "vm.h"
 
 #include <stdint.h>
 #include <string.h> // memcpy
@@ -12,7 +13,8 @@
 // Object memory management
 // ========================
 
-Obj* object_allocate(VM* vm, ObjType type, size_t sz) {
+Obj* object_allocate(VM* vm, ObjType type, size_t sz)
+{
     Obj* object = memory_realloc(vm, NULL, 0, sz);
     object->type = type;
     object->next = vm->objects;
@@ -32,24 +34,26 @@ static void objclosure_free(VM*, Obj*);
 static void objobject_free(VM*, Obj*);
 static void objnative_free(VM*, Obj*);
 
-void object_free(Obj* obj, VM* vm) {
+void object_free(Obj* obj, VM* vm)
+{
 #ifdef SUBTLE_DEBUG_TRACE_ALLOC
     printf("%p free type %d\n", (void*)obj, obj->type);
 #endif
     switch (obj->type) {
-        case OBJ_STRING:   objstring_free(vm,   obj); break;
-        case OBJ_FUNCTION: objfunction_free(vm, obj); break;
-        case OBJ_UPVALUE:  objupvalue_free(vm,  obj); break;
-        case OBJ_CLOSURE:  objclosure_free(vm,  obj); break;
-        case OBJ_OBJECT:   objobject_free(vm,   obj); break;
-        case OBJ_NATIVE:   objnative_free(vm,   obj); break;
+    case OBJ_STRING: objstring_free(vm, obj); break;
+    case OBJ_FUNCTION: objfunction_free(vm, obj); break;
+    case OBJ_UPVALUE: objupvalue_free(vm, obj); break;
+    case OBJ_CLOSURE: objclosure_free(vm, obj); break;
+    case OBJ_OBJECT: objobject_free(vm, obj); break;
+    case OBJ_NATIVE: objnative_free(vm, obj); break;
     }
 }
 
 // ObjString
 // =========
 
-static uint32_t hash_string(const char* str, size_t length) {
+static uint32_t hash_string(const char* str, size_t length)
+{
     uint32_t hash = 2166136261u;
     for (size_t i = 0; i < length; i++) {
         hash ^= (uint8_t)str[i];
@@ -101,7 +105,7 @@ objstring_concat(VM* vm, ObjString* a, ObjString* b)
 {
     size_t length = a->length + b->length;
     char* chars = ALLOCATE_ARRAY(vm, char, length + 1);
-    memcpy(chars,             a->chars, a->length);
+    memcpy(chars, a->chars, a->length);
     memcpy(chars + a->length, b->chars, b->length);
     chars[length] = '\0';
 
@@ -195,27 +199,23 @@ objobject_new(VM* vm)
     return object;
 }
 
-bool
-objobject_has(ObjObject* obj, Value key)
+bool objobject_has(ObjObject* obj, Value key)
 {
     Value res;
     return objobject_get(obj, key, &res);
 }
 
-bool
-objobject_get(ObjObject* obj, Value key, Value* result)
+bool objobject_get(ObjObject* obj, Value key, Value* result)
 {
     return table_get(&obj->slots, key, result);
 }
 
-void
-objobject_set(ObjObject* obj, VM* vm, Value key, Value value)
+void objobject_set(ObjObject* obj, VM* vm, Value key, Value value)
 {
     table_set(&obj->slots, vm, key, value);
 }
 
-bool
-objobject_delete(ObjObject* obj, VM* vm, Value key)
+bool objobject_delete(ObjObject* obj, VM* vm, Value key)
 {
     return table_delete(&obj->slots, vm, key);
 }
