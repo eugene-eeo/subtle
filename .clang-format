@@ -13,6 +13,7 @@ AllowShortIfStatementsOnASingleLine: OnlyFirstIf
 AllowShortLoopsOnASingleLine: true
 AllowShortBlocksOnASingleLine: true
 AlignAfterOpenBracket: Align
+AlwaysBreakAfterReturnType: AllDefinitions
 BraceWrapping:
   AfterControlStatement: Never
 BreakBeforeBraces: Linux

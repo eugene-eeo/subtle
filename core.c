@@ -114,7 +114,7 @@ DEFINE_NATIVE(Object, rawGetSlot) {
     RETURN(slot);
 }
 
-DEFINE_NATIVE(Object, rawSetSlot) {
+DEFINE_NATIVE(Object, setSlot) {
     ARGSPEC("O**");
 
     objobject_set(VAL_TO_OBJECT(args[0]), vm, args[1], args[2]);
@@ -382,10 +382,11 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "proto",       Object_proto);
     ADD_METHOD(ObjectProto, "setProto",    Object_setProto);
     ADD_METHOD(ObjectProto, "rawGetSlot",  Object_rawGetSlot);
-    ADD_METHOD(ObjectProto, "rawSetSlot",  Object_rawSetSlot);
+    ADD_METHOD(ObjectProto, "rawSetSlot",  Object_setSlot);
+    ADD_METHOD(ObjectProto, "setSlot",     Object_setSlot);
     ADD_METHOD(ObjectProto, "hasSlot",     Object_hasSlot);
     ADD_METHOD(ObjectProto, "getOwnSlot",  Object_getOwnSlot);
-    ADD_METHOD(ObjectProto, "setOwnSlot",  Object_rawSetSlot);
+    ADD_METHOD(ObjectProto, "setOwnSlot",  Object_setSlot);
     ADD_METHOD(ObjectProto, "hasOwnSlot",  Object_hasOwnSlot);
     ADD_METHOD(ObjectProto, "deleteSlot",  Object_deleteSlot);
     ADD_METHOD(ObjectProto, "same",        Object_same);

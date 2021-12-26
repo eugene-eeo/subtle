@@ -13,7 +13,8 @@
 // Object memory management
 // ========================
 
-Obj* object_allocate(VM* vm, ObjType type, size_t sz)
+Obj*
+object_allocate(VM* vm, ObjType type, size_t sz)
 {
     Obj* object = memory_realloc(vm, NULL, 0, sz);
     object->type = type;
@@ -34,7 +35,8 @@ static void objclosure_free(VM*, Obj*);
 static void objobject_free(VM*, Obj*);
 static void objnative_free(VM*, Obj*);
 
-void object_free(Obj* obj, VM* vm)
+void
+object_free(Obj* obj, VM* vm)
 {
 #ifdef SUBTLE_DEBUG_TRACE_ALLOC
     printf("%p free type %d\n", (void*)obj, obj->type);
@@ -52,7 +54,8 @@ void object_free(Obj* obj, VM* vm)
 // ObjString
 // =========
 
-static uint32_t hash_string(const char* str, size_t length)
+static uint32_t
+hash_string(const char* str, size_t length)
 {
     uint32_t hash = 2166136261u;
     for (size_t i = 0; i < length; i++) {
@@ -199,23 +202,27 @@ objobject_new(VM* vm)
     return object;
 }
 
-bool objobject_has(ObjObject* obj, Value key)
+bool
+objobject_has(ObjObject* obj, Value key)
 {
     Value res;
     return objobject_get(obj, key, &res);
 }
 
-bool objobject_get(ObjObject* obj, Value key, Value* result)
+bool
+objobject_get(ObjObject* obj, Value key, Value* result)
 {
     return table_get(&obj->slots, key, result);
 }
 
-void objobject_set(ObjObject* obj, VM* vm, Value key, Value value)
+void
+objobject_set(ObjObject* obj, VM* vm, Value key, Value value)
 {
     table_set(&obj->slots, vm, key, value);
 }
 
-bool objobject_delete(ObjObject* obj, VM* vm, Value key)
+bool
+objobject_delete(ObjObject* obj, VM* vm, Value key)
 {
     return table_delete(&obj->slots, vm, key);
 }

@@ -1,7 +1,7 @@
 # Currently getSlot and setSlot use vm_call.
 # We stress-test them below...
 
-let setSlot = Object.rawGetSlot("rawSetSlot");
+let setSlot = Object.rawGetSlot("setSlot");
 let getSlot = Object.rawGetSlot("rawGetSlot");
 
 let x = {};
@@ -9,7 +9,7 @@ let record = {};
 
 x.getSlot = Fn.new{|k|
     let rv = getSlot.callWithThis(this, k);
-    record.rawSetSlot(k, "seen");
+    record.setSlot(k, "seen");
     return rv;
 };
 

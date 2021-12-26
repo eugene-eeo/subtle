@@ -471,10 +471,6 @@ static InterpretResult run(VM* vm, int top_level) {
                 Value key = READ_CONSTANT();
                 Value obj = vm_peek(vm, 1);
                 Value value = vm_peek(vm, 0);
-                if (!IS_OBJECT(obj)) {
-                    vm_runtime_error(vm, "Trying to set slot on non-object.");
-                    return INTERPRET_RUNTIME_ERROR;
-                }
                 Value return_value;
                 // Call <obj>.setSlot(<key>, <value>) if it exists.
                 Value setSlot_slot;
@@ -485,15 +481,15 @@ static InterpretResult run(VM* vm, int top_level) {
                     vm_push(vm, value);
                     if (!vm_call(vm, setSlot_slot, 2, &return_value, &rv))
                         return rv;
-                    // vm_call should've popped them out.
+                    // the arguments should've been popped out
+                    vm_pop(vm); // value
+                    vm_pop(vm); // object
+                    vm_push(vm, return_value);
+                    break;
                 } else {
-                    objobject_set(VAL_TO_OBJECT(obj), vm, key, value);
-                    return_value = value;
+                    vm_runtime_error(vm, "No setSlot found.");
+                    return INTERPRET_RUNTIME_ERROR;
                 }
-                vm_pop(vm); // value
-                vm_pop(vm); // object
-                vm_push(vm, return_value);
-                break;
             }
             case OP_INVOKE: {
                 Value key = READ_CONSTANT();
