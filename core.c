@@ -10,15 +10,7 @@
 // Type checks / Conversion
 // ------------------------
 
-#define DEFINE_TYPECHECK_WITH_DATA(name, raw_check) \
-    static inline bool \
-    name(Value val) \
-    { \
-        if (IS_OBJECT(val)) \
-            val = VAL_TO_OBJECT(val)->data; \
-        return raw_check(val); \
-    }
-#define DEFINE_CONVERSION_WITH_DATA(name, type, raw_convert) \
+#define DEFINE_DATA_FN(name, type, raw_convert) \
     static inline type \
     name(Value val) \
     { \
@@ -27,11 +19,11 @@
         return raw_convert(val); \
     }
 
-DEFINE_TYPECHECK_WITH_DATA(virt_is_number, IS_NUMBER)
-DEFINE_TYPECHECK_WITH_DATA(virt_is_string, IS_STRING)
+DEFINE_DATA_FN(virt_is_number, bool, IS_NUMBER)
+DEFINE_DATA_FN(virt_is_string, bool, IS_STRING)
 
-DEFINE_CONVERSION_WITH_DATA(virt_to_number, double, VAL_TO_NUMBER)
-DEFINE_CONVERSION_WITH_DATA(virt_to_string, ObjString*, VAL_TO_STRING)
+DEFINE_DATA_FN(virt_to_number, double, VAL_TO_NUMBER)
+DEFINE_DATA_FN(virt_to_string, ObjString*, VAL_TO_STRING)
 
 static inline void
 define_on_table(VM* vm, Table* table, const char* name, Value value) {
