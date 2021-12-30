@@ -41,9 +41,6 @@ typedef struct VM {
     // Constants needed by the VM
     Value getSlot_string;
     Value setSlot_string;
-    Value equal_string;
-    Value notEqual_string;
-    Value not_string;
 
     // Core Protos
     ObjObject* ObjectProto;
