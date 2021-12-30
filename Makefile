@@ -38,6 +38,7 @@ lint:
 	# clang-tidy *.c -checks=performance-*,clang-analyzer-*,-clang-analyzer-cplusplus*
 
 run_test:
+	$(RUNNER) ./subtle ./tests/README
 	$(RUNNER) ./subtle ./tests/operations
 	$(RUNNER) ./subtle ./tests/globals
 	$(RUNNER) ./subtle ./tests/locals
