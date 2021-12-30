@@ -339,15 +339,6 @@ DEFINE_NATIVE(Number, negate) {
 
 // ============================= String =============================
 
-DEFINE_NATIVE(String, eq) {
-    ARGSPEC("S*");
-    if (!IS_STRING(args[1]))
-        RETURN(BOOL_TO_VAL(false));
-    ObjString* lhs = VAL_TO_STRING(args[0]);
-    ObjString* rhs = VAL_TO_STRING(args[1]);
-    RETURN(BOOL_TO_VAL(lhs == rhs));
-}
-
 DEFINE_NATIVE(String, plus) {
     ARGSPEC("SS");
     RETURN(OBJ_TO_VAL(objstring_concat(vm,
@@ -418,7 +409,6 @@ void core_init_vm(VM* vm)
 
     vm->StringProto = objobject_new(vm);
     vm->StringProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    ADD_METHOD(StringProto, "==",     String_eq);
     ADD_METHOD(StringProto, "+",      String_plus);
     ADD_METHOD(StringProto, "length", String_length);
 
