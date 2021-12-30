@@ -74,6 +74,7 @@ typedef enum {
     PREC_TERM,       // + -
     PREC_FACTOR,     // * /
     PREC_PREFIX,     // ! -
+    PREC_POSTFIX,    // method calls
     PREC_CALL,       // (), .
     PREC_LITERAL,    // literals
 } Precedence;
@@ -165,7 +166,7 @@ static void consume(Compiler* compiler, TokenType type, const char* message) {
 
 static bool match_slot(Compiler* compiler) {
     if (check(compiler, TOKEN_VARIABLE)
-            || check(compiler, TOKEN_TRUE)   || check(compiler, TOKEN_FALSE) || check(compiler, TOKEN_NIL)
+            || check(compiler, TOKEN_TRUE)  || check(compiler, TOKEN_FALSE) || check(compiler, TOKEN_NIL)
             || check(compiler, TOKEN_THIS)
             || check(compiler, TOKEN_PLUS)  || check(compiler, TOKEN_MINUS)
             || check(compiler, TOKEN_TIMES) || check(compiler, TOKEN_SLASH)
@@ -549,8 +550,7 @@ static void block_argument(Compiler* compiler) {
     }
 }
 
-static void dot(Compiler* compiler, bool can_assign) {
-    consume_slot(compiler, "Expect slot name after '.'.");
+static void invoke(Compiler* compiler, bool can_assign) {
     uint16_t slot_name = identifier_constant(compiler, &compiler->parser->previous);
 
     if (can_assign && match(compiler, TOKEN_EQ)) {
@@ -584,6 +584,11 @@ static void dot(Compiler* compiler, bool can_assign) {
     emit_byte(compiler, OP_INVOKE);
     emit_offset(compiler, slot_name);
     emit_byte(compiler, num_args);
+}
+
+static void dot(Compiler* compiler, bool can_assign) {
+    consume_slot(compiler, "Expect slot name after '.'.");
+    invoke(compiler, can_assign);
 }
 
 static void this(Compiler* compiler, bool can_assign) {
@@ -682,13 +687,13 @@ static ParseRule rules[] = {
     [TOKEN_PIPE_PIPE] = {NULL,     or_,    PREC_OR},
     [TOKEN_NUMBER]    = {number,   NULL,   PREC_NONE},
     [TOKEN_STRING]    = {string,   NULL,   PREC_NONE},
-    [TOKEN_VARIABLE]  = {variable, NULL,   PREC_NONE},
-    [TOKEN_NIL]       = {literal,  NULL,   PREC_NONE},
-    [TOKEN_TRUE]      = {literal,  NULL,   PREC_NONE},
-    [TOKEN_FALSE]     = {literal,  NULL,   PREC_NONE},
+    [TOKEN_VARIABLE]  = {variable, invoke, PREC_POSTFIX},
+    [TOKEN_NIL]       = {literal,  invoke, PREC_POSTFIX},
+    [TOKEN_TRUE]      = {literal,  invoke, PREC_POSTFIX},
+    [TOKEN_FALSE]     = {literal,  invoke, PREC_POSTFIX},
     [TOKEN_WHILE]     = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_THIS]      = {this,     NULL,   PREC_NONE},
-    [TOKEN_SUPER]     = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_THIS]      = {this,     invoke, PREC_POSTFIX},
+    [TOKEN_SUPER]     = {NULL,     invoke, PREC_POSTFIX},
     [TOKEN_IF]        = {NULL,     NULL,   PREC_NONE},
     [TOKEN_ELSE]      = {NULL,     NULL,   PREC_NONE},
     [TOKEN_LET]       = {NULL,     NULL,   PREC_NONE},
