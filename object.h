@@ -88,7 +88,6 @@ typedef struct {
 
 typedef struct {
     Obj obj;
-    Value data;
     Value proto;
     Table slots;
 } ObjObject;
