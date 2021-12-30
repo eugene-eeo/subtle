@@ -69,8 +69,9 @@ static uint32_t object_hash(Obj* obj)
 
 uint32_t value_hash(Value v) {
     switch (v.type) {
-        case VALUE_NIL:    return 0;
-        case VALUE_BOOL:   return VAL_TO_BOOL(v) ? 1 : 2;
+        case VALUE_NIL:    return hash_bits(0);
+        case VALUE_TRUE:   return hash_bits(1);
+        case VALUE_FALSE:  return hash_bits(2);
         case VALUE_NUMBER: return hash_bits(double_to_bits(VAL_TO_NUMBER(v)));
         case VALUE_OBJ:    return object_hash(VAL_TO_OBJ(v));
         default: UNREACHABLE();
@@ -80,8 +81,10 @@ uint32_t value_hash(Value v) {
 bool value_equal(Value a, Value b) {
     if (a.type != b.type) return false;
     switch (a.type) {
-        case VALUE_NIL:    return true;
-        case VALUE_BOOL:   return VAL_TO_BOOL(a) == VAL_TO_BOOL(b);
+        case VALUE_NIL:
+        case VALUE_TRUE:
+        case VALUE_FALSE:
+            return true;
         case VALUE_NUMBER: return VAL_TO_NUMBER(a) == VAL_TO_NUMBER(b);
         case VALUE_OBJ:    return VAL_TO_OBJ(a) == VAL_TO_OBJ(b);
         default: UNREACHABLE();
@@ -89,7 +92,6 @@ bool value_equal(Value a, Value b) {
 }
 
 bool value_truthy(Value a) {
-    if (IS_NIL(a)) return false;
-    if (IS_BOOL(a)) return VAL_TO_BOOL(a);
+    if (IS_NIL(a) || IS_FALSE(a)) return false;
     return true;
 }

@@ -187,9 +187,12 @@ Value
 vm_get_prototype(VM* vm, Value value)
 {
     switch (value.type) {
-        case VALUE_NIL: return OBJ_TO_VAL(vm->ObjectProto);
-        case VALUE_BOOL: return OBJ_TO_VAL(vm->ObjectProto);
-        case VALUE_NUMBER: return OBJ_TO_VAL(vm->NumberProto);
+        case VALUE_NIL:
+        case VALUE_TRUE:
+        case VALUE_FALSE:
+            return OBJ_TO_VAL(vm->ObjectProto);
+        case VALUE_NUMBER:
+            return OBJ_TO_VAL(vm->NumberProto);
         case VALUE_OBJ: {
             Obj* object = VAL_TO_OBJ(value);
             switch (object->type) {

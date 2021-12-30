@@ -48,7 +48,6 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
         case 'O': if (!IS_OBJECT(arg)) ARG_ERROR(idx, "an Object"); break; \
         case 'S': if (!IS_STRING(arg)) ARG_ERROR(idx, "a String"); break; \
         case 'N': if (!IS_NUMBER(arg)) ARG_ERROR(idx, "a Number"); break; \
-        case 'B': if (!IS_BOOL(arg)) ARG_ERROR(idx, "a Boolean"); break; \
         case 'n': if (!IS_NATIVE(arg)) ARG_ERROR(idx, "a Native"); break; \
         case 'F': if (!IS_CLOSURE(arg)) ARG_ERROR(idx, "an Fn"); break; \
         case '*': break; \
@@ -207,9 +206,8 @@ DEFINE_NATIVE(Object, toString) {
 
     switch (this.type) {
     case VALUE_NIL:  RETURN(OBJ_TO_VAL(objstring_copy(vm, "nil", 3)));
-    case VALUE_BOOL: RETURN(OBJ_TO_VAL((Obj*) (VAL_TO_BOOL(this)
-            ? objstring_copy(vm, "true", 4)
-            : objstring_copy(vm, "false", 5))));
+    case VALUE_TRUE: RETURN(OBJ_TO_VAL((Obj*)objstring_copy(vm, "true", 4)));
+    case VALUE_FALSE: RETURN(OBJ_TO_VAL((Obj*)objstring_copy(vm, "false", 5)));
     case VALUE_NUMBER:
         buf_size = snprintf(NULL, 0, "%g", VAL_TO_NUMBER(this)) + 1;
         buffer = ALLOCATE_ARRAY(vm, char, buf_size);

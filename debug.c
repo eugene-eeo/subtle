@@ -35,7 +35,8 @@ void debug_print_value(Value value) {
     switch (value.type) {
         case VALUE_UNDEFINED: printf("undefined"); break;
         case VALUE_NIL: printf("nil"); break;
-        case VALUE_BOOL: printf(VAL_TO_BOOL(value) ? "true" : "false"); break;
+        case VALUE_TRUE: printf("true"); break;
+        case VALUE_FALSE: printf("false"); break;
         case VALUE_NUMBER: printf("%g", VAL_TO_NUMBER(value)); break;
         case VALUE_OBJ: debug_print_object(VAL_TO_OBJ(value)); break;
     }
