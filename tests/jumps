@@ -23,3 +23,33 @@ assert a == 10;
 let a = Fn.new { assert false; };
 assert true || a.call();
 assert !(false && a.call());
+
+let a = 0;
+let b = 0;
+while (a < 10) {
+    a = a + 1;
+    if (a == 5 || a == 4)
+        continue;
+    b = b + 1;
+}
+assert a == 10;
+assert b == 8;
+
+if (true) {
+    # just want to enter a block
+    let a = 0;
+    while (a < 10) {
+        a = a + 1;
+        Fn.new {|z|
+            let u = 1;
+            while (true) {
+                break;
+                u = u + 1;
+            }
+            assert u == 1;
+        };
+        if (a == 5)
+            break;
+    }
+    assert a == 5;
+}

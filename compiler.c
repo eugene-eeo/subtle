@@ -30,6 +30,13 @@ typedef struct {
     bool panic_mode;
 } Parser;
 
+typedef struct Loop {
+    struct Loop* outer;
+    int depth; // Initial depth of the loop
+    int break_jump; // Offset of the break jump
+    int continue_jump; // Offset to continue
+} Loop;
+
 typedef struct {
     Token name;
     int depth;
@@ -58,6 +65,7 @@ typedef struct Compiler {
     int local_count;
     Upvalue upvalues[MAX_UPVALUES];
     int scope_depth; // Current scope depth.
+    Loop* loop;
 
     VM* vm;
 } Compiler;
@@ -109,6 +117,7 @@ compiler_init(Compiler* compiler, Compiler* enclosing,
     compiler->local_count = 0;
     compiler->scope_depth = 0;
     compiler->vm = vm;
+    compiler->loop = NULL;
 
     Local* local = &compiler->locals[compiler->local_count++];
     local->depth = 0;
@@ -278,6 +287,21 @@ static void end_block(Compiler* compiler) {
     }
 }
 
+// Similar to end_block, but without actually modifying the compiler.
+static void pop_to_scope(Compiler* compiler, int scope_depth) {
+    int local_count = compiler->local_count;
+    ASSERT(compiler->scope_depth >= scope_depth, "compiler->scope_depth < scope_depth");
+    while (local_count > 0
+           && compiler->locals[local_count - 1].depth > scope_depth) {
+        if (compiler->locals[local_count - 1].is_captured) {
+            emit_byte(compiler, OP_CLOSE_UPVALUE);
+        } else {
+            emit_byte(compiler, OP_POP);
+        }
+        local_count--;
+    }
+}
+
 static void add_local(Compiler* compiler, Token name) {
     if (compiler->local_count == MAX_LOCALS) {
         error_at(compiler, &name, "Too many locals in one chunk.");
@@ -359,6 +383,22 @@ resolve_upvalue(Compiler* compiler, Token* token)
         return add_upvalue(compiler, (uint8_t)upvalue, false);
 
     return -1;
+}
+
+// Loop helpers
+// ============
+
+static void
+enter_loop(Compiler* compiler, Loop* loop)
+{
+    loop->outer = compiler->loop;
+    compiler->loop = loop;
+}
+
+static void
+exit_loop(Compiler* compiler)
+{
+    compiler->loop = compiler->loop->outer;
 }
 
 // Jumping helpers
@@ -843,7 +883,23 @@ static void if_stmt(Compiler* compiler) {
 }
 
 static void while_stmt(Compiler* compiler) {
+    // Design:
+    // 1. Inject an OP_JUMP where we can break from the loop.
+    // 2. Skip over that OP_JUMP initially.
+    // 3. Do the actual looping.
+
+    int skip_jump = emit_jump(compiler, OP_JUMP);  // (2)
+    int break_jump = emit_jump(compiler, OP_JUMP); // (1)
+    patch_jump(compiler, skip_jump);
+
     int loop_start = current_chunk(compiler)->length;
+
+    Loop loop;
+    loop.depth = compiler->scope_depth;
+    loop.break_jump = break_jump - 1;
+    loop.continue_jump = loop_start;
+    enter_loop(compiler, &loop);
+
     consume(compiler, TOKEN_LPAREN, "Expect '(' after while.");
     expression(compiler);
     consume(compiler, TOKEN_RPAREN, "Expect ')' after condition.");
@@ -857,6 +913,31 @@ static void while_stmt(Compiler* compiler) {
 
     patch_jump(compiler, end_jump);
     emit_byte(compiler, OP_POP);
+    patch_jump(compiler, break_jump);
+
+    exit_loop(compiler);
+}
+
+static void continue_stmt(Compiler* compiler) {
+    if (compiler->loop == NULL) {
+        error(compiler, "Cannot continue from outside a loop.");
+        return;
+    }
+    // First have to pop off the scope
+    pop_to_scope(compiler, compiler->loop->depth);
+    emit_loop(compiler, compiler->loop->continue_jump);
+    consume(compiler, TOKEN_SEMICOLON, "Expect ';' after 'continue'.");
+}
+
+static void break_stmt(Compiler* compiler) {
+    if (compiler->loop == NULL) {
+        error(compiler, "Cannot break from outside a loop.");
+        return;
+    }
+    // First have to pop off the scope
+    pop_to_scope(compiler, compiler->loop->depth);
+    emit_loop(compiler, compiler->loop->break_jump);
+    consume(compiler, TOKEN_SEMICOLON, "Expect ';' after 'break'.");
 }
 
 static void return_stmt(Compiler* compiler) {
@@ -880,6 +961,8 @@ static void synchronize(Compiler* compiler) {
             case TOKEN_LET:
             case TOKEN_WHILE:
             case TOKEN_RETURN:
+            case TOKEN_BREAK:
+            case TOKEN_CONTINUE:
             case TOKEN_ASSERT:
             case TOKEN_IF:
                 return;
@@ -908,6 +991,10 @@ static void statement(Compiler* compiler) {
         while_stmt(compiler);
     } else if (match(compiler, TOKEN_RETURN)) {
         return_stmt(compiler);
+    } else if (match(compiler, TOKEN_BREAK)) {
+        break_stmt(compiler);
+    } else if (match(compiler, TOKEN_CONTINUE)) {
+        continue_stmt(compiler);
     } else {
         // Expression statement
         expression(compiler);

@@ -134,6 +134,8 @@ match_rest(Lexer* lexer, TokenType type,
 static TokenType variable_type(Lexer* lexer) {
     switch (lexer->start[0]) {
         case 'a': return match_rest(lexer, TOKEN_ASSERT, 1, "ssert", 5);
+        case 'b': return match_rest(lexer, TOKEN_BREAK, 1, "reak", 4);
+        case 'c': return match_rest(lexer, TOKEN_CONTINUE, 1, "ontinue", 7);
         case 'e': return match_rest(lexer, TOKEN_ELSE, 1, "lse", 3);
         case 'f': return match_rest(lexer, TOKEN_FALSE, 1, "alse", 4);
         case 'i': return match_rest(lexer, TOKEN_IF, 1, "f", 1);
