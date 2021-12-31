@@ -33,8 +33,8 @@ typedef struct {
 typedef struct Loop {
     struct Loop* outer;
     int depth; // Initial depth of the loop
-    int break_jump; // Offset of the break jump
-    int continue_jump; // Offset to continue
+    size_t break_jump; // Offset of the break jump
+    size_t continue_jump; // Offset to continue
 } Loop;
 
 typedef struct {
@@ -404,7 +404,7 @@ exit_loop(Compiler* compiler)
 // Jumping helpers
 // ===============
 
-static int
+static size_t
 emit_jump(Compiler* compiler, uint8_t op)
 {
     emit_byte(compiler, op);
@@ -414,14 +414,14 @@ emit_jump(Compiler* compiler, uint8_t op)
 }
 
 static void
-patch_jump(Compiler* compiler, int offset)
+patch_jump(Compiler* compiler, size_t offset)
 {
     // Compute how many bytes we need to jump over -- accounting
     // for the 2-byte offset after the jump instruction.
     //
     // | OP_JUMP | 0 | 0 | .... | OP_POP |  |
     //             ^-- offset              ^-- chunk->length
-    int jump = current_chunk(compiler)->length - offset - 2;
+    size_t jump = current_chunk(compiler)->length - offset - 2;
     if (jump > UINT16_MAX)
         error(compiler, "Too much code to jump over.");
 
@@ -430,7 +430,7 @@ patch_jump(Compiler* compiler, int offset)
 }
 
 static void
-emit_loop(Compiler* compiler, int start)
+emit_loop(Compiler* compiler, size_t start)
 {
     // It's important that this line is here, otherwise we would jump
     // over the wrong number of bytes: the bottom line assumes that
@@ -438,7 +438,7 @@ emit_loop(Compiler* compiler, int start)
     emit_byte(compiler, OP_LOOP);
 
     // Have to +2 here to account for the VM reading the 2 byte argument.
-    int jump = current_chunk(compiler)->length - start + 2;
+    size_t jump = current_chunk(compiler)->length - start + 2;
     if (jump > UINT16_MAX)
         error(compiler, "Too much code to jump over.");
 
@@ -480,7 +480,7 @@ static void literal(Compiler* compiler, bool can_assign) {
 }
 
 static void and_(Compiler* compiler, bool can_assign) {
-    int else_jump = emit_jump(compiler, OP_JUMP_IF_FALSE);
+    size_t else_jump = emit_jump(compiler, OP_JUMP_IF_FALSE);
 
     emit_byte(compiler, OP_POP);
     parse_precedence(compiler, PREC_AND);
@@ -489,7 +489,7 @@ static void and_(Compiler* compiler, bool can_assign) {
 }
 
 static void or_(Compiler* compiler, bool can_assign) {
-    int else_jump = emit_jump(compiler, OP_JUMP_IF_TRUE);
+    size_t else_jump = emit_jump(compiler, OP_JUMP_IF_TRUE);
 
     emit_byte(compiler, OP_POP);
     parse_precedence(compiler, PREC_OR);
@@ -868,11 +868,11 @@ static void if_stmt(Compiler* compiler) {
     expression(compiler);
     consume(compiler, TOKEN_RPAREN, "Expect ')' after condition.");
 
-    int then_jump = emit_jump(compiler, OP_JUMP_IF_FALSE);
+    size_t then_jump = emit_jump(compiler, OP_JUMP_IF_FALSE);
     emit_byte(compiler, OP_POP); // Pop the condition off the stack.
     block_or_stmt(compiler);
 
-    int else_jump = emit_jump(compiler, OP_JUMP);
+    size_t else_jump = emit_jump(compiler, OP_JUMP);
 
     patch_jump(compiler, then_jump);
     emit_byte(compiler, OP_POP);
@@ -888,11 +888,11 @@ static void while_stmt(Compiler* compiler) {
     // 2. Skip over that OP_JUMP initially.
     // 3. Do the actual looping.
 
-    int skip_jump = emit_jump(compiler, OP_JUMP);  // (2)
-    int break_jump = emit_jump(compiler, OP_JUMP); // (1)
+    size_t skip_jump = emit_jump(compiler, OP_JUMP);  // (2)
+    size_t break_jump = emit_jump(compiler, OP_JUMP); // (1)
     patch_jump(compiler, skip_jump);
 
-    int loop_start = current_chunk(compiler)->length;
+    size_t loop_start = current_chunk(compiler)->length;
 
     Loop loop;
     loop.depth = compiler->scope_depth;
@@ -904,7 +904,7 @@ static void while_stmt(Compiler* compiler) {
     expression(compiler);
     consume(compiler, TOKEN_RPAREN, "Expect ')' after condition.");
 
-    int end_jump = emit_jump(compiler, OP_JUMP_IF_FALSE);
+    size_t end_jump = emit_jump(compiler, OP_JUMP_IF_FALSE);
     emit_byte(compiler, OP_POP);
 
     // Compile the body of the while loop.
@@ -923,7 +923,6 @@ static void continue_stmt(Compiler* compiler) {
         error(compiler, "Cannot continue from outside a loop.");
         return;
     }
-    // First have to pop off the scope
     pop_to_scope(compiler, compiler->loop->depth);
     emit_loop(compiler, compiler->loop->continue_jump);
     consume(compiler, TOKEN_SEMICOLON, "Expect ';' after 'continue'.");
@@ -934,7 +933,6 @@ static void break_stmt(Compiler* compiler) {
         error(compiler, "Cannot break from outside a loop.");
         return;
     }
-    // First have to pop off the scope
     pop_to_scope(compiler, compiler->loop->depth);
     emit_loop(compiler, compiler->loop->break_jump);
     consume(compiler, TOKEN_SEMICOLON, "Expect ';' after 'break'.");
