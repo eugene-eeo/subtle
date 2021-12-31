@@ -141,7 +141,12 @@ complete_call(VM* vm, Value callee, int args)
         Value* args_start = &vm->stack_top[-args - 1];
         return native->fn(vm, args_start, args);
     }
-    vm_runtime_error(vm, "Tried to call non-callable value.");
+    if (args == 0) {
+        vm_pop(vm);
+        vm_push(vm, callee);
+        return true;
+    }
+    vm_runtime_error(vm, "Tried to call a non-activatable slot with %d > 0 args.", args);
     return false;
 }
 
@@ -266,17 +271,6 @@ invoke(VM* vm, Value obj, Value key, int num_args, InterpretResult* rv)
 {
     Value slot_value;
     if (!pre_invoke(vm, obj, key, &slot_value, rv)) return false;
-    if (!is_activatable(slot_value)) {
-        if (num_args > 0) {
-            vm_runtime_error(vm, "Tried to call non-activatable slot with %d > 0 args.", num_args);
-            *rv = INTERPRET_RUNTIME_ERROR;
-            return false;
-        }
-        vm_pop(vm); // The object.
-        vm_push(vm, slot_value);
-        return true;
-    }
-
     // The stack is already in the correct form for a method call.
     // We have `obj` followed by `num_args`.
     if (!complete_call(vm, slot_value, num_args)) {
@@ -291,19 +285,6 @@ vm_invoke(VM* vm, Value obj, Value key, int num_args, Value* return_value, Inter
 {
     Value slot_value;
     if (!pre_invoke(vm, obj, key, &slot_value, rv)) return false;
-    if (!is_activatable(slot_value)) {
-        if (num_args > 0) {
-            vm_runtime_error(vm, "Tried to call non-activatable slot with %d > 0 args.", num_args);
-            *rv = INTERPRET_RUNTIME_ERROR;
-            return false;
-        }
-        // Since this function is expected to have 0 stack impact, we need
-        // to pop the `this` off the stack.
-        vm_pop(vm); // The object.
-        *return_value = slot_value;
-        return true;
-    }
-
     return vm_call(vm, slot_value, num_args, return_value, rv);
 }
 
@@ -475,7 +456,6 @@ static InterpretResult run(VM* vm, int top_level) {
                 Value obj = vm_peek(vm, 1);
                 Value value = vm_peek(vm, 0);
                 Value return_value;
-                // Call <obj>.setSlot(<key>, <value>) if it exists.
                 Value setSlot_slot;
                 if (vm_get_slot(vm, obj, vm->setSlot_string, &setSlot_slot)) {
                     InterpretResult rv;
@@ -534,8 +514,13 @@ vm_call(VM* vm, Value slot, int num_args,
             ? INTERPRET_OK
             : INTERPRET_RUNTIME_ERROR;
     } else {
-        vm_runtime_error(vm, "Tried to call a non-activatable slot.");
-        result = INTERPRET_RUNTIME_ERROR;
+        if (num_args > 0) {
+            vm_runtime_error(vm, "Tried to call a non-activatable slot with %d > 0 args.", num_args);
+            result = INTERPRET_RUNTIME_ERROR;
+        } else {
+            vm_push(vm, slot);
+            result = INTERPRET_OK;
+        }
     }
 
     *res = result;
