@@ -10,9 +10,6 @@
 #include <string.h>
 #include <stdio.h>
 
-// Type checks / Conversion
-// ------------------------
-
 static inline void
 define_on_table(VM* vm, Table* table, const char* name, Value value) {
     vm_push_root(vm, value);
@@ -339,6 +336,20 @@ DEFINE_NATIVE(Number, negate) {
 
 // ============================= String =============================
 
+#define DEFINE_STRING_METHOD(name, op) \
+    DEFINE_NATIVE(String, name) {\
+        ARGSPEC("SS"); \
+        const char* a = VAL_TO_STRING(args[0])->chars; \
+        const char* b = VAL_TO_STRING(args[1])->chars; \
+        int cmp = strcmp(a, b); \
+        RETURN(BOOL_TO_VAL(cmp op 0)); \
+    }
+
+DEFINE_STRING_METHOD(lt, <)
+DEFINE_STRING_METHOD(gt, >)
+DEFINE_STRING_METHOD(leq, <=)
+DEFINE_STRING_METHOD(geq, >=)
+
 DEFINE_NATIVE(String, plus) {
     ARGSPEC("SS");
     RETURN(OBJ_TO_VAL(objstring_concat(vm,
@@ -411,6 +422,10 @@ void core_init_vm(VM* vm)
     vm->StringProto->proto = OBJ_TO_VAL(vm->ObjectProto);
     ADD_METHOD(StringProto, "+",      String_plus);
     ADD_METHOD(StringProto, "length", String_length);
+    ADD_METHOD(StringProto, "<",      String_lt);
+    ADD_METHOD(StringProto, ">",      String_gt);
+    ADD_METHOD(StringProto, "<=",     String_leq);
+    ADD_METHOD(StringProto, ">=",     String_geq);
 
     ADD_OBJECT(&vm->globals, "Object",  vm->ObjectProto);
     ADD_OBJECT(&vm->globals, "Fn",      vm->FnProto);
