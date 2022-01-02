@@ -63,7 +63,8 @@ typedef struct ObjString {
 
 typedef struct {
     Obj obj;
-    int arity; // If the arity is -1, then this is a script.
+    int max_slots; // Max slots required by this function.
+    int arity;     // If the arity is -1, then this is a script.
     int upvalue_count;
     Chunk chunk;
 } ObjFunction;

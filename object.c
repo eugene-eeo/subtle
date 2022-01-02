@@ -1,5 +1,6 @@
 #include "object.h"
 
+#include "debug.h"
 #include "memory.h"
 #include "table.h"
 #include "vm.h"
@@ -132,6 +133,7 @@ ObjFunction*
 objfunction_new(VM* vm)
 {
     ObjFunction* fn = ALLOCATE_OBJECT(vm, OBJ_FUNCTION, ObjFunction);
+    fn->max_slots = 0;
     fn->arity = 0;
     fn->upvalue_count = 0;
     chunk_init(&fn->chunk);
@@ -276,7 +278,7 @@ objfiber_new(VM* vm, ObjClosure* closure)
     fiber->frames_count = 0;
     fiber->frames_capacity = frames_capacity;
 
-    fiber->stack[0] = OBJ_TO_VAL(closure);
+    *fiber->stack_top = OBJ_TO_VAL(closure);
     fiber->stack_top++;
     objfiber_push_frame(fiber, vm, closure, fiber->stack_top - 1);
 
@@ -296,41 +298,43 @@ void
 objfiber_ensure_stack(ObjFiber* fiber, VM* vm, size_t sz)
 {
     size_t stack_count = fiber->stack_top - fiber->stack;
-    if (stack_count + sz <= fiber->stack_capacity)
+    size_t required = stack_count + sz;
+    if (fiber->stack_capacity >= required)
         return;
 
-    size_t new_capacity = next_power_of_two(stack_count + sz);
-    Value* new_stack = GROW_ARRAY(vm, fiber->stack, Value,
-                                  fiber->stack_capacity,
-                                  new_capacity);
+    Value* old_stack = fiber->stack;
+    size_t new_capacity = next_power_of_two(required);
+    fiber->stack = GROW_ARRAY(vm, fiber->stack, Value,
+                              fiber->stack_capacity,
+                              new_capacity);
+    fiber->stack_capacity = new_capacity;
 
     // If the stack has moved, then we must also move pointers
     // referencing values on the stack.
-    if (new_stack != fiber->stack) {
+    if (fiber->stack != old_stack) {
         // Callframes
-        for (size_t i = 0; i < fiber->frames_capacity; i++) {
+        for (size_t i = 0; i < fiber->frames_count; i++) {
             CallFrame* frame = &fiber->frames[i];
-            frame->slots = new_stack + (frame->slots - fiber->stack);
+            frame->slots = fiber->stack + (frame->slots - old_stack);
         }
 
         // Upvalues
         for (ObjUpvalue* upvalue = fiber->open_upvalues;
              upvalue != NULL;
              upvalue = upvalue->next) {
-            upvalue->location = new_stack + (upvalue->location - fiber->stack);
+            upvalue->location = fiber->stack + (upvalue->location - old_stack);
         }
-    }
 
-    fiber->stack = new_stack;
-    fiber->stack_top = new_stack + stack_count;
-    fiber->stack_capacity = new_capacity;
+        // Stack pointer
+        fiber->stack_top = fiber->stack + (fiber->stack_top - old_stack);
+    }
 }
 
 CallFrame*
 objfiber_push_frame(ObjFiber* fiber, VM* vm,
                     ObjClosure* closure, Value* stack_start)
 {
-    if (fiber->frames_count + 1 >= fiber->frames_capacity) {
+    if (fiber->frames_count + 1 > fiber->frames_capacity) {
         size_t new_capacity = GROW_CAPACITY(fiber->frames_capacity);
         fiber->frames = GROW_ARRAY(vm, fiber->frames, CallFrame, fiber->frames_capacity, new_capacity);
         fiber->frames_capacity = new_capacity;

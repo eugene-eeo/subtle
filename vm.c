@@ -57,7 +57,11 @@ void vm_free(VM* vm) {
 }
 
 void vm_push(VM* vm, Value value) {
-    objfiber_ensure_stack(vm->fiber, vm, 1);
+    if ((vm->fiber->stack_top - vm->fiber->stack) + 1 > vm->fiber->stack_capacity) {
+        vm_push_root(vm, value);
+        objfiber_ensure_stack(vm->fiber, vm, 1);
+        vm_pop_root(vm);
+    }
     *vm->fiber->stack_top = value;
     vm->fiber->stack_top++;
 }
@@ -103,12 +107,20 @@ void vm_runtime_error(VM* vm, const char* format, ...) {
 }
 
 void
+vm_ensure_stack(VM* vm, size_t n)
+{
+    objfiber_ensure_stack(vm->fiber, vm, n);
+}
+
+void
 vm_push_frame(VM* vm, ObjClosure* closure, int args)
 {
-    vm_push_root(vm, OBJ_TO_VAL(closure));
     Value* stack_start = vm->fiber->stack_top - args - 1;
+
     ObjFunction* function = closure->function;
+    /* vm_ensure_stack(vm, function->max_slots); */
     objfiber_push_frame(vm->fiber, vm, closure, stack_start);
+
     // Fix the number of arguments.
     // Since -1 arity means a script, we ignore that here.
     if (function->arity != -1) {
@@ -116,7 +128,6 @@ vm_push_frame(VM* vm, ObjClosure* closure, int args)
         if (args > function->arity)
             vm_drop(vm, args - function->arity);
     }
-    vm_pop_root(vm);
 }
 
 static bool
@@ -241,6 +252,7 @@ pre_invoke(VM* vm, Value obj, Value key, Value* slot_value, InterpretResult* rv)
         // we consult the getSlot method.
         Value getSlot_value;
         if (vm_get_slot(vm, obj, vm->getSlot_string, &getSlot_value)) {
+            vm_ensure_stack(vm, 2);
             vm_push(vm, obj);
             vm_push(vm, key);
             // slot_value will hold the result of getSlot
@@ -449,6 +461,7 @@ static InterpretResult run(VM* vm, int top_level) {
                 Value setSlot_slot;
                 if (vm_get_slot(vm, obj, vm->setSlot_string, &setSlot_slot)) {
                     InterpretResult rv;
+                    vm_ensure_stack(vm, 3);
                     vm_push(vm, obj);
                     vm_push(vm, key);
                     vm_push(vm, value);

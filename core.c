@@ -238,6 +238,7 @@ DEFINE_NATIVE(Object, print) {
     Value this = args[0];
     Value string_slot;
     InterpretResult rv;
+    vm_ensure_stack(vm, 1);
     vm_push(vm, this);
     if (!vm_invoke(vm, args[0], OBJ_TO_VAL(objstring_copy(vm, "toString", 8)), 0, &string_slot, &rv))
         return rv;
@@ -252,6 +253,7 @@ DEFINE_NATIVE(Object, print) {
 DEFINE_NATIVE(Object, println) {
     Value tmp;
     InterpretResult rv;
+    vm_ensure_stack(vm, 1);
     vm_push(vm, args[0]);
     if (!vm_invoke(vm, args[0], OBJ_TO_VAL(objstring_copy(vm, "print", 5)), 0, &tmp, &rv))
         return rv;
@@ -281,11 +283,13 @@ DEFINE_NATIVE(Fn, callWithThis) {
     // We have: | fn | newThis | arg1 | arg2 | ... | arg_{num_args} |
     // we want:      | newThis | arg1 | arg2 | ... | arg_{num_args} |
     //                 0         1      2            num_args-1
+    vm_push_root(vm, args[0]);
     ObjClosure* closure = VAL_TO_CLOSURE(args[0]);
     for (int i = 0; i < num_args; i++)
         args[i] = args[i + 1];
     vm_pop(vm); // this will be a duplicate
     vm_push_frame(vm, closure, num_args - 1);
+    vm_pop_root(vm);
     return true;
 }
 

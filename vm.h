@@ -8,8 +8,6 @@
 #include "table.h"
 #include "compiler.h"
 
-#define FRAMES_MAX 64
-#define STACK_MAX (256 * FRAMES_MAX)
 #define MAX_ROOTS 8
 
 typedef enum {
@@ -78,6 +76,12 @@ InterpretResult vm_interpret(VM* vm, const char* source);
 // =============
 Value vm_get_prototype(VM* vm, Value value);
 bool vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value);
+
+// Invocation
+// ==========
+
+// Ensures that we have at least n slots on the stack.
+void vm_ensure_stack(VM* vm, size_t n);
 
 // Pushes the given closure onto the call stack. Note that the
 // num_args argument should be the number of _actual_ arguments.
