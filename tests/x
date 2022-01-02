@@ -1,8 +1,14 @@
-let x = {};
-x.a = Fn.new { |u, f|
-    assert u == f(u);
-};
+# This file will contain several tests to exercise some aspects of
+# the VM; it just serves as a file for regression tests.
 
-x.a(1) { |u|
-    return u;
+# 93de905 stress test vm_push_frame
+let x = {};
+x.getSlot = Fn.new{|k|
+    # return a closure here; this will test if
+    # we free closures wrongly.
+    return Fn.new{
+        return k;
+    };
 };
+assert x a == "a";
+assert x b == "b";

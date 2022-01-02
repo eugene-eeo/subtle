@@ -48,6 +48,7 @@ run_test:
 	$(RUNNER) ./subtle ./tests/vm_call
 	$(RUNNER) ./subtle ./tests/compact
 	$(RUNNER) ./subtle ./tests/table
+	$(RUNNER) ./subtle ./tests/x
 
 test:
 	make stress
