@@ -131,9 +131,7 @@ static bool
 complete_call(VM* vm, Value callee, int args)
 {
     if (IS_CLOSURE(callee)) {
-        /* vm_push_root(vm, callee); */
         vm_push_frame(vm, VAL_TO_CLOSURE(callee), args);
-        /* vm_pop_root(vm); */
         return true;
     }
     if (IS_NATIVE(callee)) {
