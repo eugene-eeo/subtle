@@ -34,6 +34,7 @@ static void objupvalue_free(VM*, Obj*);
 static void objclosure_free(VM*, Obj*);
 static void objobject_free(VM*, Obj*);
 static void objnative_free(VM*, Obj*);
+static void objfiber_free(VM*, Obj*);
 
 void
 object_free(Obj* obj, VM* vm)
@@ -48,6 +49,7 @@ object_free(Obj* obj, VM* vm)
     case OBJ_CLOSURE: objclosure_free(vm, obj); break;
     case OBJ_OBJECT: objobject_free(vm, obj); break;
     case OBJ_NATIVE: objnative_free(vm, obj); break;
+    case OBJ_FIBER: objfiber_free(vm, obj); break;
     }
 }
 
@@ -249,4 +251,102 @@ static void
 objnative_free(VM* vm, Obj* obj)
 {
     FREE(vm, ObjNative, obj);
+}
+
+// ObjFiber
+// ========
+
+ObjFiber*
+objfiber_new(VM* vm, ObjClosure* closure)
+{
+    // Allocate arrays first in case of GC
+    size_t stack_capacity = 8;
+    Value* stack = ALLOCATE_ARRAY(vm, Value, stack_capacity);
+
+    size_t frames_capacity = 4;
+    CallFrame* frames = ALLOCATE_ARRAY(vm, CallFrame, frames_capacity);
+
+    ObjFiber* fiber = ALLOCATE_OBJECT(vm, OBJ_FIBER, ObjFiber);
+    fiber->open_upvalues = NULL;
+    fiber->error = NIL_VAL;
+    fiber->stack = stack;
+    fiber->stack_top = stack;
+    fiber->stack_capacity = stack_capacity;
+    fiber->frames = frames;
+    fiber->frames_count = 0;
+    fiber->frames_capacity = frames_capacity;
+
+    fiber->stack[0] = OBJ_TO_VAL(closure);
+    fiber->stack_top++;
+    objfiber_push_frame(fiber, vm, closure, fiber->stack_top - 1);
+
+    return fiber;
+}
+
+static size_t
+next_power_of_two(size_t n)
+{
+    size_t m = 1;
+    while (m < n)
+        m *= 2;
+    return m;
+}
+
+void
+objfiber_ensure_stack(ObjFiber* fiber, VM* vm, size_t sz)
+{
+    size_t stack_count = fiber->stack_top - fiber->stack;
+    if (stack_count + sz <= fiber->stack_capacity)
+        return;
+
+    size_t new_capacity = next_power_of_two(stack_count + sz);
+    Value* new_stack = GROW_ARRAY(vm, fiber->stack, Value,
+                                  fiber->stack_capacity,
+                                  new_capacity);
+
+    // If the stack has moved, then we must also move pointers
+    // referencing values on the stack.
+    if (new_stack != fiber->stack) {
+        // Callframes
+        for (size_t i = 0; i < fiber->frames_capacity; i++) {
+            CallFrame* frame = &fiber->frames[i];
+            frame->slots = new_stack + (frame->slots - fiber->stack);
+        }
+
+        // Upvalues
+        for (ObjUpvalue* upvalue = fiber->open_upvalues;
+             upvalue != NULL;
+             upvalue = upvalue->next) {
+            upvalue->location = new_stack + (upvalue->location - fiber->stack);
+        }
+    }
+
+    fiber->stack = new_stack;
+    fiber->stack_top = new_stack + stack_count;
+    fiber->stack_capacity = new_capacity;
+}
+
+CallFrame*
+objfiber_push_frame(ObjFiber* fiber, VM* vm,
+                    ObjClosure* closure, Value* stack_start)
+{
+    if (fiber->frames_count + 1 >= fiber->frames_capacity) {
+        size_t new_capacity = GROW_CAPACITY(fiber->frames_capacity);
+        fiber->frames = GROW_ARRAY(vm, fiber->frames, CallFrame, fiber->frames_capacity, new_capacity);
+        fiber->frames_capacity = new_capacity;
+    }
+    CallFrame* frame = &fiber->frames[fiber->frames_count++];
+    frame->closure = closure;
+    frame->ip = closure->function->chunk.code;
+    frame->slots = stack_start;
+    return frame;
+}
+
+static void
+objfiber_free(VM* vm, Obj* obj)
+{
+    ObjFiber* fiber = (ObjFiber*)obj;
+    FREE_ARRAY(vm, fiber->stack, Value, fiber->stack_capacity);
+    FREE_ARRAY(vm, fiber->frames, CallFrame, fiber->frames_capacity);
+    FREE(vm, ObjFiber, obj);
 }

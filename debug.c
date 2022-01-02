@@ -28,6 +28,9 @@ void debug_print_object(Obj* obj) {
         case OBJ_OBJECT:
             printf("object_%p", (void*)obj);
             break;
+        case OBJ_FIBER:
+            printf("fiber_%p", (void*)obj);
+            break;
     }
 }
 

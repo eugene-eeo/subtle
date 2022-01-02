@@ -66,21 +66,8 @@ void mark_value(VM* vm, Value value) {
 }
 
 static void mark_roots(VM* vm) {
-    // Mark the stack.
-    for (Value* slot = vm->stack; slot != vm->stack_top; slot++) {
-        mark_value(vm, *slot);
-    }
-
-    // Mark each closure on the call stack.
-    for (int i = 0; i < vm->frame_count; i++) {
-        mark_object(vm, (Obj*)vm->frames[i].closure);
-    }
-
-    // Mark the open upvalues list.
-    for (ObjUpvalue* upvalue = vm->open_upvalues;
-            upvalue != NULL;
-            upvalue = upvalue->next)
-        mark_object(vm, (Obj*)upvalue);
+    // Mark the currently running fiber.
+    mark_object(vm, (Obj*)vm->fiber);
 
     // Mark the roots stack.
     for (int i = 0; i < vm->roots_count; i++)
@@ -100,6 +87,8 @@ static void mark_roots(VM* vm) {
     table_mark(&vm->globals, vm);
     compiler_mark(vm->compiler, vm);
 }
+
+static void blacken_fiber(VM* vm, ObjFiber* fiber);
 
 static void blacken_object(VM* vm, Obj* obj) {
 #ifdef SUBTLE_DEBUG_TRACE_ALLOC
@@ -132,7 +121,31 @@ static void blacken_object(VM* vm, Obj* obj) {
             table_mark(&object->slots, vm);
             break;
         }
+        case OBJ_FIBER:
+            blacken_fiber(vm, (ObjFiber*)obj);
+            break;
     }
+}
+
+static void
+blacken_fiber(VM* vm, ObjFiber* fiber)
+{
+    // Mark each value on the stack.
+    for (Value* slot = fiber->stack; slot != fiber->stack_top; slot++)
+        mark_value(vm, *slot);
+
+    // Mark each closure on the call stack.
+    for (int i = 0; i < fiber->frames_count; i++)
+        mark_object(vm, (Obj*)fiber->frames[i].closure);
+
+    // Mark the list of open upvalues.
+    for (ObjUpvalue* upvalue = fiber->open_upvalues;
+            upvalue != NULL;
+            upvalue = upvalue->next)
+        mark_object(vm, (Obj*)upvalue);
+
+    // Mark the error, if any.
+    mark_value(vm, fiber->error);
 }
 
 static void trace_references(VM* vm) {

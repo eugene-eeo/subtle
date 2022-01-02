@@ -18,24 +18,8 @@ typedef enum {
     INTERPRET_RUNTIME_ERROR,
 } InterpretResult;
 
-typedef struct {
-    ObjClosure* closure;
-    uint8_t* ip;
-    Value* slots;
-} CallFrame;
-
 typedef struct VM {
-    CallFrame frames[FRAMES_MAX];
-    int frame_count;
-
-    Value stack[STACK_MAX];
-    Value* stack_top;
-
-    // The _top_ of the open upvalues list is the upvalue associated
-    // with the _topmost_ stack slot. That is, if we navigate the
-    // ->next pointers of each upvalue, we go from upvalues capturing
-    // stack_top to the 'bottom' of the stack.
-    ObjUpvalue* open_upvalues;
+    ObjFiber* fiber;
 
     // ---- init'ed by core ----
     // Constants needed by the VM
@@ -104,7 +88,7 @@ bool vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value);
 //   | ... | this |  ...  |
 //   +-----+------+-------+
 //                        ^-- stack_top
-bool vm_push_frame(VM* vm, ObjClosure* closure, int num_args);
+void vm_push_frame(VM* vm, ObjClosure* closure, int num_args);
 
 // Runs the given slot, returning true if the call succeeded
 // and false otherwise. Note that unlike vm_push_frame(),

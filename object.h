@@ -35,6 +35,7 @@ typedef enum {
     OBJ_CLOSURE,
     OBJ_OBJECT,
     OBJ_NATIVE,
+    OBJ_FIBER,
 } ObjType;
 
 typedef struct Obj {
@@ -47,7 +48,8 @@ typedef struct Obj {
     struct Obj* next;
 } Obj;
 
-static inline bool is_object_type(Value value, ObjType type)
+static inline bool
+is_object_type(Value value, ObjType type)
 {
     return IS_OBJ(value) && VAL_TO_OBJ(value)->type == type;
 }
@@ -61,8 +63,7 @@ typedef struct ObjString {
 
 typedef struct {
     Obj obj;
-    // If the arity is -1, then this is a script.
-    int arity;
+    int arity; // If the arity is -1, then this is a script.
     int upvalue_count;
     Chunk chunk;
 } ObjFunction;
@@ -98,6 +99,26 @@ typedef struct {
     Obj obj;
     NativeFn fn;
 } ObjNative;
+
+typedef struct {
+    ObjClosure* closure;
+    uint8_t* ip;
+    Value* slots;
+} CallFrame;
+
+typedef struct {
+    Obj obj;
+    Value* stack;
+    Value* stack_top;
+    size_t stack_capacity;
+
+    CallFrame* frames;
+    size_t frames_count;
+    size_t frames_capacity;
+
+    ObjUpvalue* open_upvalues;
+    Value error;
+} ObjFiber;
 
 // Object memory management
 // ========================
@@ -142,5 +163,13 @@ bool objobject_delete(ObjObject* obj, VM* vm, Value key);
 // =========
 
 ObjNative* objnative_new(VM* vm, NativeFn fn);
+
+// ObjFiber
+// ========
+
+ObjFiber* objfiber_new(VM* vm, ObjClosure* closure);
+void objfiber_ensure_stack(ObjFiber* fiber, VM* vm, size_t sz);
+CallFrame* objfiber_push_frame(ObjFiber* fiber, VM* vm,
+                               ObjClosure* closure, Value* stack_start);
 
 #endif

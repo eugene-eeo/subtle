@@ -13,9 +13,8 @@ cute:
 
 debug:
 	$(CC) -DSUBTLE_DEBUG \
-		-DSUBTLE_DEBUG_TRACE_EXECUTION \
-		-DSUBTLE_DEBUG_PRINT_CODE \
 		-DSUBTLE_DEBUG_TRACE_ALLOC \
+		-DSUBTLE_DEBUG_STRESS_GC \
 		-g -Og $(MAIN) -o subtle
 
 release:
@@ -28,8 +27,7 @@ stress:
 
 benchmark:
 	mkdir -p build
-	$(CC) -DSUBTLE_DEBUG_TABLE_STATS \
-		-O3 $(DEPS) \
+	$(CC) -O3 $(DEPS) \
 		bench/benchmark_table.c -o build/table_benchmark
 	./build/table_benchmark
 
