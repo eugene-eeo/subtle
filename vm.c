@@ -57,11 +57,8 @@ void vm_free(VM* vm) {
 }
 
 void vm_push(VM* vm, Value value) {
-    if ((vm->fiber->stack_top - vm->fiber->stack) + 1 > vm->fiber->stack_capacity) {
-        vm_push_root(vm, value);
-        objfiber_ensure_stack(vm->fiber, vm, 1);
-        vm_pop_root(vm);
-    }
+    ASSERT(vm->fiber->stack_capacity >= (vm->fiber->stack_top - vm->fiber->stack) + 1,
+           "Stack size was not ensured.");
     *vm->fiber->stack_top = value;
     vm->fiber->stack_top++;
 }
@@ -118,8 +115,8 @@ vm_push_frame(VM* vm, ObjClosure* closure, int args)
     Value* stack_start = vm->fiber->stack_top - args - 1;
 
     ObjFunction* function = closure->function;
-    /* vm_ensure_stack(vm, function->max_slots); */
     objfiber_push_frame(vm->fiber, vm, closure, stack_start);
+    vm_ensure_stack(vm, function->max_slots);
 
     // Fix the number of arguments.
     // Since -1 arity means a script, we ignore that here.
@@ -134,7 +131,9 @@ static bool
 complete_call(VM* vm, Value callee, int args)
 {
     if (IS_CLOSURE(callee)) {
+        /* vm_push_root(vm, callee); */
         vm_push_frame(vm, VAL_TO_CLOSURE(callee), args);
+        /* vm_pop_root(vm); */
         return true;
     }
     if (IS_NATIVE(callee)) {
@@ -391,16 +390,26 @@ static InterpretResult run(VM* vm, int top_level) {
                 frame->ip += offset;
                 break;
             }
-            case OP_JUMP_IF_TRUE: {
+            case OP_JUMP_IF_FALSE: {
                 uint16_t offset = READ_SHORT();
-                if (value_truthy(vm_peek(vm, 0)))
+                if (!value_truthy(vm_pop(vm)))
                     frame->ip += offset;
                 break;
             }
-            case OP_JUMP_IF_FALSE: {
+            case OP_OR: {
+                uint16_t offset = READ_SHORT();
+                if (value_truthy(vm_peek(vm, 0)))
+                    frame->ip += offset;
+                else
+                    vm_pop(vm);
+                break;
+            }
+            case OP_AND: {
                 uint16_t offset = READ_SHORT();
                 if (!value_truthy(vm_peek(vm, 0)))
                     frame->ip += offset;
+                else
+                    vm_pop(vm);
                 break;
             }
             case OP_CLOSURE: {
@@ -459,23 +468,22 @@ static InterpretResult run(VM* vm, int top_level) {
                 Value value = vm_peek(vm, 0);
                 Value return_value;
                 Value setSlot_slot;
-                if (vm_get_slot(vm, obj, vm->setSlot_string, &setSlot_slot)) {
-                    InterpretResult rv;
-                    vm_ensure_stack(vm, 3);
-                    vm_push(vm, obj);
-                    vm_push(vm, key);
-                    vm_push(vm, value);
-                    if (!vm_call(vm, setSlot_slot, 2, &return_value, &rv))
-                        return rv;
-                    // the arguments should've been popped out
-                    vm_pop(vm); // value
-                    vm_pop(vm); // object
-                    vm_push(vm, return_value);
-                    break;
-                } else {
+                if (!vm_get_slot(vm, obj, vm->setSlot_string, &setSlot_slot)) {
                     vm_runtime_error(vm, "No setSlot found.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
+                InterpretResult rv;
+                vm_ensure_stack(vm, 3);
+                vm_push(vm, obj);
+                vm_push(vm, key);
+                vm_push(vm, value);
+                if (!vm_call(vm, setSlot_slot, 2, &return_value, &rv))
+                    return rv;
+                // the arguments should've been popped out
+                vm_pop(vm); // value
+                vm_pop(vm); // object
+                vm_push(vm, return_value);
+                break;
             }
             case OP_INVOKE: {
                 Value key = READ_CONSTANT();
@@ -515,10 +523,10 @@ vm_call(VM* vm, Value slot, int num_args,
         if (num_args > 0) {
             vm_runtime_error(vm, "Tried to call a non-activatable slot with %d > 0 args.", num_args);
             result = INTERPRET_RUNTIME_ERROR;
-        } else {
-            vm_push(vm, slot);
-            result = INTERPRET_OK;
         }
+        *res = INTERPRET_OK;
+        *return_value = slot;
+        return true;
     }
 
     *res = result;

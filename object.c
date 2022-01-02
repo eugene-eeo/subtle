@@ -258,11 +258,20 @@ objnative_free(VM* vm, Obj* obj)
 // ObjFiber
 // ========
 
+static size_t
+next_power_of_two(size_t n)
+{
+    size_t m = 1;
+    while (m < n)
+        m *= 2;
+    return m;
+}
+
 ObjFiber*
 objfiber_new(VM* vm, ObjClosure* closure)
 {
     // Allocate arrays first in case of GC
-    size_t stack_capacity = 8;
+    size_t stack_capacity = next_power_of_two(closure->function->max_slots);
     Value* stack = ALLOCATE_ARRAY(vm, Value, stack_capacity);
 
     size_t frames_capacity = 4;
@@ -283,15 +292,6 @@ objfiber_new(VM* vm, ObjClosure* closure)
     objfiber_push_frame(fiber, vm, closure, fiber->stack_top - 1);
 
     return fiber;
-}
-
-static size_t
-next_power_of_two(size_t n)
-{
-    size_t m = 1;
-    while (m < n)
-        m *= 2;
-    return m;
 }
 
 void

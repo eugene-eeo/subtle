@@ -60,6 +60,9 @@ typedef struct Compiler {
     ObjFunction* function;
     FunctionType type;
 
+    // Keep track of the number of stack slots currently
+    int slot_count;
+
     // Scoping
     Local locals[MAX_LOCALS];
     int local_count;
@@ -114,6 +117,7 @@ compiler_init(Compiler* compiler, Compiler* enclosing,
         compiler->function->arity = -1;
 
     compiler->type = type;
+    compiler->slot_count = 1; // the initial local
     compiler->local_count = 0;
     compiler->scope_depth = 0;
     compiler->vm = vm;
@@ -207,6 +211,42 @@ static void emit_byte(Compiler* compiler, uint8_t b) {
     chunk_write_byte(current_chunk(compiler), compiler->vm, b, compiler->parser->previous.line);
 }
 
+static int stack_effects[] = {
+    [OP_RETURN] = -1,
+    [OP_CONSTANT] = 1,
+    [OP_POP] = -1,
+    [OP_TRUE] = 1,
+    [OP_FALSE] = 1,
+    [OP_NIL] = 1,
+    [OP_DEF_GLOBAL] = -1,
+    [OP_GET_GLOBAL] = 1,
+    [OP_SET_GLOBAL] = 0,
+    [OP_ASSERT] = -1,
+    [OP_GET_LOCAL] = 1,
+    [OP_SET_LOCAL] = 0,
+    [OP_LOOP] = 0,
+    [OP_JUMP] = 0,
+    [OP_JUMP_IF_FALSE] = -1,
+    [OP_OR] = -1,
+    [OP_AND] = -1,
+    [OP_CLOSURE] = 1,
+    [OP_GET_UPVALUE] = 1,
+    [OP_SET_UPVALUE] = 0,
+    [OP_CLOSE_UPVALUE] = -1,
+    [OP_OBJECT] = 1,
+    [OP_OBJECT_SET] = -1,
+    [OP_OBJLIT_SET] = -1,
+    [OP_INVOKE] = 0,
+};
+
+static void emit_op(Compiler* compiler, uint8_t op) {
+    emit_byte(compiler, op);
+    compiler->slot_count += stack_effects[op];
+    ASSERT(compiler->slot_count >= 1, "compiler->slot_count < 1");
+    if (compiler->function->max_slots < compiler->slot_count)
+        compiler->function->max_slots = compiler->slot_count;
+}
+
 static void emit_offset(Compiler* compiler, uint16_t offset) {
     chunk_write_offset(current_chunk(compiler), compiler->vm, offset, compiler->parser->previous.line);
 }
@@ -235,13 +275,13 @@ static void emit_constant(Compiler* compiler, Value v) {
     // make_constant() calls chunk_write_constant, which saves the
     // constant to the VM's root stack.
     uint16_t constant = make_constant(compiler, v);
-    emit_byte(compiler, OP_CONSTANT);
+    emit_op(compiler, OP_CONSTANT);
     emit_offset(compiler, constant);
 }
 
 static void emit_return(Compiler* compiler) {
-    emit_byte(compiler, OP_NIL);
-    emit_byte(compiler, OP_RETURN);
+    emit_op(compiler, OP_NIL);
+    emit_op(compiler, OP_RETURN);
 }
 
 static ObjFunction*
@@ -257,6 +297,8 @@ compiler_end(Compiler* compiler)
         } else {
             printf("fn_%p", (void*)compiler->function);
         }
+        printf(" [c=%d]", compiler->slot_count);
+        printf(" [m=%d]", compiler->function->max_slots);
         printf(" ==\n");
         debug_print_chunk(current_chunk(compiler));
     }
@@ -279,9 +321,9 @@ static void end_block(Compiler* compiler) {
            && compiler->locals[compiler->local_count - 1].depth
                 > compiler->scope_depth) {
         if (compiler->locals[compiler->local_count - 1].is_captured) {
-            emit_byte(compiler, OP_CLOSE_UPVALUE);
+            emit_op(compiler, OP_CLOSE_UPVALUE);
         } else {
-            emit_byte(compiler, OP_POP);
+            emit_op(compiler, OP_POP);
         }
         compiler->local_count--;
     }
@@ -293,6 +335,8 @@ static void pop_to_scope(Compiler* compiler, int scope_depth) {
     ASSERT(compiler->scope_depth >= scope_depth, "compiler->scope_depth < scope_depth");
     while (local_count > 0
            && compiler->locals[local_count - 1].depth > scope_depth) {
+        // use emit_byte instead of emit_op here since
+        // we don't want to change slot_count
         if (compiler->locals[local_count - 1].is_captured) {
             emit_byte(compiler, OP_CLOSE_UPVALUE);
         } else {
@@ -407,7 +451,7 @@ exit_loop(Compiler* compiler)
 static size_t
 emit_jump(Compiler* compiler, uint8_t op)
 {
-    emit_byte(compiler, op);
+    emit_op(compiler, op);
     emit_offset(compiler, 0xFFFF);
     // Return the index to the start of the offset.
     return current_chunk(compiler)->length - 2;
@@ -435,7 +479,7 @@ emit_loop(Compiler* compiler, size_t start)
     // It's important that this line is here, otherwise we would jump
     // over the wrong number of bytes: the bottom line assumes that
     // we would skip over only the 2 byte argument.
-    emit_byte(compiler, OP_LOOP);
+    emit_op(compiler, OP_LOOP);
 
     // Have to +2 here to account for the VM reading the 2 byte argument.
     size_t jump = current_chunk(compiler)->length - start + 2;
@@ -472,28 +516,22 @@ static void number(Compiler* compiler, bool can_assign) {
 
 static void literal(Compiler* compiler, bool can_assign) {
     switch (compiler->parser->previous.type) {
-        case TOKEN_TRUE:  emit_byte(compiler, OP_TRUE); break;
-        case TOKEN_FALSE: emit_byte(compiler, OP_FALSE); break;
-        case TOKEN_NIL:   emit_byte(compiler, OP_NIL); break;
+        case TOKEN_TRUE:  emit_op(compiler, OP_TRUE); break;
+        case TOKEN_FALSE: emit_op(compiler, OP_FALSE); break;
+        case TOKEN_NIL:   emit_op(compiler, OP_NIL); break;
         default: UNREACHABLE();
     }
 }
 
 static void and_(Compiler* compiler, bool can_assign) {
-    size_t else_jump = emit_jump(compiler, OP_JUMP_IF_FALSE);
-
-    emit_byte(compiler, OP_POP);
+    size_t else_jump = emit_jump(compiler, OP_AND);
     parse_precedence(compiler, PREC_AND);
-
     patch_jump(compiler, else_jump);
 }
 
 static void or_(Compiler* compiler, bool can_assign) {
-    size_t else_jump = emit_jump(compiler, OP_JUMP_IF_TRUE);
-
-    emit_byte(compiler, OP_POP);
+    size_t else_jump = emit_jump(compiler, OP_OR);
     parse_precedence(compiler, PREC_OR);
-
     patch_jump(compiler, else_jump);
 }
 
@@ -503,10 +541,10 @@ static void named_variable(Compiler* compiler, Token* name, bool can_assign) {
     if (local != -1) {
         if (can_assign && match(compiler, TOKEN_EQ)) {
             expression(compiler);
-            emit_byte(compiler, OP_SET_LOCAL);
+            emit_op(compiler, OP_SET_LOCAL);
             emit_byte(compiler, (uint8_t) local);
         } else {
-            emit_byte(compiler, OP_GET_LOCAL);
+            emit_op(compiler, OP_GET_LOCAL);
             emit_byte(compiler, (uint8_t) local);
         }
         return;
@@ -517,10 +555,10 @@ static void named_variable(Compiler* compiler, Token* name, bool can_assign) {
     if (upvalue != -1) {
         if (can_assign && match(compiler, TOKEN_EQ)) {
             expression(compiler);
-            emit_byte(compiler, OP_SET_UPVALUE);
+            emit_op(compiler, OP_SET_UPVALUE);
             emit_byte(compiler, (uint8_t) upvalue);
         } else {
-            emit_byte(compiler, OP_GET_UPVALUE);
+            emit_op(compiler, OP_GET_UPVALUE);
             emit_byte(compiler, (uint8_t) upvalue);
         }
         return;
@@ -530,10 +568,10 @@ static void named_variable(Compiler* compiler, Token* name, bool can_assign) {
     uint16_t global = identifier_constant(compiler, name);
     if (can_assign && match(compiler, TOKEN_EQ)) {
         expression(compiler);
-        emit_byte(compiler, OP_SET_GLOBAL);
+        emit_op(compiler, OP_SET_GLOBAL);
         emit_offset(compiler, global);
     } else {
-        emit_byte(compiler, OP_GET_GLOBAL);
+        emit_op(compiler, OP_GET_GLOBAL);
         emit_offset(compiler, global);
     }
 }
@@ -544,14 +582,14 @@ static void variable(Compiler* compiler, bool can_assign) {
 
 static void object(Compiler* compiler, bool can_assign) {
     // Object literal.
-    emit_byte(compiler, OP_OBJECT);
+    emit_op(compiler, OP_OBJECT);
     if (!check(compiler, TOKEN_RBRACE)) {
         do {
             consume_slot(compiler, "Expect a slot name.");
             uint16_t constant = identifier_constant(compiler, &compiler->parser->previous);
             consume(compiler, TOKEN_COLON, "Expect ':' after slot name.");
             expression(compiler);
-            emit_byte(compiler, OP_OBJLIT_SET);
+            emit_op(compiler, OP_OBJLIT_SET);
             emit_offset(compiler, constant);
         } while (match(compiler, TOKEN_COMMA));
     }
@@ -573,6 +611,7 @@ static void block_argument(Compiler* compiler) {
             }
             uint8_t constant = parse_variable(&c, "Expect parameter name.");
             define_variable(&c, constant);
+            c.slot_count++;
         } while (match(&c, TOKEN_COMMA));
         consume(&c, TOKEN_PIPE, "Expect '|' after parameters.");
     }
@@ -581,7 +620,7 @@ static void block_argument(Compiler* compiler) {
 
     ObjFunction* fn = compiler_end(&c);
     uint16_t idx = make_constant(compiler, OBJ_TO_VAL(fn));
-    emit_byte(compiler, OP_CLOSURE);
+    emit_op(compiler, OP_CLOSURE);
     emit_offset(compiler, idx);
 
     for (int i = 0; i < fn->upvalue_count; i++) {
@@ -595,7 +634,7 @@ static void invoke(Compiler* compiler, bool can_assign) {
 
     if (can_assign && match(compiler, TOKEN_EQ)) {
         expression(compiler);
-        emit_byte(compiler, OP_OBJECT_SET);
+        emit_op(compiler, OP_OBJECT_SET);
         emit_offset(compiler, slot_name);
         return;
     }
@@ -621,9 +660,10 @@ static void invoke(Compiler* compiler, bool can_assign) {
         block_argument(compiler);
     }
 
-    emit_byte(compiler, OP_INVOKE);
+    emit_op(compiler, OP_INVOKE);
     emit_offset(compiler, slot_name);
     emit_byte(compiler, num_args);
+    compiler->slot_count -= num_args; // consumes the number of arguments
 }
 
 static void dot(Compiler* compiler, bool can_assign) {
@@ -637,7 +677,7 @@ static void this(Compiler* compiler, bool can_assign) {
     }
     // The 0-th stack slot contains the target of the call.
     // Remember that we put this slot aside in compiler_init.
-    emit_byte(compiler, OP_GET_LOCAL);
+    emit_op(compiler, OP_GET_LOCAL);
     emit_byte(compiler, 0);
 }
 
@@ -666,7 +706,7 @@ static void unary(Compiler* compiler, bool can_assign) {
         }
         default: UNREACHABLE();
     }
-    emit_byte(compiler, OP_INVOKE);
+    emit_op(compiler, OP_INVOKE);
     emit_offset(compiler, method_constant);
     emit_byte(compiler, 0); // 0 arguments.
 }
@@ -692,9 +732,10 @@ static void binary(Compiler* compiler, bool can_assign) {
         case TOKEN_AMP:
         case TOKEN_PIPE:
         {
-            emit_byte(compiler, OP_INVOKE);
+            emit_op(compiler, OP_INVOKE);
             emit_offset(compiler, constant);
             emit_byte(compiler, 1); // 1 argument.
+            compiler->slot_count--;
             break;
         }
         default: UNREACHABLE();
@@ -814,7 +855,7 @@ static void define_variable(Compiler* compiler, uint16_t global) {
         return;
     }
 
-    emit_byte(compiler, OP_DEF_GLOBAL);
+    emit_op(compiler, OP_DEF_GLOBAL);
     emit_offset(compiler, global);
 }
 
@@ -834,7 +875,7 @@ static void let_decl(Compiler* compiler) {
     if (match(compiler, TOKEN_EQ)) {
         expression(compiler);
     } else {
-        emit_byte(compiler, OP_NIL);
+        emit_op(compiler, OP_NIL);
     }
     consume(compiler, TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
 
@@ -844,7 +885,7 @@ static void let_decl(Compiler* compiler) {
 static void assert_stmt(Compiler* compiler) {
     expression(compiler);
     consume(compiler, TOKEN_SEMICOLON, "Expect ';' after expression.");
-    emit_byte(compiler, OP_ASSERT);
+    emit_op(compiler, OP_ASSERT);
 }
 
 static void block(Compiler* compiler) {
@@ -868,18 +909,16 @@ static void if_stmt(Compiler* compiler) {
     expression(compiler);
     consume(compiler, TOKEN_RPAREN, "Expect ')' after condition.");
 
-    size_t then_jump = emit_jump(compiler, OP_JUMP_IF_FALSE);
-    emit_byte(compiler, OP_POP); // Pop the condition off the stack.
+    size_t else_jump = emit_jump(compiler, OP_JUMP_IF_FALSE);
     block_or_stmt(compiler);
 
-    size_t else_jump = emit_jump(compiler, OP_JUMP);
+    size_t exit_jump = emit_jump(compiler, OP_JUMP);
 
-    patch_jump(compiler, then_jump);
-    emit_byte(compiler, OP_POP);
+    patch_jump(compiler, else_jump);
 
     if (match(compiler, TOKEN_ELSE))
         block_or_stmt(compiler);
-    patch_jump(compiler, else_jump);
+    patch_jump(compiler, exit_jump);
 }
 
 static void while_stmt(Compiler* compiler) {
@@ -905,14 +944,12 @@ static void while_stmt(Compiler* compiler) {
     consume(compiler, TOKEN_RPAREN, "Expect ')' after condition.");
 
     size_t end_jump = emit_jump(compiler, OP_JUMP_IF_FALSE);
-    emit_byte(compiler, OP_POP);
 
     // Compile the body of the while loop.
     block_or_stmt(compiler);
     emit_loop(compiler, loop_start);
 
     patch_jump(compiler, end_jump);
-    emit_byte(compiler, OP_POP);
     patch_jump(compiler, break_jump);
 
     exit_loop(compiler);
@@ -947,7 +984,7 @@ static void return_stmt(Compiler* compiler) {
     } else {
         expression(compiler);
         consume(compiler, TOKEN_SEMICOLON, "Expected ';' after expression.");
-        emit_byte(compiler, OP_RETURN);
+        emit_op(compiler, OP_RETURN);
     }
 }
 
@@ -997,7 +1034,7 @@ static void statement(Compiler* compiler) {
         // Expression statement
         expression(compiler);
         consume(compiler, TOKEN_SEMICOLON, "Expect ';' after expression.");
-        emit_byte(compiler, OP_POP);
+        emit_op(compiler, OP_POP);
     }
 }
 

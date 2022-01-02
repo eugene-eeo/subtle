@@ -20,8 +20,9 @@ enum OpCode {
     OP_SET_LOCAL,
     OP_LOOP,
     OP_JUMP,
-    OP_JUMP_IF_TRUE,
-    OP_JUMP_IF_FALSE,
+    OP_JUMP_IF_FALSE, // Pop, then jump
+    OP_OR,  // Jump if the top is true, else pop
+    OP_AND, // Jump if the top is false, else pop
     OP_CLOSURE,
     OP_GET_UPVALUE,
     OP_SET_UPVALUE,
