@@ -319,9 +319,10 @@ run(VM* vm, ObjFiber* fiber, int top_level) {
                 close_upvalues(fiber, frame->slots);
                 fiber->frames_count--;
                 fiber->stack_top = frame->slots;
-                vm_push(vm, result);
-                if (fiber == original_fiber && fiber->frames_count == top_level)
+                if (fiber == original_fiber && fiber->frames_count == top_level) {
+                    vm_push(vm, result);
                     return INTERPRET_OK;
+                }
                 if (objfiber_is_done(fiber)) {
                     // Transfer control to the parent fiber.
                     fiber = fiber->parent;
@@ -329,6 +330,7 @@ run(VM* vm, ObjFiber* fiber, int top_level) {
                     if (fiber == NULL)
                         return INTERPRET_OK; // Nothing to do?
                 }
+                vm_push(vm, result);
                 REFRESH_FRAME();
                 break;
             }

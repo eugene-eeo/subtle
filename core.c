@@ -366,18 +366,43 @@ DEFINE_NATIVE(String, length) {
 
 // ============================= Fiber =============================
 
+// Run the given `fiber` with some data.
+static bool
+run_fiber(VM* vm, ObjFiber* fiber, Value value)
+{
+    fiber->parent = vm->fiber;
+    vm->fiber = fiber;
+    if (fiber->frames_count == 1
+        && fiber->frames[0].ip == fiber->frames[0].closure->function->chunk.code
+        && fiber->frames[0].closure->function->arity == 1) {
+        // The fiber has not ran yet, and is expecting some
+        // data to be sent.
+        *fiber->stack_top = value;
+        fiber->stack_top++;
+    } else {
+        fiber->stack_top[-1] = value;
+    }
+    return true;
+}
+
 DEFINE_NATIVE(Fiber, current) {
     RETURN(OBJ_TO_VAL(vm->fiber));
 }
 
 DEFINE_NATIVE(Fiber, yield) {
-    vm->fiber = vm->fiber->parent;
-    return true;
+    if (num_args > 1)
+        vm_drop(vm, num_args - 1);
+    return run_fiber(vm, vm->fiber->parent, num_args >= 1 ? vm_pop(vm) : NIL_VAL);
 }
 
 DEFINE_NATIVE(Fiber, new) {
     ARGSPEC("*F");
-    ObjFiber* fiber = objfiber_new(vm, VAL_TO_CLOSURE(args[1]));
+    ObjClosure* closure = VAL_TO_CLOSURE(args[1]);
+    if (closure->function->arity != 0
+        && closure->function->arity != 1) {
+        ERROR("Cannot create fiber from function with arity %d.", closure->function->arity);
+    }
+    ObjFiber* fiber = objfiber_new(vm, closure);
     RETURN(OBJ_TO_VAL(fiber));
 }
 
@@ -388,10 +413,10 @@ DEFINE_NATIVE(Fiber, parent) {
 
 DEFINE_NATIVE(Fiber, call) {
     ARGSPEC("f");
+    if (num_args > 1)
+        vm_drop(vm, num_args - 1);
     ObjFiber* fiber = VAL_TO_FIBER(args[0]);
-    fiber->parent = vm->fiber;
-    vm->fiber = fiber;
-    RETURN(NIL_VAL);
+    return run_fiber(vm, fiber, num_args >= 1 ? vm_pop(vm) : NIL_VAL);
 }
 
 DEFINE_NATIVE(Fiber, isDone) {
