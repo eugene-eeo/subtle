@@ -109,7 +109,7 @@ typedef struct {
     Value* slots;
 } CallFrame;
 
-typedef struct {
+typedef struct ObjFiber {
     Obj obj;
     Value* stack;
     Value* stack_top;
@@ -119,6 +119,7 @@ typedef struct {
     size_t frames_count;
     size_t frames_capacity;
 
+    struct ObjFiber* parent;
     ObjUpvalue* open_upvalues;
     Value error;
 } ObjFiber;

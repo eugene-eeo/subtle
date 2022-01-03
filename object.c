@@ -286,6 +286,7 @@ objfiber_new(VM* vm, ObjClosure* closure)
     fiber->frames = frames;
     fiber->frames_count = 0;
     fiber->frames_capacity = frames_capacity;
+    fiber->parent = NULL;
 
     *fiber->stack_top = OBJ_TO_VAL(closure);
     fiber->stack_top++;

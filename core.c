@@ -367,7 +367,38 @@ DEFINE_NATIVE(String, length) {
 // ============================= Fiber =============================
 
 DEFINE_NATIVE(Fiber, current) {
-    return vm->fiber;
+    RETURN(OBJ_TO_VAL(vm->fiber));
+}
+
+DEFINE_NATIVE(Fiber, yield) {
+    vm->fiber = vm->fiber->parent;
+    return true;
+}
+
+DEFINE_NATIVE(Fiber, new) {
+    ARGSPEC("*F");
+    ObjFiber* fiber = objfiber_new(vm, VAL_TO_CLOSURE(args[1]));
+    RETURN(OBJ_TO_VAL(fiber));
+}
+
+DEFINE_NATIVE(Fiber, parent) {
+    ARGSPEC("f");
+    RETURN(OBJ_TO_VAL(vm->fiber->parent));
+}
+
+DEFINE_NATIVE(Fiber, call) {
+    ARGSPEC("f");
+    ObjFiber* fiber = VAL_TO_FIBER(args[0]);
+    fiber->parent = vm->fiber;
+    vm->fiber = fiber;
+    RETURN(NIL_VAL);
+}
+
+DEFINE_NATIVE(Fiber, isDone) {
+    ARGSPEC("f");
+    ObjFiber* fiber = VAL_TO_FIBER(args[0]);
+    bool is_done = fiber->frames_count == 0;
+    RETURN(BOOL_TO_VAL(is_done));
 }
 
 void core_init_vm(VM* vm)
@@ -437,6 +468,11 @@ void core_init_vm(VM* vm)
     vm->FiberProto = objobject_new(vm);
     vm->FiberProto->proto = OBJ_TO_VAL(vm->ObjectProto);
     ADD_METHOD(FiberProto, "current", Fiber_current);
+    ADD_METHOD(FiberProto, "new",     Fiber_new);
+    ADD_METHOD(FiberProto, "parent",  Fiber_parent);
+    ADD_METHOD(FiberProto, "call",    Fiber_call);
+    ADD_METHOD(FiberProto, "yield",   Fiber_yield);
+    ADD_METHOD(FiberProto, "isDone",  Fiber_isDone);
 
     ADD_OBJECT(&vm->globals, "Object",  vm->ObjectProto);
     ADD_OBJECT(&vm->globals, "Fn",      vm->FnProto);

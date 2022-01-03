@@ -1,0 +1,46 @@
+# Test fiber functionality.
+
+# let f = Fiber.new {
+#     assert Fiber.current == f;
+#     2.println;
+#     Fiber.yield;
+#     assert Fiber.current == f;
+#     4.println;
+# };
+
+# 1.println;
+# assert !f.isDone;
+# f.call;
+# 3.println;
+# assert !f.isDone;
+# f.call;
+# 5.println;
+# assert f.isDone;
+# assert !Fiber.current.isDone;
+
+
+# yielding many fibers
+let i = 0;
+let x = {};
+while (i < 5) {
+    x.setSlot(i, Fiber.new{
+        assert Fiber.current == x.getOwnSlot(i);
+        i.println;
+        Fiber.yield;
+    });
+    i = i + 1;
+}
+"=== run".println;
+i = 0;
+while (i < 5) {
+    x.getOwnSlot(i).call;
+    assert !x.getOwnSlot(i).isDone;
+    i = i + 1;
+}
+"=== end".println;
+i = 0;
+while (i < 5) {
+    x.getOwnSlot(i).call;
+    assert x.getOwnSlot(i).isDone;
+    i = i + 1;
+}

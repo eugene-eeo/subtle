@@ -145,8 +145,8 @@ blacken_fiber(VM* vm, ObjFiber* fiber)
             upvalue = upvalue->next)
         mark_object(vm, (Obj*)upvalue);
 
-    // Mark the error, if any.
     mark_value(vm, fiber->error);
+    mark_object(vm, (Obj*)fiber->parent);
 }
 
 static void trace_references(VM* vm) {

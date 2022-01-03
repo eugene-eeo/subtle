@@ -283,7 +283,11 @@ vm_invoke(VM* vm, Value obj, Value key, int num_args, Value* return_value, Inter
     return vm_call(vm, slot_value, num_args, return_value, rv);
 }
 
-static InterpretResult run(VM* vm, int top_level) {
+// Run the given fiber until fiber->frames_count == top_level.
+static
+InterpretResult
+run(VM* vm, ObjFiber* fiber, int top_level) {
+    ObjFiber* original_fiber = fiber;
     CallFrame* frame;
 
 #define REFRESH_FRAME() (frame = &vm->fiber->frames[vm->fiber->frames_count - 1])
@@ -299,7 +303,7 @@ static InterpretResult run(VM* vm, int top_level) {
     for (;;) {
 #ifdef SUBTLE_DEBUG_TRACE_EXECUTION
         // Trace the stack.
-        for (Value* vptr = vm->fiber->stack; vptr != vm->fiber->stack_top; vptr++) {
+        for (Value* vptr = fiber->stack; vptr != fiber->stack_top; vptr++) {
             printf("[ ");
             debug_print_value(*vptr);
             printf(" ]");
@@ -312,13 +316,19 @@ static InterpretResult run(VM* vm, int top_level) {
         switch (READ_BYTE()) {
             case OP_RETURN: {
                 Value result = vm_pop(vm);
-                close_upvalues(vm->fiber, frame->slots);
-                vm->fiber->frames_count--;
-                vm->fiber->stack_top = frame->slots;
+                close_upvalues(fiber, frame->slots);
+                fiber->frames_count--;
+                fiber->stack_top = frame->slots;
                 vm_push(vm, result);
-                if (vm->fiber->frames_count == top_level)
+                if (fiber == original_fiber && fiber->frames_count == top_level)
                     return INTERPRET_OK;
-                ASSERT(vm->fiber->frames_count > 0, "frame_count == 0");
+                if (fiber->frames_count == 0) {
+                    // Transfer control to the parent fiber.
+                    fiber = fiber->parent;
+                    vm->fiber = fiber;
+                    if (fiber == NULL)
+                        return INTERPRET_OK; // Nothing to do?
+                }
                 REFRESH_FRAME();
                 break;
             }
@@ -438,7 +448,7 @@ static InterpretResult run(VM* vm, int top_level) {
                 break;
             }
             case OP_CLOSE_UPVALUE: {
-                close_upvalues(vm->fiber, vm->fiber->stack_top - 1);
+                close_upvalues(fiber, fiber->stack_top - 1);
                 vm_pop(vm);
                 break;
             }
@@ -487,6 +497,12 @@ static InterpretResult run(VM* vm, int top_level) {
                 InterpretResult rv;
                 if (!invoke(vm, obj, key, num_args, &rv))
                     return rv;
+                fiber = vm->fiber;
+                if (fiber == NULL) return INTERPRET_OK;
+                if (fiber->frames_count == 0) {
+                    fiber = fiber->parent;
+                    vm->fiber = fiber;
+                }
                 REFRESH_FRAME();
                 break;
             }
@@ -508,7 +524,7 @@ vm_call(VM* vm, Value slot, int num_args,
     if (IS_CLOSURE(slot)) {
         ObjClosure* closure = VAL_TO_CLOSURE(slot);
         vm_push_frame(vm, closure, num_args);
-        result = run(vm, vm->fiber->frames_count - 1);
+        result = run(vm, vm->fiber, vm->fiber->frames_count - 1);
     } else if (IS_NATIVE(slot)) {
         ObjNative* native = VAL_TO_NATIVE(slot);
         result = native->fn(vm, &vm->fiber->stack_top[-num_args - 1], num_args)
@@ -543,7 +559,7 @@ InterpretResult vm_interpret(VM* vm, const char* source) {
     vm_pop_root(vm);
     vm_pop_root(vm);
 
-    InterpretResult result = run(vm, 0);
+    InterpretResult result = run(vm, vm->fiber, 0);
     vm->fiber = NULL;
     return result;
 }
