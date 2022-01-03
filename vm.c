@@ -25,6 +25,7 @@ void vm_init(VM* vm) {
     vm->NativeProto = NULL;
     vm->NumberProto = NULL;
     vm->StringProto = NULL;
+    vm->FiberProto = NULL;
 
     vm->objects = NULL;
     vm->bytes_allocated = 0;
@@ -104,19 +105,15 @@ void vm_runtime_error(VM* vm, const char* format, ...) {
 }
 
 void
-vm_ensure_stack(VM* vm, size_t n)
-{
-    objfiber_ensure_stack(vm->fiber, vm, n);
-}
-
-void
 vm_push_frame(VM* vm, ObjClosure* closure, int args)
 {
     Value* stack_start = vm->fiber->stack_top - args - 1;
 
     ObjFunction* function = closure->function;
+    vm_push_root(vm, OBJ_TO_VAL(closure));
     objfiber_push_frame(vm->fiber, vm, closure, stack_start);
     vm_ensure_stack(vm, function->max_slots);
+    vm_pop_root(vm);
 
     // Fix the number of arguments.
     // Since -1 arity means a script, we ignore that here.
@@ -175,14 +172,14 @@ capture_upvalue(VM* vm, Value* local)
 }
 
 static void
-close_upvalues(VM* vm, Value* last)
+close_upvalues(ObjFiber* fiber, Value* last)
 {
-    while (vm->fiber->open_upvalues != NULL
-           && vm->fiber->open_upvalues->location >= last) {
-        ObjUpvalue* upvalue = vm->fiber->open_upvalues;
+    while (fiber->open_upvalues != NULL
+           && fiber->open_upvalues->location >= last) {
+        ObjUpvalue* upvalue = fiber->open_upvalues;
         upvalue->closed = *upvalue->location;
         upvalue->location = &upvalue->closed;
-        vm->fiber->open_upvalues = upvalue->next;
+        fiber->open_upvalues = upvalue->next;
     }
 }
 
@@ -203,6 +200,7 @@ vm_get_prototype(VM* vm, Value value)
                 case OBJ_NATIVE:  return OBJ_TO_VAL(vm->NativeProto);
                 case OBJ_OBJECT:  return ((ObjObject*)object)->proto;
                 case OBJ_CLOSURE: return OBJ_TO_VAL(vm->FnProto);
+                case OBJ_FIBER:   return OBJ_TO_VAL(vm->FiberProto);
                 default: UNREACHABLE();
             }
         }
@@ -242,9 +240,9 @@ is_activatable(Value value)
 //  1) a pre-invoke, which fetches the slot (and calls getSlot if necessary).
 //  2) activating the slot's value, if necessary.
 static inline bool
-pre_invoke(VM* vm, Value obj, Value key, Value* slot_value, InterpretResult* rv)
+pre_invoke(VM* vm, Value obj, Value key, Value* slot, InterpretResult* rv)
 {
-    if (!vm_get_slot(vm, obj, key, slot_value)) {
+    if (!vm_get_slot(vm, obj, key, slot)) {
         // If there is no such slot following a recursive proto search,
         // we consult the getSlot method.
         Value getSlot_value;
@@ -252,12 +250,10 @@ pre_invoke(VM* vm, Value obj, Value key, Value* slot_value, InterpretResult* rv)
             vm_ensure_stack(vm, 2);
             vm_push(vm, obj);
             vm_push(vm, key);
-            // slot_value will hold the result of getSlot
-            if (!vm_call(vm, getSlot_value, 1, slot_value, rv))
+            if (!vm_call(vm, getSlot_value, 1, slot, rv))
                 return false;
         } else {
-            // slot_value is nil.
-            *slot_value = NIL_VAL;
+            *slot = NIL_VAL;
             return true;
         }
     }
@@ -316,7 +312,7 @@ static InterpretResult run(VM* vm, int top_level) {
         switch (READ_BYTE()) {
             case OP_RETURN: {
                 Value result = vm_pop(vm);
-                close_upvalues(vm, frame->slots);
+                close_upvalues(vm->fiber, frame->slots);
                 vm->fiber->frames_count--;
                 vm->fiber->stack_top = frame->slots;
                 vm_push(vm, result);
@@ -363,6 +359,7 @@ static InterpretResult run(VM* vm, int top_level) {
             }
             case OP_ASSERT: {
                 if (!value_truthy(vm_pop(vm))) {
+                    frame->ip--; // To get a correct line number.
                     vm_runtime_error(vm, "Assertion failed.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
@@ -441,7 +438,7 @@ static InterpretResult run(VM* vm, int top_level) {
                 break;
             }
             case OP_CLOSE_UPVALUE: {
-                close_upvalues(vm, vm->fiber->stack_top - 1);
+                close_upvalues(vm->fiber, vm->fiber->stack_top - 1);
                 vm_pop(vm);
                 break;
             }

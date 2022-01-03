@@ -274,7 +274,7 @@ objfiber_new(VM* vm, ObjClosure* closure)
     size_t stack_capacity = next_power_of_two(closure->function->max_slots);
     Value* stack = ALLOCATE_ARRAY(vm, Value, stack_capacity);
 
-    size_t frames_capacity = 4;
+    size_t frames_capacity = 1;
     CallFrame* frames = ALLOCATE_ARRAY(vm, CallFrame, frames_capacity);
 
     ObjFiber* fiber = ALLOCATE_OBJECT(vm, OBJ_FIBER, ObjFiber);

@@ -1,12 +1,12 @@
 #ifndef SUBTLE_VM_H
 #define SUBTLE_VM_H
 
-#include "common.h"
 #include "chunk.h"
-#include "value.h"
+#include "common.h"
+#include "compiler.h"
 #include "object.h"
 #include "table.h"
-#include "compiler.h"
+#include "value.h"
 
 #define MAX_ROOTS 8
 
@@ -30,6 +30,7 @@ typedef struct VM {
     ObjObject* NativeProto;
     ObjObject* NumberProto;
     ObjObject* StringProto;
+    ObjObject* FiberProto;
     // -------------------------
 
     // ---- GC ----
@@ -80,8 +81,12 @@ bool vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value);
 // Invocation
 // ==========
 
-// Ensures that we have at least n slots on the stack.
-void vm_ensure_stack(VM* vm, size_t n);
+// Ensures that we have at least n more slots on the stack.
+inline void
+vm_ensure_stack(VM* vm, size_t n)
+{
+    objfiber_ensure_stack(vm->fiber, vm, n);
+}
 
 // Pushes the given closure onto the call stack. Note that the
 // num_args argument should be the number of _actual_ arguments.

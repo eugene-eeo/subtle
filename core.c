@@ -47,28 +47,23 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
         case 'N': if (!IS_NUMBER(arg)) ARG_ERROR(idx, "a Number"); break; \
         case 'n': if (!IS_NATIVE(arg)) ARG_ERROR(idx, "a Native"); break; \
         case 'F': if (!IS_CLOSURE(arg)) ARG_ERROR(idx, "an Fn"); break; \
+        case 'f': if (!IS_FIBER(arg)) ARG_ERROR(idx, "a Fiber"); break; \
         case '*': break; \
         default: UNREACHABLE(); \
     } \
     } while(false)
 
-#define POP_ARGS(num_args) vm_drop(vm, num_args)
-
 #define ERROR(...) \
     do { \
         vm_runtime_error(vm, __VA_ARGS__); \
-        POP_ARGS(num_args); \
+        vm_drop(vm, num_args); \
         return false; \
     } while (false)
 
-// NOTE: The order in which the following operations happen is important;
-// We first assign to the return value BEFORE popping arguments off the
-// stack. This is so that if EXPR triggers a GC, which is dependent on the
-// stack, we don't pop the arguments off too early.
 #define RETURN(EXPR) \
     do { \
-        args[0] = EXPR; \
-        POP_ARGS(num_args); \
+        *(vm->fiber->stack_top - num_args - 1) = EXPR; \
+        vm_drop(vm, num_args); \
         return true; \
     } while (false)
 
@@ -218,6 +213,7 @@ DEFINE_NATIVE(Object, toString) {
         case OBJ_CLOSURE: fmt = "Fn_%p"; break;
         case OBJ_OBJECT:  fmt = "Object_%p"; break;
         case OBJ_NATIVE:  fmt = "Native_%p"; break;
+        case OBJ_FIBER:   fmt = "Fiber_%p"; break;
         default: UNREACHABLE();
         }
         buf_size = snprintf(NULL, 0, fmt, (void*) obj) + 1;
@@ -240,7 +236,7 @@ DEFINE_NATIVE(Object, print) {
     InterpretResult rv;
     vm_ensure_stack(vm, 1);
     vm_push(vm, this);
-    if (!vm_invoke(vm, args[0], OBJ_TO_VAL(objstring_copy(vm, "toString", 8)), 0, &string_slot, &rv))
+    if (!vm_invoke(vm, this, OBJ_TO_VAL(objstring_copy(vm, "toString", 8)), 0, &string_slot, &rv))
         return rv;
 
     if (!IS_STRING(string_slot))
@@ -251,11 +247,12 @@ DEFINE_NATIVE(Object, print) {
 }
 
 DEFINE_NATIVE(Object, println) {
+    Value this = args[0];
     Value tmp;
     InterpretResult rv;
     vm_ensure_stack(vm, 1);
-    vm_push(vm, args[0]);
-    if (!vm_invoke(vm, args[0], OBJ_TO_VAL(objstring_copy(vm, "print", 5)), 0, &tmp, &rv))
+    vm_push(vm, this);
+    if (!vm_invoke(vm, this, OBJ_TO_VAL(objstring_copy(vm, "print", 5)), 0, &tmp, &rv))
         return rv;
 
     fprintf(stdout, "\n");
@@ -283,13 +280,11 @@ DEFINE_NATIVE(Fn, callWithThis) {
     // We have: | fn | newThis | arg1 | arg2 | ... | arg_{num_args} |
     // we want:      | newThis | arg1 | arg2 | ... | arg_{num_args} |
     //                 0         1      2            num_args-1
-    vm_push_root(vm, args[0]);
     ObjClosure* closure = VAL_TO_CLOSURE(args[0]);
     for (int i = 0; i < num_args; i++)
         args[i] = args[i + 1];
     vm_pop(vm); // this will be a duplicate
     vm_push_frame(vm, closure, num_args - 1);
-    vm_pop_root(vm);
     return true;
 }
 
@@ -369,6 +364,12 @@ DEFINE_NATIVE(String, length) {
     RETURN(NUMBER_TO_VAL(VAL_TO_STRING(args[0])->length));
 }
 
+// ============================= Fiber =============================
+
+DEFINE_NATIVE(Fiber, current) {
+    return vm->fiber;
+}
+
 void core_init_vm(VM* vm)
 {
 #define ADD_OBJECT(table, name, obj) (define_on_table(vm, table, name, OBJ_TO_VAL(obj)))
@@ -433,11 +434,16 @@ void core_init_vm(VM* vm)
     ADD_METHOD(StringProto, "<=",     String_leq);
     ADD_METHOD(StringProto, ">=",     String_geq);
 
+    vm->FiberProto = objobject_new(vm);
+    vm->FiberProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    ADD_METHOD(FiberProto, "current", Fiber_current);
+
     ADD_OBJECT(&vm->globals, "Object",  vm->ObjectProto);
     ADD_OBJECT(&vm->globals, "Fn",      vm->FnProto);
     ADD_OBJECT(&vm->globals, "Native",  vm->NativeProto);
     ADD_OBJECT(&vm->globals, "Number",  vm->NumberProto);
     ADD_OBJECT(&vm->globals, "String",  vm->StringProto);
+    ADD_OBJECT(&vm->globals, "Fiber",   vm->FiberProto);
 
 #undef ADD_OBJECT
 #undef ADD_NATIVE

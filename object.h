@@ -18,6 +18,7 @@ typedef struct VM VM;
 #define IS_CLOSURE(value)      (is_object_type(value, OBJ_CLOSURE))
 #define IS_OBJECT(value)       (is_object_type(value, OBJ_OBJECT))
 #define IS_NATIVE(value)       (is_object_type(value, OBJ_NATIVE))
+#define IS_FIBER(value)        (is_object_type(value, OBJ_FIBER))
 
 #define OBJ_TYPE(value)        (VAL_TO_OBJ(value)->type)
 
@@ -27,6 +28,7 @@ typedef struct VM VM;
 #define VAL_TO_CLOSURE(value)  ((ObjClosure*)VAL_TO_OBJ(value))
 #define VAL_TO_OBJECT(value)   ((ObjObject*)VAL_TO_OBJ(value))
 #define VAL_TO_NATIVE(value)   ((ObjNative*)VAL_TO_OBJ(value))
+#define VAL_TO_FIBER(value)    ((ObjFiber*)VAL_TO_OBJ(value))
 
 typedef enum {
     OBJ_STRING,

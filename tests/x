@@ -2,13 +2,13 @@
 # the VM; it just serves as a file for regression tests.
 
 # 93de905 stress test vm_push_frame
-let x = {};
+let x = Object.clone(nil);
+x.setSlot = Object.rawGetSlot("rawSetSlot");
+x.setProto(x);
 x.getSlot = Fn.new{|k|
-    # return a closure here; this will test if
-    # we free closures wrongly.
     return Fn.new{
         return k;
     };
 };
-assert x a == "a";
-assert x b == "b";
+Object.rawGetSlot("print")
+      .callWithThis(x);

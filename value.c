@@ -62,6 +62,7 @@ static uint32_t object_hash(Obj* obj)
         case OBJ_FUNCTION:
         case OBJ_OBJECT:
         case OBJ_NATIVE:
+        case OBJ_FIBER:
             return hash_bits((uintptr_t)obj);
         default: UNREACHABLE();
     }
@@ -69,9 +70,9 @@ static uint32_t object_hash(Obj* obj)
 
 uint32_t value_hash(Value v) {
     switch (v.type) {
-        case VALUE_NIL:    return hash_bits(0);
-        case VALUE_TRUE:   return hash_bits(1);
-        case VALUE_FALSE:  return hash_bits(2);
+        case VALUE_NIL:    return 0xa3b1799d;
+        case VALUE_TRUE:   return 0x46685257;
+        case VALUE_FALSE:  return 0x392456de;
         case VALUE_NUMBER: return hash_bits(double_to_bits(VAL_TO_NUMBER(v)));
         case VALUE_OBJ:    return object_hash(VAL_TO_OBJ(v));
         default: UNREACHABLE();
