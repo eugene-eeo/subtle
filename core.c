@@ -371,17 +371,27 @@ static bool
 run_fiber(VM* vm, ObjFiber* fiber, Value value)
 {
     fiber->parent = vm->fiber;
-    vm->fiber = fiber;
     if (fiber->frames_count == 1
-        && fiber->frames[0].ip == fiber->frames[0].closure->function->chunk.code
-        && fiber->frames[0].closure->function->arity == 1) {
-        // The fiber has not ran yet, and is expecting some
-        // data to be sent.
-        *fiber->stack_top = value;
-        fiber->stack_top++;
+        && fiber->frames[0].ip == fiber->frames[0].closure->function->chunk.code) {
+        if (fiber->frames[0].closure->function->arity == 1) {
+            // The fiber has not ran yet, and is expecting some
+            // data to be sent.
+            *fiber->stack_top = value;
+            fiber->stack_top++;
+        }
     } else {
+        // We're resuming another fiber. In this case, the other
+        // fiber will have their stack like so, since they have
+        // been suspended (e.g. from a Fiber.call or Fiber.suspend).
+        //   +---+-----------+
+        //   |...| Fiber_... |
+        //   +---+-----------+
+        //                   ^-- stack_top
+        // By replacing stack_top[-1], we give Fiber.call or
+        // Fiber.suspend a return value.
         fiber->stack_top[-1] = value;
     }
+    vm->fiber = fiber;
     return true;
 }
 

@@ -110,10 +110,8 @@ vm_push_frame(VM* vm, ObjClosure* closure, int args)
     Value* stack_start = vm->fiber->stack_top - args - 1;
 
     ObjFunction* function = closure->function;
-    vm_push_root(vm, OBJ_TO_VAL(closure));
     objfiber_push_frame(vm->fiber, vm, closure, stack_start);
     vm_ensure_stack(vm, function->max_slots);
-    vm_pop_root(vm);
 
     // Fix the number of arguments.
     // Since -1 arity means a script, we ignore that here.
@@ -328,10 +326,13 @@ run(VM* vm, ObjFiber* fiber, int top_level) {
                     fiber = fiber->parent;
                     vm->fiber = fiber;
                     if (fiber == NULL)
-                        return INTERPRET_OK; // Nothing to do?
+                       return INTERPRET_OK; // Nothing to do?
+                    fiber->stack_top[-1] = result;
+                    REFRESH_FRAME();
+                } else {
+                    vm_push(vm, result);
+                    REFRESH_FRAME();
                 }
-                vm_push(vm, result);
-                REFRESH_FRAME();
                 break;
             }
             case OP_CONSTANT: {
