@@ -368,8 +368,13 @@ DEFINE_NATIVE(String, length) {
 
 // Run the given `fiber` with some data.
 static bool
-run_fiber(VM* vm, ObjFiber* fiber, Value value)
+run_fiber(VM* vm, ObjFiber* fiber, Value value, const char* verb)
 {
+    int num_args = 0;
+    // Should've already been popped; this is to make ERROR work.
+    if (objfiber_is_done(fiber))
+        ERROR("%s: Cannot run a finished fiber.", verb);
+
     fiber->parent = vm->fiber;
     if (fiber->frames_count == 1
         && fiber->frames[0].ip == fiber->frames[0].closure->function->chunk.code) {
@@ -380,15 +385,15 @@ run_fiber(VM* vm, ObjFiber* fiber, Value value)
             fiber->stack_top++;
         }
     } else {
-        // We're resuming another fiber. In this case, the other
-        // fiber will have their stack like so, since they have
-        // been suspended (e.g. from a Fiber.call or Fiber.suspend).
+        // We're resuming the `fiber`. In this case, `fiber`'s stack
+        // will be like so, since it has already been suspended (e.g.
+        // from a Fiber.call or Fiber.suspend).
         //   +---+-----------+
         //   |...| Fiber_... |
         //   +---+-----------+
         //                   ^-- stack_top
-        // By replacing stack_top[-1], we give Fiber.call or
-        // Fiber.suspend a return value.
+        // Replacing stack_top[-1] gives Fiber.call or Fiber.suspend
+        // a return value.
         fiber->stack_top[-1] = value;
     }
     vm->fiber = fiber;
@@ -400,9 +405,12 @@ DEFINE_NATIVE(Fiber, current) {
 }
 
 DEFINE_NATIVE(Fiber, yield) {
-    if (num_args > 1)
+    Value v = NIL_VAL;
+    if (num_args >= 1) {
         vm_drop(vm, num_args - 1);
-    return run_fiber(vm, vm->fiber->parent, num_args >= 1 ? vm_pop(vm) : NIL_VAL);
+        v = vm_pop(vm);
+    }
+    return run_fiber(vm, vm->fiber->parent, v, "Fiber_yield");
 }
 
 DEFINE_NATIVE(Fiber, new) {
@@ -418,22 +426,26 @@ DEFINE_NATIVE(Fiber, new) {
 
 DEFINE_NATIVE(Fiber, parent) {
     ARGSPEC("f");
-    RETURN(OBJ_TO_VAL(vm->fiber->parent));
+    RETURN(vm->fiber->parent != NULL
+            ? OBJ_TO_VAL(vm->fiber->parent)
+            : NIL_VAL);
 }
 
 DEFINE_NATIVE(Fiber, call) {
     ARGSPEC("f");
-    if (num_args > 1)
-        vm_drop(vm, num_args - 1);
     ObjFiber* fiber = VAL_TO_FIBER(args[0]);
-    return run_fiber(vm, fiber, num_args >= 1 ? vm_pop(vm) : NIL_VAL);
+    Value v = NIL_VAL;
+    if (num_args >= 1) {
+        vm_drop(vm, num_args - 1);
+        v = vm_pop(vm);
+    }
+    return run_fiber(vm, fiber, v, "Fiber_call");
 }
 
 DEFINE_NATIVE(Fiber, isDone) {
     ARGSPEC("f");
     ObjFiber* fiber = VAL_TO_FIBER(args[0]);
-    bool is_done = objfiber_is_done(fiber);
-    RETURN(BOOL_TO_VAL(is_done));
+    RETURN(BOOL_TO_VAL(objfiber_is_done(fiber)));
 }
 
 void core_init_vm(VM* vm)
