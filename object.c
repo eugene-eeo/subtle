@@ -347,6 +347,12 @@ objfiber_push_frame(ObjFiber* fiber, VM* vm,
     return frame;
 }
 
+bool
+objfiber_is_done(ObjFiber* fiber)
+{
+    return fiber->frames_count == 0;
+}
+
 static void
 objfiber_free(VM* vm, Obj* obj)
 {

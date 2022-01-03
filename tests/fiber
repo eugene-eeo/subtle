@@ -1,27 +1,28 @@
 # Test fiber functionality.
 
-# let f = Fiber.new {
-#     assert Fiber.current == f;
-#     2.println;
-#     Fiber.yield;
-#     assert Fiber.current == f;
-#     4.println;
-# };
+let f = Fiber.new {
+    assert Fiber.current == f;
+    2.println;
+    Fiber.yield;
+    assert Fiber.current == f;
+    4.println;
+};
 
-# 1.println;
-# assert !f.isDone;
-# f.call;
-# 3.println;
-# assert !f.isDone;
-# f.call;
-# 5.println;
-# assert f.isDone;
-# assert !Fiber.current.isDone;
+1.println;
+assert !f.isDone;
+f.call;
+3.println;
+assert !f.isDone;
+f.call;
+5.println;
+assert f.isDone;
+assert !Fiber.current.isDone;
 
 
 # yielding many fibers
 let i = 0;
 let x = {};
+"=== pre".println;
 while (i < 5) {
     x.setSlot(i, Fiber.new{
         assert Fiber.current == x.getOwnSlot(i);

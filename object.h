@@ -175,5 +175,6 @@ ObjFiber* objfiber_new(VM* vm, ObjClosure* closure);
 void objfiber_ensure_stack(ObjFiber* fiber, VM* vm, size_t sz);
 CallFrame* objfiber_push_frame(ObjFiber* fiber, VM* vm,
                                ObjClosure* closure, Value* stack_start);
+bool objfiber_is_done(ObjFiber* fiber);
 
 #endif

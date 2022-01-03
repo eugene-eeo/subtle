@@ -397,7 +397,7 @@ DEFINE_NATIVE(Fiber, call) {
 DEFINE_NATIVE(Fiber, isDone) {
     ARGSPEC("f");
     ObjFiber* fiber = VAL_TO_FIBER(args[0]);
-    bool is_done = fiber->frames_count == 0;
+    bool is_done = objfiber_is_done(fiber);
     RETURN(BOOL_TO_VAL(is_done));
 }
 
