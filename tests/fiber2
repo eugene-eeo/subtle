@@ -1,19 +1,18 @@
-# let f = Fiber.new{|v|
-#     v println;
-#     let q = Fiber.yield(2);
-#     q println;
-#     return 4;
-# };
-# f.call(1).println;
-# f.call(3).println;
+let f = Fiber.new{|v|
+    v println;
+    let q = Fiber.yield(2);
+    q println;
+    return 4;
+};
+f.call(1).println;
+f.call(3).println;
 
 # let f = Fiber.current;
 # f.parent.println;
 # f.call;
 # f.parent.println;
 
-let f = Fiber.new{
-    1 println;
-};
-f.call;
-f.call;
+# let f = Fiber.new{
+#     1 println;
+# };
+# f.call;

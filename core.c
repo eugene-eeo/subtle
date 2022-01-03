@@ -1,10 +1,7 @@
 #include "core.h"
-#include "common.h"
-#include "debug.h"
 #include "value.h"
 #include "object.h"
 #include "table.h"
-#include "vm.h"
 #include "memory.h"
 
 #include <string.h>
@@ -370,10 +367,18 @@ DEFINE_NATIVE(String, length) {
 static bool
 run_fiber(VM* vm, ObjFiber* fiber, Value value, const char* verb)
 {
-    int num_args = 0;
+    if (fiber == NULL) {
+        // Can never return to this fiber without black magic.
+        vm->fiber = NULL;
+        return true;
+    }
+
     // Should've already been popped; this is to make ERROR work.
+    int num_args = 0;
     if (objfiber_is_done(fiber))
         ERROR("%s: Cannot run a finished fiber.", verb);
+    if (fiber->parent != NULL)
+        ERROR("%s: Fiber already has a parent.", verb);
 
     fiber->parent = vm->fiber;
     if (fiber->frames_count == 1
@@ -410,7 +415,13 @@ DEFINE_NATIVE(Fiber, yield) {
         vm_drop(vm, num_args - 1);
         v = vm_pop(vm);
     }
-    return run_fiber(vm, vm->fiber->parent, v, "Fiber_yield");
+    ObjFiber* parent = vm->fiber->parent;
+    vm->fiber->parent = NULL;
+    vm->fiber = parent;
+    if (vm->fiber != NULL) {
+        vm->fiber->stack_top[-1] = v;
+    }
+    return true;
 }
 
 DEFINE_NATIVE(Fiber, new) {
