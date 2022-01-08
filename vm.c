@@ -88,20 +88,59 @@ void vm_pop_root(VM* vm) {
 }
 
 void vm_runtime_error(VM* vm, const char* format, ...) {
+    char buffer[256];
     va_list args;
     va_start(args, format);
-    vfprintf(stderr, format, args);
+    ssize_t len = vsnprintf(buffer, 256, format, args);
     va_end(args);
-    fputs("\n", stderr);
 
-    for (int i = vm->fiber->frames_count - 1; i >= 0; i--) {
-        CallFrame* frame = &vm->fiber->frames[i];
-        ObjFunction* function = frame->closure->function;
-        size_t instruction = frame->ip - function->chunk.code;
-        fprintf(stderr, "[line %zu] in %s\n",
-                chunk_get_line(&function->chunk, instruction),
-                function->arity == -1 ? "script" : "fn");
+    len = len >= 255 ? 255 : len;
+    vm->fiber->error = OBJ_TO_VAL(objstring_copy(vm, buffer, len));
+}
+
+static void
+print_stack_trace(VM* vm)
+{
+    ObjString* str = VAL_TO_STRING(vm->fiber->error);
+    fprintf(stderr, "Uncaught Error: %s\n", str->chars);
+    for (ObjFiber* fiber = vm->fiber;
+         fiber != NULL;
+         fiber = fiber->parent) {
+        for (int i = fiber->frames_count - 1; i >= 0; i--) {
+            CallFrame* frame = &fiber->frames[i];
+            ObjFunction* function = frame->closure->function;
+            size_t instruction = frame->ip - function->chunk.code;
+            fprintf(stderr, "[line %zu] in %s\n",
+                    chunk_get_line(&function->chunk, instruction),
+                    function->arity == -1 ? "script" : "fn");
+        }
     }
+}
+
+static void
+runtime_error(VM* vm)
+{
+    ASSERT(!IS_UNDEFINED(vm->fiber->error), "Should only be called after an error.");
+    ObjFiber* fiber = vm->fiber;
+    Value error = fiber->error;
+
+    // Check if we can find a fiber ran with FIBER_TRY
+    while (fiber != NULL) {
+        fiber->error = error;
+
+        if (fiber->state == FIBER_TRY) {
+            fiber->parent->stack_top[-1] = error;
+            vm->fiber = fiber->parent;
+            return;
+        }
+
+        ObjFiber* parent = fiber->parent;
+        fiber->parent = NULL;
+        fiber = parent;
+    }
+
+    print_stack_trace(vm);
+    vm->fiber = NULL;
 }
 
 void
@@ -228,12 +267,6 @@ vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
     return rv;
 }
 
-static inline bool
-is_activatable(Value value)
-{
-    return IS_CLOSURE(value) || IS_NATIVE(value);
-}
-
 // An Invoke is split into two sections:
 //  1) a pre-invoke, which fetches the slot (and calls getSlot if necessary).
 //  2) activating the slot's value, if necessary.
@@ -355,7 +388,7 @@ run(VM* vm, ObjFiber* fiber, int top_level) {
                 if (!table_get(&vm->globals, name, &value)) {
                     vm_runtime_error(vm, "Undefined variable '%s'.",
                                   VAL_TO_STRING(name)->chars);
-                    return INTERPRET_RUNTIME_ERROR;
+                    goto handle_fibers;
                 }
                 vm_push(vm, value);
                 break;
@@ -366,7 +399,7 @@ run(VM* vm, ObjFiber* fiber, int top_level) {
                     table_delete(&vm->globals, vm, name);
                     vm_runtime_error(vm, "Undefined variable '%s'.",
                                   VAL_TO_STRING(name)->chars);
-                    return INTERPRET_RUNTIME_ERROR;
+                    goto handle_fibers;
                 }
                 break;
             }
@@ -374,7 +407,7 @@ run(VM* vm, ObjFiber* fiber, int top_level) {
                 if (!value_truthy(vm_pop(vm))) {
                     frame->ip--; // To get a correct line number.
                     vm_runtime_error(vm, "Assertion failed.");
-                    return INTERPRET_RUNTIME_ERROR;
+                    goto handle_fibers;
                 }
                 break;
             }
@@ -465,8 +498,7 @@ run(VM* vm, ObjFiber* fiber, int top_level) {
                 Value key = READ_CONSTANT();
                 Value obj = vm_peek(vm, 1);
                 Value value = vm_peek(vm, 0);
-                ObjObject* object = VAL_TO_OBJECT(obj);
-                objobject_set(object, vm, key, value);
+                objobject_set(VAL_TO_OBJECT(obj), vm, key, value);
                 vm_pop(vm); // value
                 break;
             }
@@ -474,34 +506,32 @@ run(VM* vm, ObjFiber* fiber, int top_level) {
                 Value key = READ_CONSTANT();
                 Value obj = vm_peek(vm, 1);
                 Value value = vm_peek(vm, 0);
-                Value return_value;
                 Value setSlot_slot;
                 if (!vm_get_slot(vm, obj, vm->setSlot_string, &setSlot_slot)) {
                     vm_runtime_error(vm, "No setSlot found.");
-                    return INTERPRET_RUNTIME_ERROR;
+                    goto handle_fibers;
                 }
-                InterpretResult rv;
-                vm_ensure_stack(vm, 3);
-                vm_push(vm, obj);
-                vm_push(vm, key);
+                vm_ensure_stack(vm, 1);
+                fiber->stack_top[-1] = key;
                 vm_push(vm, value);
-                if (!vm_call(vm, setSlot_slot, 2, &return_value, &rv))
-                    return rv;
-                // the arguments should've been popped out
-                vm_pop(vm); // value
-                vm_pop(vm); // object
-                vm_push(vm, return_value);
-                break;
+                complete_call(vm, setSlot_slot, 2);
+                goto handle_fibers;
             }
             case OP_INVOKE: {
                 Value key = READ_CONSTANT();
                 uint8_t num_args = READ_BYTE();
                 Value obj = vm_peek(vm, num_args);
                 InterpretResult rv;
-                if (!invoke(vm, obj, key, num_args, &rv))
-                    return rv;
+                invoke(vm, obj, key, num_args, &rv);
+handle_fibers:
                 fiber = vm->fiber;
                 if (fiber == NULL) return INTERPRET_OK;
+                if (!IS_UNDEFINED(fiber->error)) {
+                    runtime_error(vm);
+                    fiber = vm->fiber;
+                    if (fiber == NULL)
+                        return INTERPRET_RUNTIME_ERROR;
+                }
                 if (objfiber_is_done(fiber)) {
                     fiber = fiber->parent;
                     vm->fiber = fiber;

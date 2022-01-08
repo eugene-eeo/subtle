@@ -18,8 +18,8 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
     vm_pop_root(vm);
 }
 
-#define DEFINE_NATIVE(proto, name) \
-    static bool proto##_##name(VM* vm, Value* args, int num_args)
+#define DEFINE_NATIVE(name) \
+    static bool name(VM* vm, Value* args, int num_args)
 
 #define ARG_ERROR(arg_idx, msg) \
     do { \
@@ -53,7 +53,6 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
 #define ERROR(...) \
     do { \
         vm_runtime_error(vm, __VA_ARGS__); \
-        vm_drop(vm, num_args); \
         return false; \
     } while (false)
 
@@ -67,12 +66,12 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
 
 // ============================= Object =============================
 
-DEFINE_NATIVE(Object, proto) {
+DEFINE_NATIVE(Object_proto) {
     Value proto = vm_get_prototype(vm, args[0]);
     RETURN(proto);
 }
 
-DEFINE_NATIVE(Object, setProto) {
+DEFINE_NATIVE(Object_setProto) {
     ARGSPEC("O*");
 
     ObjObject* object = VAL_TO_OBJECT(args[0]);
@@ -80,7 +79,7 @@ DEFINE_NATIVE(Object, setProto) {
     RETURN(NIL_VAL);
 }
 
-DEFINE_NATIVE(Object, rawGetSlot) {
+DEFINE_NATIVE(Object_rawGetSlot) {
     ARGSPEC("**");
 
     Value this = args[0];
@@ -90,14 +89,14 @@ DEFINE_NATIVE(Object, rawGetSlot) {
     RETURN(slot);
 }
 
-DEFINE_NATIVE(Object, setSlot) {
+DEFINE_NATIVE(Object_setSlot) {
     ARGSPEC("O**");
 
     objobject_set(VAL_TO_OBJECT(args[0]), vm, args[1], args[2]);
     RETURN(NIL_VAL);
 }
 
-DEFINE_NATIVE(Object, hasSlot) {
+DEFINE_NATIVE(Object_hasSlot) {
     ARGSPEC("**");
 
     Value slot;
@@ -105,7 +104,7 @@ DEFINE_NATIVE(Object, hasSlot) {
     RETURN(BOOL_TO_VAL(has_slot));
 }
 
-DEFINE_NATIVE(Object, getOwnSlot) {
+DEFINE_NATIVE(Object_getOwnSlot) {
     ARGSPEC("**");
 
     if (!IS_OBJECT(args[0]))
@@ -119,7 +118,7 @@ DEFINE_NATIVE(Object, getOwnSlot) {
     RETURN(NIL_VAL);
 }
 
-DEFINE_NATIVE(Object, hasOwnSlot) {
+DEFINE_NATIVE(Object_hasOwnSlot) {
     ARGSPEC("**");
 
     if (!IS_OBJECT(args[0]))
@@ -129,7 +128,7 @@ DEFINE_NATIVE(Object, hasOwnSlot) {
     RETURN(BOOL_TO_VAL(objobject_has(this, args[1])));
 }
 
-DEFINE_NATIVE(Object, deleteSlot) {
+DEFINE_NATIVE(Object_deleteSlot) {
     ARGSPEC("O*");
 
     ObjObject* this = VAL_TO_OBJECT(args[0]);
@@ -137,26 +136,26 @@ DEFINE_NATIVE(Object, deleteSlot) {
     RETURN(BOOL_TO_VAL(has_slot));
 }
 
-DEFINE_NATIVE(Object, same) {
+DEFINE_NATIVE(Object_same) {
     ARGSPEC("***");
     RETURN(BOOL_TO_VAL(value_equal(args[1], args[2])));
 }
 
-DEFINE_NATIVE(Object, equal) {
+DEFINE_NATIVE(Object_equal) {
     ARGSPEC("**");
     RETURN(BOOL_TO_VAL(value_equal(args[0], args[1])));
 }
 
-DEFINE_NATIVE(Object, notEqual) {
+DEFINE_NATIVE(Object_notEqual) {
     ARGSPEC("**");
     RETURN(BOOL_TO_VAL(!value_equal(args[0], args[1])));
 }
 
-DEFINE_NATIVE(Object, not) {
+DEFINE_NATIVE(Object_not) {
     RETURN(BOOL_TO_VAL(!value_truthy(args[0])));
 }
 
-DEFINE_NATIVE(Object, clone) {
+DEFINE_NATIVE(Object_clone) {
     ObjObject* obj = objobject_new(vm);
     obj->proto = args[0];
     RETURN(OBJ_TO_VAL(obj));
@@ -181,12 +180,12 @@ has_ancestor(VM* vm, Value src, Value target)
 // obj.hasAncestor(x) returns true if the obj has x anywhere
 // on obj's prototype chain (including obj itself, i.e.
 // obj.hasAncestor(obj) is always true).
-DEFINE_NATIVE(Object, hasAncestor) {
+DEFINE_NATIVE(Object_hasAncestor) {
     ARGSPEC("**");
     RETURN(BOOL_TO_VAL(has_ancestor(vm, args[0], args[1])));
 }
 
-DEFINE_NATIVE(Object, toString) {
+DEFINE_NATIVE(Object_toString) {
     Value this = args[0];
 
     ssize_t buf_size;
@@ -227,7 +226,7 @@ DEFINE_NATIVE(Object, toString) {
     RETURN(OBJ_TO_VAL(str));
 }
 
-DEFINE_NATIVE(Object, print) {
+DEFINE_NATIVE(Object_print) {
     Value this = args[0];
     Value string_slot;
     InterpretResult rv;
@@ -243,7 +242,7 @@ DEFINE_NATIVE(Object, print) {
     RETURN(NIL_VAL);
 }
 
-DEFINE_NATIVE(Object, println) {
+DEFINE_NATIVE(Object_println) {
     Value this = args[0];
     Value tmp;
     InterpretResult rv;
@@ -259,18 +258,18 @@ DEFINE_NATIVE(Object, println) {
 
 // ============================= Fn =============================
 
-DEFINE_NATIVE(Fn, new) {
+DEFINE_NATIVE(Fn_new) {
     ARGSPEC("*F");
     RETURN(args[1]);
 }
 
-DEFINE_NATIVE(Fn, call) {
+DEFINE_NATIVE(Fn_call) {
     ARGSPEC("F");
     vm_push_frame(vm, VAL_TO_CLOSURE(args[0]), num_args);
     return true;
 }
 
-DEFINE_NATIVE(Fn, callWithThis) {
+DEFINE_NATIVE(Fn_callWithThis) {
     ARGSPEC("F*");
     // Shift the arguments, so that we set up the stack properly.
     //            0    1         2      3            num_args
@@ -287,14 +286,14 @@ DEFINE_NATIVE(Fn, callWithThis) {
 
 // ============================= Native =============================
 
-DEFINE_NATIVE(Native, call) {
+DEFINE_NATIVE(Native_call) {
     ARGSPEC("n");
 
     ObjNative* native = VAL_TO_NATIVE(args[0]);
     return native->fn(vm, args, num_args);
 }
 
-DEFINE_NATIVE(Native, callWithThis) {
+DEFINE_NATIVE(Native_callWithThis) {
     ARGSPEC("n*");
 
     ObjNative* native = VAL_TO_NATIVE(args[0]);
@@ -307,7 +306,7 @@ DEFINE_NATIVE(Native, callWithThis) {
 // ============================= Number =============================
 
 #define DEFINE_NUMBER_METHOD(name, cast_to, op, return_type) \
-    DEFINE_NATIVE(Number, name) {\
+    DEFINE_NATIVE(Number_##name) {\
         ARGSPEC("NN"); \
         cast_to a = (cast_to) VAL_TO_NUMBER(args[0]); \
         cast_to b = (cast_to) VAL_TO_NUMBER(args[1]); \
@@ -326,7 +325,7 @@ DEFINE_NUMBER_METHOD(lor,      int32_t, |, NUMBER_TO_VAL)
 DEFINE_NUMBER_METHOD(land,     int32_t, &, NUMBER_TO_VAL)
 #undef DEFINE_NUMBER_METHOD
 
-DEFINE_NATIVE(Number, negate) {
+DEFINE_NATIVE(Number_negate) {
     ARGSPEC("N");
 
     RETURN(NUMBER_TO_VAL(-VAL_TO_NUMBER(args[0])));
@@ -335,7 +334,7 @@ DEFINE_NATIVE(Number, negate) {
 // ============================= String =============================
 
 #define DEFINE_STRING_METHOD(name, op) \
-    DEFINE_NATIVE(String, name) {\
+    DEFINE_NATIVE(String_##name) {\
         ARGSPEC("SS"); \
         const char* a = VAL_TO_STRING(args[0])->chars; \
         const char* b = VAL_TO_STRING(args[1])->chars; \
@@ -348,7 +347,7 @@ DEFINE_STRING_METHOD(gt, >)
 DEFINE_STRING_METHOD(leq, <=)
 DEFINE_STRING_METHOD(geq, >=)
 
-DEFINE_NATIVE(String, plus) {
+DEFINE_NATIVE(String_plus) {
     ARGSPEC("SS");
     RETURN(OBJ_TO_VAL(objstring_concat(vm,
         VAL_TO_STRING(args[0]),
@@ -356,31 +355,22 @@ DEFINE_NATIVE(String, plus) {
         )));
 }
 
-DEFINE_NATIVE(String, length) {
+DEFINE_NATIVE(String_length) {
     ARGSPEC("S");
     RETURN(NUMBER_TO_VAL(VAL_TO_STRING(args[0])->length));
 }
 
 // ============================= Fiber =============================
 
-// Run the given `fiber` with some data.
+// Run the given `fiber`, transferring `value`.
 static bool
-run_fiber(VM* vm, ObjFiber* fiber, Value value, const char* verb)
+run_fiber(VM* vm, ObjFiber* fiber,
+          Value value, const char* verb)
 {
-    if (fiber == NULL) {
-        // Can never return to this fiber without black magic.
-        vm->fiber = NULL;
-        return true;
-    }
+    if (!IS_UNDEFINED(fiber->error)) ERROR("Cannot %s a fiber with an error.", verb);
+    if (objfiber_is_done(fiber))     ERROR("Cannot %s a finished fiber.", verb);
+    if (fiber->parent != NULL)       ERROR("Cannot %s a fiber with a parent.", verb);
 
-    // Should've already been popped; this is to make ERROR work.
-    int num_args = 0;
-    if (objfiber_is_done(fiber))
-        ERROR("%s: Cannot run a finished fiber.", verb);
-    if (fiber->parent != NULL)
-        ERROR("%s: Fiber already has a parent.", verb);
-
-    fiber->parent = vm->fiber;
     if (fiber->frames_count == 1
         && fiber->frames[0].ip == fiber->frames[0].closure->function->chunk.code) {
         if (fiber->frames[0].closure->function->arity == 1) {
@@ -392,30 +382,32 @@ run_fiber(VM* vm, ObjFiber* fiber, Value value, const char* verb)
     } else {
         // We're resuming the `fiber`. In this case, `fiber`'s stack
         // will be like so, since it has already been suspended (e.g.
-        // from a Fiber.call or Fiber.suspend).
+        // from a Fiber.call or Fiber.yield).
         //   +---+-----------+
         //   |...| Fiber_... |
         //   +---+-----------+
         //                   ^-- stack_top
-        // Replacing stack_top[-1] gives Fiber.call or Fiber.suspend
+        // Replacing stack_top[-1] gives Fiber.call or Fiber.yield
         // a return value.
         fiber->stack_top[-1] = value;
     }
+    fiber->parent = vm->fiber;
     vm->fiber = fiber;
     return true;
 }
 
-DEFINE_NATIVE(Fiber, current) {
+DEFINE_NATIVE(Fiber_current) {
     RETURN(OBJ_TO_VAL(vm->fiber));
 }
 
-DEFINE_NATIVE(Fiber, yield) {
+DEFINE_NATIVE(Fiber_yield) {
     Value v = NIL_VAL;
     if (num_args >= 1) {
         vm_drop(vm, num_args - 1);
         v = vm_pop(vm);
     }
     ObjFiber* parent = vm->fiber->parent;
+    vm->fiber->state = FIBER_OTHER;
     vm->fiber->parent = NULL;
     vm->fiber = parent;
     if (vm->fiber != NULL) {
@@ -424,7 +416,13 @@ DEFINE_NATIVE(Fiber, yield) {
     return true;
 }
 
-DEFINE_NATIVE(Fiber, new) {
+DEFINE_NATIVE(Fiber_abort) {
+    ARGSPEC("*S");
+    vm->fiber->error = vm_pop(vm);
+    return true;
+}
+
+DEFINE_NATIVE(Fiber_new) {
     ARGSPEC("*F");
     ObjClosure* closure = VAL_TO_CLOSURE(args[1]);
     if (closure->function->arity != 0
@@ -435,14 +433,14 @@ DEFINE_NATIVE(Fiber, new) {
     RETURN(OBJ_TO_VAL(fiber));
 }
 
-DEFINE_NATIVE(Fiber, parent) {
+DEFINE_NATIVE(Fiber_parent) {
     ARGSPEC("f");
     RETURN(vm->fiber->parent != NULL
             ? OBJ_TO_VAL(vm->fiber->parent)
             : NIL_VAL);
 }
 
-DEFINE_NATIVE(Fiber, call) {
+DEFINE_NATIVE(Fiber_call) {
     ARGSPEC("f");
     ObjFiber* fiber = VAL_TO_FIBER(args[0]);
     Value v = NIL_VAL;
@@ -450,10 +448,33 @@ DEFINE_NATIVE(Fiber, call) {
         vm_drop(vm, num_args - 1);
         v = vm_pop(vm);
     }
-    return run_fiber(vm, fiber, v, "Fiber_call");
+    return run_fiber(vm, fiber, v, "call");
 }
 
-DEFINE_NATIVE(Fiber, isDone) {
+DEFINE_NATIVE(Fiber_try) {
+    ARGSPEC("f");
+    ObjFiber* fiber = VAL_TO_FIBER(args[0]);
+    Value v = NIL_VAL;
+    if (num_args >= 1) {
+        vm_drop(vm, num_args - 1);
+        v = vm_pop(vm);
+    }
+    if (run_fiber(vm, fiber, v, "try")) {
+        vm->fiber->state = FIBER_TRY;
+        return true;
+    }
+    return false;
+}
+
+DEFINE_NATIVE(Fiber_error) {
+    ARGSPEC("f");
+    ObjFiber* fiber = VAL_TO_FIBER(args[0]);
+    if (IS_UNDEFINED(fiber->error))
+        RETURN(NIL_VAL);
+    RETURN(fiber->error);
+}
+
+DEFINE_NATIVE(Fiber_isDone) {
     ARGSPEC("f");
     ObjFiber* fiber = VAL_TO_FIBER(args[0]);
     RETURN(BOOL_TO_VAL(objfiber_is_done(fiber)));
@@ -526,11 +547,14 @@ void core_init_vm(VM* vm)
     vm->FiberProto = objobject_new(vm);
     vm->FiberProto->proto = OBJ_TO_VAL(vm->ObjectProto);
     ADD_METHOD(FiberProto, "current", Fiber_current);
+    ADD_METHOD(FiberProto, "yield",   Fiber_yield);
+    ADD_METHOD(FiberProto, "abort",   Fiber_abort);
     ADD_METHOD(FiberProto, "new",     Fiber_new);
     ADD_METHOD(FiberProto, "parent",  Fiber_parent);
     ADD_METHOD(FiberProto, "call",    Fiber_call);
-    ADD_METHOD(FiberProto, "yield",   Fiber_yield);
+    ADD_METHOD(FiberProto, "try",     Fiber_try);
     ADD_METHOD(FiberProto, "isDone",  Fiber_isDone);
+    ADD_METHOD(FiberProto, "error",   Fiber_error);
 
     ADD_OBJECT(&vm->globals, "Object",  vm->ObjectProto);
     ADD_OBJECT(&vm->globals, "Fn",      vm->FnProto);

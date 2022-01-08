@@ -42,12 +42,9 @@ typedef enum {
 
 typedef struct Obj {
     ObjType type;
-    // Have we already visited this object?
-    bool visited;
-    // Does this object have a live reference?
-    bool marked;
-    // Link to the next allocated object.
-    struct Obj* next;
+    bool visited;     // Have we already visited this object?
+    bool marked;      // Does this object have a live reference?
+    struct Obj* next; // Link to the next allocated object.
 } Obj;
 
 static inline bool
@@ -109,8 +106,18 @@ typedef struct {
     Value* slots;
 } CallFrame;
 
+typedef enum {
+    // This Fiber was ran with a .try(), indicating that the parent
+    // fiber will handle the error.
+    FIBER_TRY,
+    FIBER_OTHER,
+} FiberState;
+
 typedef struct ObjFiber {
     Obj obj;
+
+    FiberState state;
+
     Value* stack;
     Value* stack_top;
     size_t stack_capacity;

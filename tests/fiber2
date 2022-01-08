@@ -1,11 +1,11 @@
-let f = Fiber.new{|v|
-    v println;
-    let q = Fiber.yield(2);
-    q println;
-    return 4;
-};
-f.call(1).println;
-f.call(3).println;
+# let f = Fiber.new{|v|
+#     v println;
+#     let q = Fiber.yield(2);
+#     q println;
+#     return 4;
+# };
+# f.call(1).println;
+# f.call(3).println;
 
 # let f = Fiber.current;
 # f.parent.println;
@@ -16,3 +16,26 @@ f.call(3).println;
 #     1 println;
 # };
 # f.call;
+
+# let get_fiber = Fn.new{
+#     return Fiber.new{|v|
+#         while (true) {
+#             v println;
+#             let s = Fiber.yield(v);
+#             if (!s) break;
+#             v = v + 1;
+#         }
+#     };
+# };
+
+let f = Fiber.new{
+    let x = {};
+    x.setSlot = Fn.new{|k, v|
+        k.println;
+        Fiber.yield;
+    };
+    x.b = 1;
+    x.b.println;
+};
+f.call;
+f.call;

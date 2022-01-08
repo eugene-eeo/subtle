@@ -3,6 +3,7 @@
 #include "debug.h"
 #include "memory.h"
 #include "table.h"
+#include "value.h"
 #include "vm.h"
 
 #include <stdint.h>
@@ -278,15 +279,19 @@ objfiber_new(VM* vm, ObjClosure* closure)
     CallFrame* frames = ALLOCATE_ARRAY(vm, CallFrame, frames_capacity);
 
     ObjFiber* fiber = ALLOCATE_OBJECT(vm, OBJ_FIBER, ObjFiber);
-    fiber->open_upvalues = NULL;
-    fiber->error = NIL_VAL;
+    fiber->state = FIBER_OTHER;
+
     fiber->stack = stack;
     fiber->stack_top = stack;
     fiber->stack_capacity = stack_capacity;
+
     fiber->frames = frames;
     fiber->frames_count = 0;
     fiber->frames_capacity = frames_capacity;
+
     fiber->parent = NULL;
+    fiber->open_upvalues = NULL;
+    fiber->error = UNDEFINED_VAL;
 
     *fiber->stack_top = OBJ_TO_VAL(closure);
     fiber->stack_top++;

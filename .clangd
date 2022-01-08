@@ -1,0 +1,5 @@
+CompileFlags:
+  Add: [-Wall, -pedantic]
+Diagnostics:
+  ClangTidy:
+    Add: ['clang-analyzer-*','performance-*']
