@@ -145,7 +145,7 @@ blacken_fiber(VM* vm, ObjFiber* fiber)
             upvalue = upvalue->next)
         mark_object(vm, (Obj*)upvalue);
 
-    mark_value(vm, fiber->error);
+    mark_object(vm, (Obj*)fiber->error);
     mark_object(vm, (Obj*)fiber->parent);
 }
 

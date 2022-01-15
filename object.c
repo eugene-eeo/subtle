@@ -291,7 +291,7 @@ objfiber_new(VM* vm, ObjClosure* closure)
 
     fiber->parent = NULL;
     fiber->open_upvalues = NULL;
-    fiber->error = UNDEFINED_VAL;
+    fiber->error = NULL;
 
     *fiber->stack_top = OBJ_TO_VAL(closure);
     fiber->stack_top++;

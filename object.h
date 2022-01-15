@@ -128,7 +128,7 @@ typedef struct ObjFiber {
 
     struct ObjFiber* parent;
     ObjUpvalue* open_upvalues;
-    Value error;
+    ObjString* error;
 } ObjFiber;
 
 // Object memory management

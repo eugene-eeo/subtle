@@ -367,9 +367,9 @@ static bool
 run_fiber(VM* vm, ObjFiber* fiber,
           Value value, const char* verb)
 {
-    if (!IS_UNDEFINED(fiber->error)) ERROR("Cannot %s a fiber with an error.", verb);
-    if (objfiber_is_done(fiber))     ERROR("Cannot %s a finished fiber.", verb);
-    if (fiber->parent != NULL)       ERROR("Cannot %s a fiber with a parent.", verb);
+    if (fiber->error != NULL)    ERROR("Cannot %s a fiber with an error.", verb);
+    if (objfiber_is_done(fiber)) ERROR("Cannot %s a finished fiber.", verb);
+    if (fiber->parent != NULL)   ERROR("Cannot %s a fiber with a parent.", verb);
 
     if (fiber->frames_count == 1
         && fiber->frames[0].ip == fiber->frames[0].closure->function->chunk.code) {
@@ -418,7 +418,7 @@ DEFINE_NATIVE(Fiber_yield) {
 
 DEFINE_NATIVE(Fiber_abort) {
     ARGSPEC("*S");
-    vm->fiber->error = vm_pop(vm);
+    vm->fiber->error = VAL_TO_STRING(vm_pop(vm));
     return true;
 }
 
@@ -469,9 +469,9 @@ DEFINE_NATIVE(Fiber_try) {
 DEFINE_NATIVE(Fiber_error) {
     ARGSPEC("f");
     ObjFiber* fiber = VAL_TO_FIBER(args[0]);
-    if (IS_UNDEFINED(fiber->error))
-        RETURN(NIL_VAL);
-    RETURN(fiber->error);
+    RETURN(fiber->error != NULL
+            ? OBJ_TO_VAL(fiber->error)
+            : NIL_VAL);
 }
 
 DEFINE_NATIVE(Fiber_isDone) {

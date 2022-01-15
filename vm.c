@@ -95,14 +95,13 @@ void vm_runtime_error(VM* vm, const char* format, ...) {
     va_end(args);
 
     len = len >= 255 ? 255 : len;
-    vm->fiber->error = OBJ_TO_VAL(objstring_copy(vm, buffer, len));
+    vm->fiber->error = objstring_copy(vm, buffer, len);
 }
 
 static void
 print_stack_trace(VM* vm)
 {
-    ObjString* str = VAL_TO_STRING(vm->fiber->error);
-    fprintf(stderr, "Uncaught Error: %s\n", str->chars);
+    fprintf(stderr, "Uncaught Error: %s\n", vm->fiber->error->chars);
     for (ObjFiber* fiber = vm->fiber;
          fiber != NULL;
          fiber = fiber->parent) {
@@ -122,14 +121,14 @@ runtime_error(VM* vm)
 {
     ASSERT(!IS_UNDEFINED(vm->fiber->error), "Should only be called after an error.");
     ObjFiber* fiber = vm->fiber;
-    Value error = fiber->error;
+    ObjString* error = fiber->error;
 
     // Check if we can find a fiber ran with FIBER_TRY
     while (fiber != NULL) {
         fiber->error = error;
 
         if (fiber->state == FIBER_TRY) {
-            fiber->parent->stack_top[-1] = error;
+            fiber->parent->stack_top[-1] = OBJ_TO_VAL(error);
             vm->fiber = fiber->parent;
             return;
         }
@@ -526,7 +525,7 @@ run(VM* vm, ObjFiber* fiber, int top_level) {
 handle_fibers:
                 fiber = vm->fiber;
                 if (fiber == NULL) return INTERPRET_OK;
-                if (!IS_UNDEFINED(fiber->error)) {
+                if (fiber->error != NULL) {
                     runtime_error(vm);
                     fiber = vm->fiber;
                     if (fiber == NULL)
