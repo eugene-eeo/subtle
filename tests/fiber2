@@ -1,9 +1,10 @@
-# let f = Fiber.current;
+let f = Fiber.current;
 # f.parent.println;
-# let g = f.call;
+let g = f.call;
 # f.parent.println;
 # f.println;
-# g.println;
+# f.yield;
+g.println;
 
 let get_fiber = Fn.new{
     return Fiber.new{|v|

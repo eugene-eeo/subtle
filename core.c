@@ -451,9 +451,6 @@ DEFINE_NATIVE(Fiber_call) {
         vm_drop(vm, num_args - 1);
         v = vm_pop(vm);
     }
-    if (fiber->state == FIBER_ROOT) {
-        ERROR("Cannot call root fiber.");
-    }
     return run_fiber(vm, fiber, v, "call");
 }
 
@@ -464,9 +461,6 @@ DEFINE_NATIVE(Fiber_try) {
     if (num_args >= 1) {
         vm_drop(vm, num_args - 1);
         v = vm_pop(vm);
-    }
-    if (fiber->state == FIBER_ROOT) {
-        ERROR("Cannot try root fiber.");
     }
     if (run_fiber(vm, fiber, v, "try")) {
         vm->fiber->state = FIBER_TRY;

@@ -107,8 +107,6 @@ typedef struct {
 } CallFrame;
 
 typedef enum {
-    // Root fiber created implicitly by the VM.
-    FIBER_ROOT,
     // This Fiber was ran with a .try(), indicating that the parent
     // fiber will handle the error.
     FIBER_TRY,
