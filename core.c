@@ -228,13 +228,13 @@ DEFINE_NATIVE(Object_toString) {
 
 DEFINE_NATIVE(Object_print) {
     Value this = args[0];
-    Value string_slot;
     InterpretResult rv;
     vm_ensure_stack(vm, 1);
     vm_push(vm, this);
-    if (!vm_invoke(vm, this, OBJ_TO_VAL(objstring_copy(vm, "toString", 8)), 0, &string_slot, &rv))
+    if (!vm_invoke(vm, this, OBJ_TO_VAL(objstring_copy(vm, "toString", 8)), 0, &rv))
         return rv;
 
+    Value string_slot = vm_pop(vm);
     if (!IS_STRING(string_slot))
         ERROR("Object_print expected .toString to be a string.");
     fprintf(stdout, "%s", VAL_TO_STRING(string_slot)->chars);
@@ -244,12 +244,12 @@ DEFINE_NATIVE(Object_print) {
 
 DEFINE_NATIVE(Object_println) {
     Value this = args[0];
-    Value tmp;
     InterpretResult rv;
     vm_ensure_stack(vm, 1);
     vm_push(vm, this);
-    if (!vm_invoke(vm, this, OBJ_TO_VAL(objstring_copy(vm, "print", 5)), 0, &tmp, &rv))
+    if (!vm_invoke(vm, this, OBJ_TO_VAL(objstring_copy(vm, "print", 5)), 0, &rv))
         return rv;
+    vm_pop(vm);
 
     fprintf(stdout, "\n");
     fflush(stdout);
@@ -401,6 +401,9 @@ DEFINE_NATIVE(Fiber_current) {
 }
 
 DEFINE_NATIVE(Fiber_yield) {
+    if (!vm->can_yield) {
+        ERROR("Cannot yield from fiber.");
+    }
     Value v = NIL_VAL;
     if (num_args >= 1) {
         vm_drop(vm, num_args - 1);
@@ -448,6 +451,9 @@ DEFINE_NATIVE(Fiber_call) {
         vm_drop(vm, num_args - 1);
         v = vm_pop(vm);
     }
+    if (fiber->state == FIBER_ROOT) {
+        ERROR("Cannot call root fiber.");
+    }
     return run_fiber(vm, fiber, v, "call");
 }
 
@@ -458,6 +464,9 @@ DEFINE_NATIVE(Fiber_try) {
     if (num_args >= 1) {
         vm_drop(vm, num_args - 1);
         v = vm_pop(vm);
+    }
+    if (fiber->state == FIBER_ROOT) {
+        ERROR("Cannot try root fiber.");
     }
     if (run_fiber(vm, fiber, v, "try")) {
         vm->fiber->state = FIBER_TRY;
