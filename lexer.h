@@ -15,7 +15,6 @@ typedef enum {
     TOKEN_SEMICOLON,
     TOKEN_COLON,
     TOKEN_COMMA,
-    TOKEN_DOT,
     TOKEN_LPAREN, TOKEN_RPAREN,
     TOKEN_LBRACE, TOKEN_RBRACE,
     // One-or-two characters
@@ -25,6 +24,8 @@ typedef enum {
     TOKEN_GT, TOKEN_GEQ,         // >, >=
     TOKEN_AMP,  TOKEN_AMP_AMP,   // &, &&
     TOKEN_PIPE, TOKEN_PIPE_PIPE, // |, ||
+    // One, two, or three characters
+    TOKEN_DOT, TOKEN_DOTDOT, TOKEN_DOTDOTDOT, // ., .., ...
     // Literals
     TOKEN_NUMBER,
     TOKEN_STRING,
@@ -34,7 +35,6 @@ typedef enum {
     TOKEN_TRUE, TOKEN_FALSE,
     TOKEN_WHILE,
     TOKEN_THIS,
-    TOKEN_SUPER,
     TOKEN_IF,
     TOKEN_ELSE,
     TOKEN_LET,
@@ -42,6 +42,8 @@ typedef enum {
     TOKEN_ASSERT,
     TOKEN_BREAK,
     TOKEN_CONTINUE,
+    TOKEN_FOR,
+    TOKEN_IN,
 
     TOKEN_ERROR,
     TOKEN_EOF,

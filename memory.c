@@ -84,6 +84,7 @@ static void mark_roots(VM* vm) {
     mark_object(vm, (Obj*)vm->NumberProto);
     mark_object(vm, (Obj*)vm->StringProto);
     mark_object(vm, (Obj*)vm->FiberProto);
+    mark_object(vm, (Obj*)vm->RangeProto);
 
     table_mark(&vm->globals, vm);
     compiler_mark(vm->compiler, vm);
@@ -125,6 +126,7 @@ static void blacken_object(VM* vm, Obj* obj) {
         case OBJ_FIBER:
             blacken_fiber(vm, (ObjFiber*)obj);
             break;
+        case OBJ_RANGE: break; // Nothing to do here.
     }
 }
 

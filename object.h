@@ -19,6 +19,7 @@ typedef struct VM VM;
 #define IS_OBJECT(value)       (is_object_type(value, OBJ_OBJECT))
 #define IS_NATIVE(value)       (is_object_type(value, OBJ_NATIVE))
 #define IS_FIBER(value)        (is_object_type(value, OBJ_FIBER))
+#define IS_RANGE(value)        (is_object_type(value, OBJ_RANGE))
 
 #define OBJ_TYPE(value)        (VAL_TO_OBJ(value)->type)
 
@@ -29,6 +30,7 @@ typedef struct VM VM;
 #define VAL_TO_OBJECT(value)   ((ObjObject*)VAL_TO_OBJ(value))
 #define VAL_TO_NATIVE(value)   ((ObjNative*)VAL_TO_OBJ(value))
 #define VAL_TO_FIBER(value)    ((ObjFiber*)VAL_TO_OBJ(value))
+#define VAL_TO_RANGE(value)    ((ObjRange*)VAL_TO_OBJ(value))
 
 typedef enum {
     OBJ_STRING,
@@ -38,6 +40,7 @@ typedef enum {
     OBJ_OBJECT,
     OBJ_NATIVE,
     OBJ_FIBER,
+    OBJ_RANGE,
 } ObjType;
 
 typedef struct Obj {
@@ -131,6 +134,12 @@ typedef struct ObjFiber {
     ObjString* error;
 } ObjFiber;
 
+typedef struct ObjRange {
+    Obj obj;
+    double current;
+    double end;
+} ObjRange;
+
 // Object memory management
 // ========================
 
@@ -183,5 +192,10 @@ void objfiber_ensure_stack(ObjFiber* fiber, VM* vm, size_t sz);
 CallFrame* objfiber_push_frame(ObjFiber* fiber, VM* vm,
                                ObjClosure* closure, Value* stack_start);
 bool objfiber_is_done(ObjFiber* fiber);
+
+// ObjRange
+// ========
+
+ObjRange* objrange_new(VM* vm, double start, double end);
 
 #endif

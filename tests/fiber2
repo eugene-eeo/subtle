@@ -19,13 +19,12 @@ let get_fiber = Fn.new{
 
 let f = get_fiber.call;
 f.call(1);
-f.call(true);
-f.call(true);
+assert f.call(true) == 2;
+assert f.call(true) == 3;
 
 let x = {};
 let f = Fiber.new{
     x.setSlot = Fn.new{|k, v|
-        k.println;
         let rv = Fiber.yield;
         x.setOwnSlot(k, v);
         return rv;

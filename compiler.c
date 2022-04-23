@@ -31,10 +31,15 @@ typedef struct {
 } Parser;
 
 typedef struct Loop {
+    // Design:
+    // 1. Inject a 'well-known' OP_JUMP where we can break from the loop.
+    // 2. Skip over the OP_JUMP from (1).
+    // 3. Do the actual looping.
     struct Loop* outer;
-    int depth; // Initial depth of the loop
-    size_t break_jump; // Offset of the break jump
-    size_t continue_jump; // Offset to continue
+    int depth; // Initial depth of the loop.
+    size_t break_jump; // Loop break OP_JUMP.
+    size_t cond_jump;  // Loop condition OP_JUMP_IF_FALSE.
+    size_t start; // Where should the loop jump back to?
 } Loop;
 
 typedef struct {
@@ -82,6 +87,7 @@ typedef enum {
     PREC_BITWISE_AND,// &
     PREC_EQ,         // ==, !=
     PREC_CMP,        // <, >, <=, >=
+    PREC_RANGE,      // .., ...
     PREC_TERM,       // + -
     PREC_FACTOR,     // * /
     PREC_PREFIX,     // ! -
@@ -346,17 +352,12 @@ static void pop_to_scope(Compiler* compiler, int scope_depth) {
     }
 }
 
-static void add_local(Compiler* compiler, Token name) {
-    if (compiler->local_count == MAX_LOCALS) {
-        error_at(compiler, &name, "Too many locals in one chunk.");
-        return;
-    }
-
+static int add_local(Compiler* compiler, Token name) {
     Local* local = &compiler->locals[compiler->local_count];
     local->name = name;
     local->depth = -1;
     local->is_captured = false;
-    compiler->local_count++;
+    return compiler->local_count++;
 }
 
 static void mark_local_initialized(Compiler* compiler) {
@@ -427,22 +428,6 @@ resolve_upvalue(Compiler* compiler, Token* token)
         return add_upvalue(compiler, (uint8_t)upvalue, false);
 
     return -1;
-}
-
-// Loop helpers
-// ============
-
-static void
-enter_loop(Compiler* compiler, Loop* loop)
-{
-    loop->outer = compiler->loop;
-    compiler->loop = loop;
-}
-
-static void
-exit_loop(Compiler* compiler)
-{
-    compiler->loop = compiler->loop->outer;
 }
 
 // Jumping helpers
@@ -719,6 +704,8 @@ static void binary(Compiler* compiler, bool can_assign) {
     uint16_t constant = identifier_constant(compiler, &op_token);
 
     switch (operator) {
+        case TOKEN_DOTDOT:
+        case TOKEN_DOTDOTDOT:
         case TOKEN_EQ_EQ:
         case TOKEN_BANG_EQ:
         case TOKEN_PLUS:
@@ -749,7 +736,6 @@ static ParseRule rules[] = {
     [TOKEN_SLASH]     = {NULL,     binary, PREC_FACTOR},
     [TOKEN_SEMICOLON] = {NULL,     NULL,   PREC_NONE},
     [TOKEN_COMMA]     = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_DOT]       = {NULL,     dot,    PREC_CALL},
     [TOKEN_LPAREN]    = {grouping, NULL,   PREC_NONE},
     [TOKEN_RPAREN]    = {NULL,     NULL,   PREC_NONE},
     [TOKEN_LBRACE]    = {object,   NULL,   PREC_NONE},
@@ -766,6 +752,9 @@ static ParseRule rules[] = {
     [TOKEN_AMP_AMP]   = {NULL,     and_,   PREC_AND},
     [TOKEN_PIPE]      = {NULL,     binary, PREC_BITWISE_OR},
     [TOKEN_PIPE_PIPE] = {NULL,     or_,    PREC_OR},
+    [TOKEN_DOT]       = {NULL,     dot,    PREC_CALL},
+    [TOKEN_DOTDOT]    = {NULL,     binary, PREC_RANGE},
+    [TOKEN_DOTDOTDOT] = {NULL,     binary, PREC_RANGE},
     [TOKEN_NUMBER]    = {number,   NULL,   PREC_NONE},
     [TOKEN_STRING]    = {string,   NULL,   PREC_NONE},
     [TOKEN_VARIABLE]  = {variable, invoke, PREC_POSTFIX},
@@ -774,7 +763,6 @@ static ParseRule rules[] = {
     [TOKEN_FALSE]     = {literal,  invoke, PREC_POSTFIX},
     [TOKEN_WHILE]     = {NULL,     NULL,   PREC_NONE},
     [TOKEN_THIS]      = {this,     invoke, PREC_POSTFIX},
-    [TOKEN_SUPER]     = {NULL,     invoke, PREC_POSTFIX},
     [TOKEN_IF]        = {NULL,     NULL,   PREC_NONE},
     [TOKEN_ELSE]      = {NULL,     NULL,   PREC_NONE},
     [TOKEN_LET]       = {NULL,     NULL,   PREC_NONE},
@@ -807,6 +795,40 @@ static void parse_precedence(Compiler* compiler, Precedence prec) {
 
 static ParseRule* get_rule(TokenType type) {
     return &rules[type];
+}
+
+static void block_or_stmt(Compiler*);
+
+// Loop helpers
+// ============
+
+static void
+enter_loop(Compiler* compiler, Loop* loop)
+{
+    size_t skip_jump = emit_jump(compiler, OP_JUMP); // (2)
+    size_t break_jump = emit_jump(compiler, OP_JUMP); // (1)
+    patch_jump(compiler, skip_jump); // (2)
+
+    loop->outer = compiler->loop;
+    loop->depth = compiler->scope_depth;
+    loop->break_jump = break_jump - 1;
+    loop->start = current_chunk(compiler)->length;
+    compiler->loop = loop;
+}
+
+static void
+test_exit_loop(Compiler* compiler)
+{
+    compiler->loop->cond_jump = emit_jump(compiler, OP_JUMP_IF_FALSE);
+}
+
+static void
+exit_loop(Compiler* compiler)
+{
+    emit_loop(compiler, compiler->loop->start);
+    patch_jump(compiler, compiler->loop->cond_jump);
+    patch_jump(compiler, compiler->loop->break_jump + 1);
+    compiler->loop = compiler->loop->outer;
 }
 
 // Statement parsing
@@ -843,6 +865,11 @@ static void declare_variable(Compiler* compiler) {
             error_at(compiler, name, "Already a variable with this name in this scope.");
             break;
         }
+    }
+
+    if (compiler->local_count == MAX_LOCALS) {
+        error_at(compiler, name, "Too many locals in one chunk.");
+        return;
     }
     add_local(compiler, *name);
 }
@@ -922,37 +949,99 @@ static void if_stmt(Compiler* compiler) {
 }
 
 static void while_stmt(Compiler* compiler) {
-    // Design:
-    // 1. Inject an OP_JUMP where we can break from the loop.
-    // 2. Skip over that OP_JUMP initially.
-    // 3. Do the actual looping.
-
-    size_t skip_jump = emit_jump(compiler, OP_JUMP);  // (2)
-    size_t break_jump = emit_jump(compiler, OP_JUMP); // (1)
-    patch_jump(compiler, skip_jump);
-
-    size_t loop_start = current_chunk(compiler)->length;
-
     Loop loop;
-    loop.depth = compiler->scope_depth;
-    loop.break_jump = break_jump - 1;
-    loop.continue_jump = loop_start;
     enter_loop(compiler, &loop);
 
     consume(compiler, TOKEN_LPAREN, "Expect '(' after while.");
     expression(compiler);
     consume(compiler, TOKEN_RPAREN, "Expect ')' after condition.");
 
-    size_t end_jump = emit_jump(compiler, OP_JUMP_IF_FALSE);
+    test_exit_loop(compiler);
 
     // Compile the body of the while loop.
     block_or_stmt(compiler);
-    emit_loop(compiler, loop_start);
+    exit_loop(compiler);
+}
 
-    patch_jump(compiler, end_jump);
-    patch_jump(compiler, break_jump);
+static void load_local(Compiler* compiler, int offset) {
+    emit_op(compiler, OP_GET_LOCAL);
+    emit_byte(compiler, offset);
+}
+
+static void for_stmt(Compiler* compiler) {
+    // Desugar the following for loop:
+    // for (x in items) { | let _s = items;
+    //    bar;            | let _i = nil;
+    // }                  | while (_i = _s.iterMore(_i)) {
+    //                    |     let x = _s.iterNext(_i);
+    //                    |     bar;
+    //                    | }
+    Token seq_token  = {.start="seq ", .length=4};
+    Token iter_token = {.start="iter ", .length=5};
+    Token iterMore_token = {.start = "iterMore", .length = 8};
+    Token iterNext_token = {.start = "iterNext", .length = 8};
+    uint16_t iterMore = identifier_constant(compiler, &iterMore_token);
+    uint16_t iterNext = identifier_constant(compiler, &iterNext_token);
+
+    begin_block(compiler);
+    consume(compiler, TOKEN_LPAREN, "Expect '(' after 'for'.");
+    consume(compiler, TOKEN_VARIABLE, "Expect loop variable.");
+
+    // Remember the loop variable.
+    Token loop_var = compiler->parser->previous;
+
+    consume(compiler, TOKEN_IN, "Expect 'in' after loop variable.");
+
+    // Evaluate the sequence.
+    expression(compiler);
+
+    // Check that we have enough space to store the two locals.
+    if (compiler->local_count + 2 > MAX_LOCALS) {
+        error(compiler, "Not enough space for for-loop variables.");
+        return;
+    }
+
+    int seq = add_local(compiler, seq_token);
+    mark_local_initialized(compiler);
+
+    // The iterator value.
+    emit_op(compiler, OP_NIL);
+    int iter = add_local(compiler, iter_token);
+    mark_local_initialized(compiler);
+
+    consume(compiler, TOKEN_RPAREN, "Expect ')' after loop expression.");
+
+    Loop loop;
+    enter_loop(compiler, &loop);
+
+    // _i = _s.iterMore(_i)
+    load_local(compiler, seq);
+    load_local(compiler, iter);
+    emit_op(compiler, OP_INVOKE);
+    emit_offset(compiler, iterMore);
+    emit_byte(compiler, 1);
+    compiler->slot_count--;
+    emit_op(compiler, OP_SET_LOCAL); emit_byte(compiler, (uint8_t) iter);
+    test_exit_loop(compiler);
+
+    // loop_var = _s.iterNext(_i)
+    load_local(compiler, seq);
+    load_local(compiler, iter);
+    emit_op(compiler, OP_INVOKE);
+    emit_offset(compiler, iterNext);
+    emit_byte(compiler, 1);
+    compiler->slot_count--;
+
+    // push a fresh block for every iteration
+    begin_block(compiler);
+    add_local(compiler, loop_var);
+    mark_local_initialized(compiler);
+    block_or_stmt(compiler);
+    end_block(compiler);
 
     exit_loop(compiler);
+
+    end_block(compiler);
 }
 
 static void continue_stmt(Compiler* compiler) {
@@ -961,7 +1050,7 @@ static void continue_stmt(Compiler* compiler) {
         return;
     }
     pop_to_scope(compiler, compiler->loop->depth);
-    emit_loop(compiler, compiler->loop->continue_jump);
+    emit_loop(compiler, compiler->loop->start);
     consume(compiler, TOKEN_SEMICOLON, "Expect ';' after 'continue'.");
 }
 
@@ -995,6 +1084,7 @@ static void synchronize(Compiler* compiler) {
         switch (compiler->parser->current.type) {
             case TOKEN_LET:
             case TOKEN_WHILE:
+            case TOKEN_FOR:
             case TOKEN_RETURN:
             case TOKEN_BREAK:
             case TOKEN_CONTINUE:
@@ -1024,6 +1114,8 @@ static void statement(Compiler* compiler) {
         if_stmt(compiler);
     } else if (match(compiler, TOKEN_WHILE)) {
         while_stmt(compiler);
+    } else if (match(compiler, TOKEN_FOR)) {
+        for_stmt(compiler);
     } else if (match(compiler, TOKEN_RETURN)) {
         return_stmt(compiler);
     } else if (match(compiler, TOKEN_BREAK)) {

@@ -45,6 +45,7 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
         case 'n': if (!IS_NATIVE(arg)) ARG_ERROR(idx, "a Native"); break; \
         case 'F': if (!IS_CLOSURE(arg)) ARG_ERROR(idx, "an Fn"); break; \
         case 'f': if (!IS_FIBER(arg)) ARG_ERROR(idx, "a Fiber"); break; \
+        case 'r': if (!IS_RANGE(arg)) ARG_ERROR(idx, "a Range"); break; \
         case '*': break; \
         default: UNREACHABLE(); \
     } \
@@ -331,6 +332,20 @@ DEFINE_NATIVE(Number_negate) {
     RETURN(NUMBER_TO_VAL(-VAL_TO_NUMBER(args[0])));
 }
 
+DEFINE_NATIVE(Number_inclusiveRange) {
+    ARGSPEC("N");
+    double start = VAL_TO_NUMBER(args[0]);
+    double end = VAL_TO_NUMBER(args[1]);
+    RETURN(OBJ_TO_VAL(objrange_new(vm, start, end + 1)));
+}
+
+DEFINE_NATIVE(Number_exclusiveRange) {
+    ARGSPEC("N");
+    double start = VAL_TO_NUMBER(args[0]);
+    double end = VAL_TO_NUMBER(args[1]);
+    RETURN(OBJ_TO_VAL(objrange_new(vm, start, end)));
+}
+
 // ============================= String =============================
 
 #define DEFINE_STRING_METHOD(name, op) \
@@ -483,6 +498,22 @@ DEFINE_NATIVE(Fiber_isDone) {
     RETURN(BOOL_TO_VAL(objfiber_is_done(fiber)));
 }
 
+// ============================= Range =============================
+
+DEFINE_NATIVE(Range_iterMore) {
+    ARGSPEC("r");
+    ObjRange* range = VAL_TO_RANGE(args[0]);
+    RETURN(BOOL_TO_VAL(range->current < range->end));
+}
+
+DEFINE_NATIVE(Range_iterNext) {
+    ARGSPEC("r");
+    ObjRange* range = VAL_TO_RANGE(args[0]);
+    double current = range->current;
+    range->current++;
+    RETURN(NUMBER_TO_VAL(current));
+}
+
 void core_init_vm(VM* vm)
 {
 #define ADD_OBJECT(table, name, obj) (define_on_table(vm, table, name, OBJ_TO_VAL(obj)))
@@ -537,6 +568,8 @@ void core_init_vm(VM* vm)
     ADD_METHOD(NumberProto, "neg",   Number_negate);
     ADD_METHOD(NumberProto, "|",     Number_lor);
     ADD_METHOD(NumberProto, "&",     Number_land);
+    ADD_METHOD(NumberProto, "..",    Number_inclusiveRange);
+    ADD_METHOD(NumberProto, "...",   Number_exclusiveRange);
 
     vm->StringProto = objobject_new(vm);
     vm->StringProto->proto = OBJ_TO_VAL(vm->ObjectProto);
@@ -559,12 +592,18 @@ void core_init_vm(VM* vm)
     ADD_METHOD(FiberProto, "isDone",  Fiber_isDone);
     ADD_METHOD(FiberProto, "error",   Fiber_error);
 
+    vm->RangeProto = objobject_new(vm);
+    vm->RangeProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    ADD_METHOD(RangeProto, "iterNext", Range_iterNext);
+    ADD_METHOD(RangeProto, "iterMore", Range_iterMore);
+
     ADD_OBJECT(&vm->globals, "Object",  vm->ObjectProto);
     ADD_OBJECT(&vm->globals, "Fn",      vm->FnProto);
     ADD_OBJECT(&vm->globals, "Native",  vm->NativeProto);
     ADD_OBJECT(&vm->globals, "Number",  vm->NumberProto);
     ADD_OBJECT(&vm->globals, "String",  vm->StringProto);
     ADD_OBJECT(&vm->globals, "Fiber",   vm->FiberProto);
+    ADD_OBJECT(&vm->globals, "Range",   vm->RangeProto);
 
 #undef ADD_OBJECT
 #undef ADD_NATIVE

@@ -49,6 +49,9 @@ run_test:
 	$(RUNNER) ./subtle ./tests/compact
 	$(RUNNER) ./subtle ./tests/table
 	$(RUNNER) ./subtle ./tests/x
+	$(RUNNER) ./subtle ./tests/for-loops
+	$(RUNNER) ./subtle ./tests/fiber
+	$(RUNNER) ./subtle ./tests/fiber2
 
 test:
 	make stress

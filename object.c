@@ -37,6 +37,7 @@ static void objclosure_free(VM*, Obj*);
 static void objobject_free(VM*, Obj*);
 static void objnative_free(VM*, Obj*);
 static void objfiber_free(VM*, Obj*);
+static void objrange_free(VM*, Obj*);
 
 void
 object_free(Obj* obj, VM* vm)
@@ -52,6 +53,7 @@ object_free(Obj* obj, VM* vm)
     case OBJ_OBJECT: objobject_free(vm, obj); break;
     case OBJ_NATIVE: objnative_free(vm, obj); break;
     case OBJ_FIBER: objfiber_free(vm, obj); break;
+    case OBJ_RANGE: objrange_free(vm, obj); break;
     }
 }
 
@@ -365,4 +367,22 @@ objfiber_free(VM* vm, Obj* obj)
     FREE_ARRAY(vm, fiber->stack, Value, fiber->stack_capacity);
     FREE_ARRAY(vm, fiber->frames, CallFrame, fiber->frames_capacity);
     FREE(vm, ObjFiber, obj);
+}
+
+// ObjRange
+// ========
+
+ObjRange*
+objrange_new(VM* vm, double start, double end)
+{
+    ObjRange* range = ALLOCATE_OBJECT(vm, OBJ_RANGE, ObjRange);
+    range->current = start;
+    range->end = end;
+    return range;
+}
+
+static void
+objrange_free(VM* vm, Obj* obj)
+{
+    FREE(vm, ObjRange, obj);
 }

@@ -34,6 +34,7 @@ typedef struct VM {
     ObjObject* NumberProto;
     ObjObject* StringProto;
     ObjObject* FiberProto;
+    ObjObject* RangeProto;
     // -------------------------
 
     // ---- GC ----

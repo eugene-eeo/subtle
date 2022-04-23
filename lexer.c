@@ -137,12 +137,25 @@ static TokenType variable_type(Lexer* lexer) {
         case 'b': return match_rest(lexer, TOKEN_BREAK, 1, "reak", 4);
         case 'c': return match_rest(lexer, TOKEN_CONTINUE, 1, "ontinue", 7);
         case 'e': return match_rest(lexer, TOKEN_ELSE, 1, "lse", 3);
-        case 'f': return match_rest(lexer, TOKEN_FALSE, 1, "alse", 4);
-        case 'i': return match_rest(lexer, TOKEN_IF, 1, "f", 1);
+        case 'f':
+            if (lexer->current - lexer->start >= 2) {
+                switch (lexer->start[1]) {
+                    case 'a': return match_rest(lexer, TOKEN_FALSE, 2, "lse", 3);
+                    case 'o': return match_rest(lexer, TOKEN_FOR, 2, "r", 1);
+                }
+            }
+            break;
+        case 'i':
+            if (lexer->current - lexer->start >= 2) {
+                switch (lexer->start[1]) {
+                    case 'f': return match_rest(lexer, TOKEN_IF, 2, "f", 0);
+                    case 'n': return match_rest(lexer, TOKEN_IN, 2, "n", 0);
+                }
+            }
+            break;
         case 'l': return match_rest(lexer, TOKEN_LET, 1, "et", 2);
         case 'n': return match_rest(lexer, TOKEN_NIL, 1, "il", 2);
         case 'r': return match_rest(lexer, TOKEN_RETURN, 1, "eturn", 5);
-        case 's': return match_rest(lexer, TOKEN_SUPER, 1, "uper", 4);
         case 't':
             if (lexer->current - lexer->start >= 2) {
                 switch (lexer->start[1]) {
@@ -181,7 +194,10 @@ Token lexer_next(Lexer* lexer) {
         case ',': return make_token(lexer, TOKEN_COMMA);
         case ':': return make_token(lexer, TOKEN_COLON);
         case ';': return make_token(lexer, TOKEN_SEMICOLON);
-        case '.': return make_token(lexer, TOKEN_DOT);
+        case '.':
+            if (match(lexer, '.'))
+                return make_token(lexer, match(lexer, '.') ? TOKEN_DOTDOTDOT : TOKEN_DOTDOT);
+            return make_token(lexer, TOKEN_DOT);
         case '(': return make_token(lexer, TOKEN_LPAREN);
         case ')': return make_token(lexer, TOKEN_RPAREN);
         case '{': return make_token(lexer, TOKEN_LBRACE);
