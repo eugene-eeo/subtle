@@ -266,7 +266,7 @@ static uint16_t make_constant(Compiler* compiler, Value v) {
     return offset;
 }
 
-static uint16_t identifier_constant(Compiler* compiler, Token* token) {
+static uint16_t identifier_constant(Compiler* compiler, const Token* token) {
     return make_constant(compiler,
         OBJ_TO_VAL(objstring_copy(
             compiler->vm,
@@ -474,6 +474,29 @@ emit_loop(Compiler* compiler, size_t start)
     emit_offset(compiler, (uint16_t)jump);
 }
 
+// Invoke helpers
+// ==============
+
+static void
+invoke_token_method(Compiler* compiler, const Token* tok, int num_args)
+{
+    uint16_t method_constant = identifier_constant(compiler, tok);
+    emit_op(compiler, OP_INVOKE);
+    emit_offset(compiler, method_constant);
+    emit_byte(compiler, (uint8_t) num_args);
+    // OP_INVOKE would pop the arguments, and leave the result.
+    // Decrement the slot count accordingly.
+    ASSERT(compiler->slot_count > num_args, "compiler->slot_count <= num_args");
+    compiler->slot_count -= num_args;
+}
+
+static void
+invoke_string_method(Compiler* compiler, const char* method, int num_args)
+{
+    const Token tok = {.start=method, .length=strlen(method)};
+    invoke_token_method(compiler, &tok, num_args);
+}
+
 // Expression parsing
 // ==================
 
@@ -615,12 +638,12 @@ static void block_argument(Compiler* compiler) {
 }
 
 static void invoke(Compiler* compiler, bool can_assign) {
-    uint16_t slot_name = identifier_constant(compiler, &compiler->parser->previous);
+    const Token op_token = compiler->parser->previous;
 
     if (can_assign && match(compiler, TOKEN_EQ)) {
         expression(compiler);
         emit_op(compiler, OP_OBJECT_SET);
-        emit_offset(compiler, slot_name);
+        emit_offset(compiler, identifier_constant(compiler, &op_token));
         return;
     }
 
@@ -645,10 +668,7 @@ static void invoke(Compiler* compiler, bool can_assign) {
         block_argument(compiler);
     }
 
-    emit_op(compiler, OP_INVOKE);
-    emit_offset(compiler, slot_name);
-    emit_byte(compiler, num_args);
-    compiler->slot_count -= num_args; // consumes the number of arguments
+    invoke_token_method(compiler, &op_token, num_args);
 }
 
 static void dot(Compiler* compiler, bool can_assign) {
@@ -676,24 +696,15 @@ static void unary(Compiler* compiler, bool can_assign) {
     TokenType operator = op_token.type;
     // Compile the operand.
     parse_precedence(compiler, PREC_PREFIX);
-    uint16_t method_constant;
     switch (operator) {
-        case TOKEN_BANG:
-        {
-            method_constant = identifier_constant(compiler, &op_token);
-            break;
-        }
         case TOKEN_MINUS:
-        {
-            Token synth = {.type = TOKEN_MINUS, .start = "neg", .length = 3, .line = 0};
-            method_constant = identifier_constant(compiler, &synth);
+            invoke_string_method(compiler, "neg", 0);
+            return;
+        case TOKEN_BANG:
+            invoke_token_method(compiler, &op_token, 0);
             break;
-        }
         default: UNREACHABLE();
     }
-    emit_op(compiler, OP_INVOKE);
-    emit_offset(compiler, method_constant);
-    emit_byte(compiler, 0); // 0 arguments.
 }
 
 static void binary(Compiler* compiler, bool can_assign) {
@@ -701,7 +712,6 @@ static void binary(Compiler* compiler, bool can_assign) {
     TokenType operator = op_token.type;
     ParseRule* rule = get_rule(operator);
     parse_precedence(compiler, (Precedence)(rule->precedence + 1));
-    uint16_t constant = identifier_constant(compiler, &op_token);
 
     switch (operator) {
         case TOKEN_DOTDOT:
@@ -718,13 +728,8 @@ static void binary(Compiler* compiler, bool can_assign) {
         case TOKEN_GEQ:
         case TOKEN_AMP:
         case TOKEN_PIPE:
-        {
-            emit_op(compiler, OP_INVOKE);
-            emit_offset(compiler, constant);
-            emit_byte(compiler, 1); // 1 argument.
-            compiler->slot_count--;
+            invoke_token_method(compiler, &op_token, 1);
             break;
-        }
         default: UNREACHABLE();
     }
 }
@@ -978,10 +983,6 @@ static void for_stmt(Compiler* compiler) {
     //                    | }
     Token seq_token  = {.start="seq ", .length=4};
     Token iter_token = {.start="iter ", .length=5};
-    Token iterMore_token = {.start = "iterMore", .length = 8};
-    Token iterNext_token = {.start = "iterNext", .length = 8};
-    uint16_t iterMore = identifier_constant(compiler, &iterMore_token);
-    uint16_t iterNext = identifier_constant(compiler, &iterNext_token);
 
     begin_block(compiler);
     consume(compiler, TOKEN_LPAREN, "Expect '(' after 'for'.");
@@ -1017,20 +1018,14 @@ static void for_stmt(Compiler* compiler) {
     // _i = _s.iterMore(_i)
     load_local(compiler, seq);
     load_local(compiler, iter);
-    emit_op(compiler, OP_INVOKE);
-    emit_offset(compiler, iterMore);
-    emit_byte(compiler, 1);
-    compiler->slot_count--;
+    invoke_string_method(compiler, "iterMore", 1);
     emit_op(compiler, OP_SET_LOCAL); emit_byte(compiler, (uint8_t) iter);
     test_exit_loop(compiler);
 
     // loop_var = _s.iterNext(_i)
     load_local(compiler, seq);
     load_local(compiler, iter);
-    emit_op(compiler, OP_INVOKE);
-    emit_offset(compiler, iterNext);
-    emit_byte(compiler, 1);
-    compiler->slot_count--;
+    invoke_string_method(compiler, "iterNext", 1);
 
     // push a fresh block for every iteration
     begin_block(compiler);

@@ -211,6 +211,7 @@ DEFINE_NATIVE(Object_toString) {
         case OBJ_OBJECT:  fmt = "Object_%p"; break;
         case OBJ_NATIVE:  fmt = "Native_%p"; break;
         case OBJ_FIBER:   fmt = "Fiber_%p"; break;
+        case OBJ_RANGE:   fmt = "Range_%p"; break;
         default: UNREACHABLE();
         }
         buf_size = snprintf(NULL, 0, fmt, (void*) obj) + 1;
@@ -218,8 +219,7 @@ DEFINE_NATIVE(Object_toString) {
         snprintf(buffer, buf_size, fmt, (void*) obj);
         break;
     }
-    default:
-        UNREACHABLE();
+    default: UNREACHABLE();
     }
 
     str = objstring_copy(vm, buffer, buf_size - 1 /* exclude the \0 byte */);
