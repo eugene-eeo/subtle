@@ -36,6 +36,9 @@ void debug_print_object(Obj* obj) {
             printf("%g...%g", range->current, range->end);
             break;
         }
+        case OBJ_LIST:
+            printf("list_%p", (void*)obj);
+            break;
     }
 }
 

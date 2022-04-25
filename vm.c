@@ -28,6 +28,7 @@ void vm_init(VM* vm) {
     vm->StringProto = NULL;
     vm->FiberProto = NULL;
     vm->RangeProto = NULL;
+    vm->ListProto = NULL;
 
     vm->objects = NULL;
     vm->bytes_allocated = 0;
@@ -112,7 +113,7 @@ print_stack_trace(VM* vm)
             CallFrame* frame = &fiber->frames[i];
             ObjFunction* function = frame->closure->function;
             size_t instruction = frame->ip - function->chunk.code;
-            fprintf(stderr, "  [line %zu] in %s\n",
+            fprintf(stderr, "\t[line %zu] in %s\n",
                     chunk_get_line(&function->chunk, instruction),
                     function->arity == -1 ? "script" : "fn");
         }
@@ -241,6 +242,7 @@ vm_get_prototype(VM* vm, Value value)
                 case OBJ_CLOSURE: return OBJ_TO_VAL(vm->FnProto);
                 case OBJ_FIBER:   return OBJ_TO_VAL(vm->FiberProto);
                 case OBJ_RANGE:   return OBJ_TO_VAL(vm->RangeProto);
+                case OBJ_LIST:    return OBJ_TO_VAL(vm->ListProto);
                 default: UNREACHABLE();
             }
         }

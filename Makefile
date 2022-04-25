@@ -52,6 +52,7 @@ run_test:
 	$(RUNNER) ./subtle ./tests/for-loops
 	$(RUNNER) ./subtle ./tests/fiber
 	$(RUNNER) ./subtle ./tests/fiber2
+	$(RUNNER) ./subtle ./tests/list
 
 test:
 	make stress

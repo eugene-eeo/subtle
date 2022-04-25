@@ -38,6 +38,7 @@ static void objobject_free(VM*, Obj*);
 static void objnative_free(VM*, Obj*);
 static void objfiber_free(VM*, Obj*);
 static void objrange_free(VM*, Obj*);
+static void objlist_free(VM*, Obj*);
 
 void
 object_free(Obj* obj, VM* vm)
@@ -54,6 +55,7 @@ object_free(Obj* obj, VM* vm)
     case OBJ_NATIVE: objnative_free(vm, obj); break;
     case OBJ_FIBER: objfiber_free(vm, obj); break;
     case OBJ_RANGE: objrange_free(vm, obj); break;
+    case OBJ_LIST: objlist_free(vm, obj); break;
     }
 }
 
@@ -385,4 +387,65 @@ static void
 objrange_free(VM* vm, Obj* obj)
 {
     FREE(vm, ObjRange, obj);
+}
+
+// ObjList
+// =======
+
+ObjList*
+objlist_new(VM* vm)
+{
+    ObjList* list = ALLOCATE_OBJECT(vm, OBJ_LIST, ObjList);
+    list->values = NULL;
+    list->size = 0;
+    list->capacity = 0;
+    return list;
+}
+
+Value
+objlist_get(ObjList* list, size_t idx)
+{
+    ASSERT(list->size > idx, "list->size <= idx");
+    return list->values[idx];
+}
+
+void
+objlist_set(ObjList* list, size_t idx, Value v)
+{
+    ASSERT(list->size > idx, "list->size <= idx");
+    list->values[idx] = v;
+}
+
+void
+objlist_del(ObjList* list, VM* vm, size_t idx)
+{
+    ASSERT(list->size > idx, "list->size <= idx");
+    // [0] .. [idx] [idx+1] [idx+2] ... [sz]
+    // [0] .. [idx+1] [idx+2] .. [sz]
+    list->size--;
+    for (size_t i = idx; i < list->size; i++)
+        list->values[i] = list->values[i + 1];
+}
+
+void
+objlist_insert(ObjList* list, VM* vm, size_t idx, Value v)
+{
+    ASSERT(list->size >= idx, "list->size < idx");
+    if (list->size + 1 > list->capacity) {
+        size_t old_cap = list->capacity;
+        list->capacity = GROW_CAPACITY(list->capacity);
+        list->values = GROW_ARRAY(vm, list->values, Value, old_cap, list->capacity);
+    }
+    list->size++;
+    for (size_t i = list->size - 1; i > idx; i--)
+        list->values[i] = list->values[i - 1];
+    list->values[idx] = v;
+}
+
+void
+objlist_free(VM* vm, Obj* obj)
+{
+    ObjList* list = (ObjList*)obj;
+    FREE_ARRAY(vm, list->values, Value, list->capacity);
+    FREE(vm, ObjList, list);
 }

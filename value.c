@@ -63,8 +63,11 @@ static uint32_t object_hash(Obj* obj)
         case OBJ_OBJECT:
         case OBJ_NATIVE:
         case OBJ_FIBER:
+        case OBJ_RANGE:
+        case OBJ_LIST:
             return hash_bits((uintptr_t)obj);
-        default: UNREACHABLE();
+        default:
+            UNREACHABLE();
     }
 }
 

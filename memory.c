@@ -43,7 +43,7 @@ void mark_object(VM* vm, Obj* obj) {
     printf("\n");
 #endif
 
-    ASSERT(!obj->visited, "obj->visited");
+    /* ASSERT(!obj->visited, "obj->visited"); */
     obj->marked = true;
 
     // Make space in the gray stack.
@@ -85,6 +85,7 @@ static void mark_roots(VM* vm) {
     mark_object(vm, (Obj*)vm->StringProto);
     mark_object(vm, (Obj*)vm->FiberProto);
     mark_object(vm, (Obj*)vm->RangeProto);
+    mark_object(vm, (Obj*)vm->ListProto);
 
     table_mark(&vm->globals, vm);
     compiler_mark(vm->compiler, vm);
@@ -127,6 +128,12 @@ static void blacken_object(VM* vm, Obj* obj) {
             blacken_fiber(vm, (ObjFiber*)obj);
             break;
         case OBJ_RANGE: break; // Nothing to do here.
+        case OBJ_LIST: {
+            ObjList* list = (ObjList*)obj;
+            for (size_t i = 0; i < list->size; i++)
+                mark_value(vm, list->values[i]);
+            break;
+        }
     }
 }
 

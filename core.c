@@ -46,6 +46,7 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
         case 'F': if (!IS_CLOSURE(arg)) ARG_ERROR(idx, "an Fn"); break; \
         case 'f': if (!IS_FIBER(arg)) ARG_ERROR(idx, "a Fiber"); break; \
         case 'r': if (!IS_RANGE(arg)) ARG_ERROR(idx, "a Range"); break; \
+        case 'L': if (!IS_LIST(arg)) ARG_ERROR(idx, "a List"); break; \
         case '*': break; \
         default: UNREACHABLE(); \
     } \
@@ -64,6 +65,36 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
         return true; \
     } while (false)
 
+
+static bool
+value_to_index(Value num, size_t length, bool allow_end, int32_t* idx)
+{
+    ASSERT(IS_NUMBER(num), "!IS_NUMBER(num)");
+    int32_t i = (int32_t) VAL_TO_NUMBER(num);
+    if (i < 0) i += length;
+    if (i < 0 || (allow_end ? i > length : i >= length))
+        return false;
+    *idx = i;
+    return true;
+}
+
+// A generic implementation of iterMore for sized sequences.
+static Value
+generic_iterMore(Value arg, size_t length)
+{
+    int32_t idx = -1;
+    if (IS_NIL(arg)) {
+        idx = 0;
+    } else if (IS_NUMBER(arg)) {
+        idx = (int32_t) VAL_TO_NUMBER(arg);
+        idx++;
+    } else {
+        return FALSE_VAL;
+    }
+    if (idx < 0 || idx >= length)
+        return FALSE_VAL;
+    return NUMBER_TO_VAL((double) idx);
+}
 
 // ============================= Object =============================
 
@@ -135,6 +166,19 @@ DEFINE_NATIVE(Object_deleteSlot) {
     ObjObject* this = VAL_TO_OBJECT(args[0]);
     bool has_slot = objobject_delete(this, vm, args[1]);
     RETURN(BOOL_TO_VAL(has_slot));
+}
+
+DEFINE_NATIVE(Object_ownSlots) {
+    ARGSPEC("O");
+    ObjObject* this = VAL_TO_OBJECT(args[0]);
+    ObjList* list = objlist_new(vm);
+    vm_push_root(vm, OBJ_TO_VAL(list));
+    for (size_t i = 0; i < this->slots.capacity; i++) {
+        if (!IS_UNDEFINED(this->slots.entries[i].key))
+            objlist_insert(list, vm, list->size, this->slots.entries[i].key);
+    }
+    vm_pop_root(vm);
+    RETURN(OBJ_TO_VAL(list));
 }
 
 DEFINE_NATIVE(Object_same) {
@@ -212,7 +256,10 @@ DEFINE_NATIVE(Object_toString) {
         case OBJ_NATIVE:  fmt = "Native_%p"; break;
         case OBJ_FIBER:   fmt = "Fiber_%p"; break;
         case OBJ_RANGE:   fmt = "Range_%p"; break;
-        default: UNREACHABLE();
+        case OBJ_LIST:    fmt = "List_%p"; break;
+        case OBJ_FUNCTION:
+        case OBJ_UPVALUE:
+            UNREACHABLE();
         }
         buf_size = snprintf(NULL, 0, fmt, (void*) obj) + 1;
         buffer = ALLOCATE_ARRAY(vm, char, buf_size);
@@ -233,7 +280,7 @@ DEFINE_NATIVE(Object_print) {
     vm_ensure_stack(vm, 1);
     vm_push(vm, this);
     if (!vm_invoke(vm, this, OBJ_TO_VAL(objstring_copy(vm, "toString", 8)), 0, &rv))
-        return rv;
+        return false;
 
     Value string_slot = vm_pop(vm);
     if (!IS_STRING(string_slot))
@@ -249,12 +296,43 @@ DEFINE_NATIVE(Object_println) {
     vm_ensure_stack(vm, 1);
     vm_push(vm, this);
     if (!vm_invoke(vm, this, OBJ_TO_VAL(objstring_copy(vm, "print", 5)), 0, &rv))
-        return rv;
+        return false;
     vm_pop(vm);
 
     fprintf(stdout, "\n");
     fflush(stdout);
     RETURN(NIL_VAL);
+}
+
+DEFINE_NATIVE(Object_iterMore) {
+    ARGSPEC("O*");
+    ObjObject* obj = VAL_TO_OBJECT(args[0]);
+    int32_t idx = -1;
+    if (IS_NIL(args[1])) {
+        idx = 0;
+    } else if (IS_NUMBER(args[1])) {
+        idx = (int32_t) VAL_TO_NUMBER(args[1]);
+        idx++;
+    }
+    if (idx < 0 || idx >= obj->slots.capacity)
+        RETURN(FALSE_VAL);
+    // Find a valid entry that is >= the given index.
+    for (; idx < obj->slots.capacity; idx++) {
+        if (!IS_UNDEFINED(obj->slots.entries[idx].key))
+            RETURN(NUMBER_TO_VAL(idx));
+    }
+    RETURN(FALSE_VAL);
+}
+
+DEFINE_NATIVE(Object_iterNext) {
+    ARGSPEC("ON");
+    ObjObject* obj = VAL_TO_OBJECT(args[0]);
+    int32_t idx;
+    if (!value_to_index(args[1], obj->slots.capacity, false, &idx))
+        RETURN(NIL_VAL);
+    if (IS_UNDEFINED(obj->slots.entries[idx].key))
+        RETURN(NIL_VAL);
+    RETURN(obj->slots.entries[idx].key);
 }
 
 // ============================= Fn =============================
@@ -373,6 +451,22 @@ DEFINE_NATIVE(String_plus) {
 DEFINE_NATIVE(String_length) {
     ARGSPEC("S");
     RETURN(NUMBER_TO_VAL(VAL_TO_STRING(args[0])->length));
+}
+
+DEFINE_NATIVE(String_get) {
+    ARGSPEC("SN");
+    ObjString* s = VAL_TO_STRING(args[0]);
+    int32_t idx;
+    if (!value_to_index(args[1], s->length, false, &idx))
+        RETURN(NIL_VAL);
+    RETURN(OBJ_TO_VAL(objstring_copy(vm, s->chars + idx, 1)));
+}
+
+DEFINE_NATIVE(String_iterMore) {
+    ARGSPEC("S*");
+    ObjString* s = VAL_TO_STRING(args[0]);
+    Value rv = generic_iterMore(args[1], s->length);
+    RETURN(rv);
 }
 
 // ============================= Fiber =============================
@@ -514,6 +608,73 @@ DEFINE_NATIVE(Range_iterNext) {
     RETURN(NUMBER_TO_VAL(current));
 }
 
+// ============================= List =============================
+
+DEFINE_NATIVE(List_new) {
+    ObjList* list = objlist_new(vm);
+    vm_push_root(vm, OBJ_TO_VAL(list));
+    for (int i = 0; i < num_args; i++)
+        objlist_insert(list, vm, i, args[i+1]);
+    vm_pop_root(vm);
+    RETURN(OBJ_TO_VAL(list));
+}
+
+DEFINE_NATIVE(List_add) {
+    ARGSPEC("L*");
+    ObjList* list = VAL_TO_LIST(args[0]);
+    objlist_insert(list, vm, list->size, args[1]);
+    RETURN(OBJ_TO_VAL(list));
+}
+
+DEFINE_NATIVE(List_get) {
+    ARGSPEC("LN");
+    ObjList* list = VAL_TO_LIST(args[0]);
+    int32_t idx;
+    if (!value_to_index(args[1], list->size, false, &idx))
+        RETURN(NIL_VAL);
+    RETURN(objlist_get(list, idx));
+}
+
+DEFINE_NATIVE(List_set) {
+    ARGSPEC("LN*");
+    ObjList* list = VAL_TO_LIST(args[0]);
+    int32_t idx;
+    if (!value_to_index(args[1], list->size, false, &idx))
+        objlist_set(list, idx, args[2]);
+    RETURN(OBJ_TO_VAL(list));
+}
+
+DEFINE_NATIVE(List_del) {
+    ARGSPEC("LN");
+    ObjList* list = VAL_TO_LIST(args[0]);
+    int32_t idx;
+    if (!value_to_index(args[1], list->size, false, &idx))
+        objlist_del(list, vm, idx);
+    RETURN(OBJ_TO_VAL(list));
+}
+
+DEFINE_NATIVE(List_insert) {
+    ARGSPEC("LN*");
+    ObjList* list = VAL_TO_LIST(args[0]);
+    int32_t idx;
+    if (!value_to_index(args[1], list->size, true, &idx))
+        objlist_insert(list, vm, idx, args[2]);
+    RETURN(OBJ_TO_VAL(list));
+}
+
+DEFINE_NATIVE(List_length) {
+    ARGSPEC("L");
+    ObjList* list = VAL_TO_LIST(args[0]);
+    RETURN(NUMBER_TO_VAL((double) list->size));
+}
+
+DEFINE_NATIVE(List_iterMore) {
+    ARGSPEC("L*");
+    ObjList* list = VAL_TO_LIST(args[0]);
+    Value rv = generic_iterMore(args[1], list->size);
+    RETURN(rv);
+}
+
 void core_init_vm(VM* vm)
 {
 #define ADD_OBJECT(table, name, obj) (define_on_table(vm, table, name, OBJ_TO_VAL(obj)))
@@ -534,6 +695,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "setOwnSlot",  Object_setSlot);
     ADD_METHOD(ObjectProto, "hasOwnSlot",  Object_hasOwnSlot);
     ADD_METHOD(ObjectProto, "deleteSlot",  Object_deleteSlot);
+    ADD_METHOD(ObjectProto, "ownSlots",    Object_ownSlots);
     ADD_METHOD(ObjectProto, "same",        Object_same);
     ADD_METHOD(ObjectProto, "==",          Object_equal);
     ADD_METHOD(ObjectProto, "!=",          Object_notEqual);
@@ -543,6 +705,8 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "toString",    Object_toString);
     ADD_METHOD(ObjectProto, "print",       Object_print);
     ADD_METHOD(ObjectProto, "println",     Object_println);
+    ADD_METHOD(ObjectProto, "iterMore",    Object_iterMore);
+    ADD_METHOD(ObjectProto, "iterNext",    Object_iterNext);
 
     vm->FnProto = objobject_new(vm);
     vm->FnProto->proto = OBJ_TO_VAL(vm->ObjectProto);
@@ -579,6 +743,9 @@ void core_init_vm(VM* vm)
     ADD_METHOD(StringProto, ">",      String_gt);
     ADD_METHOD(StringProto, "<=",     String_leq);
     ADD_METHOD(StringProto, ">=",     String_geq);
+    ADD_METHOD(StringProto, "get",    String_get);
+    ADD_METHOD(StringProto, "iterNext", String_get);
+    ADD_METHOD(StringProto, "iterMore", String_iterMore);
 
     vm->FiberProto = objobject_new(vm);
     vm->FiberProto->proto = OBJ_TO_VAL(vm->ObjectProto);
@@ -597,13 +764,26 @@ void core_init_vm(VM* vm)
     ADD_METHOD(RangeProto, "iterNext", Range_iterNext);
     ADD_METHOD(RangeProto, "iterMore", Range_iterMore);
 
-    ADD_OBJECT(&vm->globals, "Object",  vm->ObjectProto);
-    ADD_OBJECT(&vm->globals, "Fn",      vm->FnProto);
-    ADD_OBJECT(&vm->globals, "Native",  vm->NativeProto);
-    ADD_OBJECT(&vm->globals, "Number",  vm->NumberProto);
-    ADD_OBJECT(&vm->globals, "String",  vm->StringProto);
-    ADD_OBJECT(&vm->globals, "Fiber",   vm->FiberProto);
-    ADD_OBJECT(&vm->globals, "Range",   vm->RangeProto);
+    vm->ListProto = objobject_new(vm);
+    vm->ListProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    ADD_METHOD(ListProto, "new", List_new);
+    ADD_METHOD(ListProto, "add", List_add);
+    ADD_METHOD(ListProto, "get",  List_get);
+    ADD_METHOD(ListProto, "set", List_set);
+    ADD_METHOD(ListProto, "del", List_del);
+    ADD_METHOD(ListProto, "length", List_length);
+    ADD_METHOD(ListProto, "insert", List_insert);
+    ADD_METHOD(ListProto, "iterNext", List_get);
+    ADD_METHOD(ListProto, "iterMore", List_iterMore);
+
+    ADD_OBJECT(&vm->globals, "Object", vm->ObjectProto);
+    ADD_OBJECT(&vm->globals, "Fn",     vm->FnProto);
+    ADD_OBJECT(&vm->globals, "Native", vm->NativeProto);
+    ADD_OBJECT(&vm->globals, "Number", vm->NumberProto);
+    ADD_OBJECT(&vm->globals, "String", vm->StringProto);
+    ADD_OBJECT(&vm->globals, "Fiber",  vm->FiberProto);
+    ADD_OBJECT(&vm->globals, "Range",  vm->RangeProto);
+    ADD_OBJECT(&vm->globals, "List",   vm->ListProto);
 
 #undef ADD_OBJECT
 #undef ADD_NATIVE
