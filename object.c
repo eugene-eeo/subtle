@@ -425,6 +425,14 @@ objlist_del(ObjList* list, VM* vm, size_t idx)
     list->size--;
     for (size_t i = idx; i < list->size; i++)
         list->values[i] = list->values[i + 1];
+    // Compact the list if necessary.
+    if (list->capacity > 8
+            && list->size * 2 < list->capacity) {
+        size_t new_capacity = SHRINK_CAPACITY(list->capacity);
+        list->values = GROW_ARRAY(vm, list->values, Value, list->capacity, new_capacity);
+        list->capacity = new_capacity;
+    }
+    ASSERT(list->capacity >= 8, "list->capacity < 8");
 }
 
 void

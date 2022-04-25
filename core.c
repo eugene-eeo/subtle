@@ -457,9 +457,9 @@ DEFINE_NATIVE(String_get) {
     ARGSPEC("SN");
     ObjString* s = VAL_TO_STRING(args[0]);
     int32_t idx;
-    if (!value_to_index(args[1], s->length, false, &idx))
-        RETURN(NIL_VAL);
-    RETURN(OBJ_TO_VAL(objstring_copy(vm, s->chars + idx, 1)));
+    if (value_to_index(args[1], s->length, false, &idx))
+        RETURN(OBJ_TO_VAL(objstring_copy(vm, s->chars + idx, 1)));
+    RETURN(NIL_VAL);
 }
 
 DEFINE_NATIVE(String_iterMore) {
@@ -630,16 +630,16 @@ DEFINE_NATIVE(List_get) {
     ARGSPEC("LN");
     ObjList* list = VAL_TO_LIST(args[0]);
     int32_t idx;
-    if (!value_to_index(args[1], list->size, false, &idx))
-        RETURN(NIL_VAL);
-    RETURN(objlist_get(list, idx));
+    if (value_to_index(args[1], list->size, false, &idx))
+        RETURN(objlist_get(list, idx));
+    RETURN(NIL_VAL);
 }
 
 DEFINE_NATIVE(List_set) {
     ARGSPEC("LN*");
     ObjList* list = VAL_TO_LIST(args[0]);
     int32_t idx;
-    if (!value_to_index(args[1], list->size, false, &idx))
+    if (value_to_index(args[1], list->size, false, &idx))
         objlist_set(list, idx, args[2]);
     RETURN(OBJ_TO_VAL(list));
 }
@@ -648,7 +648,7 @@ DEFINE_NATIVE(List_del) {
     ARGSPEC("LN");
     ObjList* list = VAL_TO_LIST(args[0]);
     int32_t idx;
-    if (!value_to_index(args[1], list->size, false, &idx))
+    if (value_to_index(args[1], list->size, false, &idx))
         objlist_del(list, vm, idx);
     RETURN(OBJ_TO_VAL(list));
 }
@@ -657,7 +657,7 @@ DEFINE_NATIVE(List_insert) {
     ARGSPEC("LN*");
     ObjList* list = VAL_TO_LIST(args[0]);
     int32_t idx;
-    if (!value_to_index(args[1], list->size, true, &idx))
+    if (value_to_index(args[1], list->size, true, &idx))
         objlist_insert(list, vm, idx, args[2]);
     RETURN(OBJ_TO_VAL(list));
 }
