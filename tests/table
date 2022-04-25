@@ -36,3 +36,22 @@ x.true = 13;  assert x.true == 13;
 x.false = 14; assert x.false == 14;
 x.nil = 15;   assert x.nil == 15;
 x.this = 16;  assert x.this == 16;
+
+let seen;
+x = {a:1, b:2, c:3};
+
+# keys
+seen = {};
+for (key in x.keys)
+    seen.setSlot(key, 1);
+assert seen.a == 1;
+assert seen.b == 1;
+assert seen.c == 1;
+
+# values
+seen = {};
+for (key in x.values)
+    seen.setSlot(key, 1);
+assert seen.getOwnSlot(1) == 1;
+assert seen.getOwnSlot(2) == 1;
+assert seen.getOwnSlot(3) == 1;

@@ -5,23 +5,26 @@ CC=gcc $(CCFLAGS)
 DEPS=$(shell ls *.c vendor/*.c | grep -v main.c)
 MAIN=$(DEPS) main.c
 
-cute:
+core.subtle.inc: core.subtle gen.py
+	python3 gen.py
+
+cute: core.subtle.inc
 	$(CC) -DSUBTLE_DEBUG \
 		-DSUBTLE_DEBUG_TRACE_EXECUTION \
 		-DSUBTLE_DEBUG_PRINT_CODE \
 		-DSUBTLE_DEBUG_STRESS_GC \
 		-g -Og $(MAIN) -o subtle
 
-debug:
+debug: core.subtle.inc
 	$(CC) -DSUBTLE_DEBUG \
 		-DSUBTLE_DEBUG_TRACE_ALLOC \
 		-DSUBTLE_DEBUG_STRESS_GC \
 		-g -Og $(MAIN) -o subtle
 
-release:
+release: core.subtle.inc
 	$(CC) -O3 $(MAIN) -o subtle
 
-stress:
+stress: core.subtle.inc
 	$(CC) -DSUBTLE_DEBUG \
 		-DSUBTLE_DEBUG_STRESS_GC \
 		-g -Og $(MAIN) -o subtle

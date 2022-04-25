@@ -3,7 +3,9 @@
 #include "object.h"
 #include "table.h"
 #include "memory.h"
+#include "core.subtle.inc"
 
+#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -168,19 +170,6 @@ DEFINE_NATIVE(Object_deleteSlot) {
     RETURN(BOOL_TO_VAL(has_slot));
 }
 
-DEFINE_NATIVE(Object_ownSlots) {
-    ARGSPEC("O");
-    ObjObject* this = VAL_TO_OBJECT(args[0]);
-    ObjList* list = objlist_new(vm);
-    vm_push_root(vm, OBJ_TO_VAL(list));
-    for (size_t i = 0; i < this->slots.capacity; i++) {
-        if (!IS_UNDEFINED(this->slots.entries[i].key))
-            objlist_insert(list, vm, list->size, this->slots.entries[i].key);
-    }
-    vm_pop_root(vm);
-    RETURN(OBJ_TO_VAL(list));
-}
-
 DEFINE_NATIVE(Object_same) {
     ARGSPEC("***");
     RETURN(BOOL_TO_VAL(value_equal(args[1], args[2])));
@@ -306,7 +295,7 @@ DEFINE_NATIVE(Object_println) {
     RETURN(NIL_VAL);
 }
 
-DEFINE_NATIVE(Object_iterMore) {
+DEFINE_NATIVE(Object_rawIterMore) {
     ARGSPEC("O*");
     ObjObject* obj = VAL_TO_OBJECT(args[0]);
     int32_t idx = -1;
@@ -326,7 +315,7 @@ DEFINE_NATIVE(Object_iterMore) {
     RETURN(FALSE_VAL);
 }
 
-DEFINE_NATIVE(Object_iterNext) {
+DEFINE_NATIVE(Object_rawIterSlotsNext) {
     ARGSPEC("ON");
     ObjObject* obj = VAL_TO_OBJECT(args[0]);
     int32_t idx;
@@ -335,6 +324,17 @@ DEFINE_NATIVE(Object_iterNext) {
     if (IS_UNDEFINED(obj->slots.entries[idx].key))
         RETURN(NIL_VAL);
     RETURN(obj->slots.entries[idx].key);
+}
+
+DEFINE_NATIVE(Object_rawIterValueNext) {
+    ARGSPEC("ON");
+    ObjObject* obj = VAL_TO_OBJECT(args[0]);
+    int32_t idx;
+    if (!value_to_index(args[1], obj->slots.capacity, false, &idx))
+        RETURN(NIL_VAL);
+    if (IS_UNDEFINED(obj->slots.entries[idx].key))
+        RETURN(NIL_VAL);
+    RETURN(obj->slots.entries[idx].value);
 }
 
 // ============================= Fn =============================
@@ -512,9 +512,8 @@ DEFINE_NATIVE(Fiber_current) {
 }
 
 DEFINE_NATIVE(Fiber_yield) {
-    if (!vm->can_yield) {
-        ERROR("Cannot yield from fiber.");
-    }
+    if (!vm->can_yield)
+        ERROR("Tried to yield from a VM call.");
     Value v = NIL_VAL;
     if (num_args >= 1) {
         vm_drop(vm, num_args - 1);
@@ -697,7 +696,6 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "setOwnSlot",  Object_setSlot);
     ADD_METHOD(ObjectProto, "hasOwnSlot",  Object_hasOwnSlot);
     ADD_METHOD(ObjectProto, "deleteSlot",  Object_deleteSlot);
-    ADD_METHOD(ObjectProto, "ownSlots",    Object_ownSlots);
     ADD_METHOD(ObjectProto, "same",        Object_same);
     ADD_METHOD(ObjectProto, "==",          Object_equal);
     ADD_METHOD(ObjectProto, "!=",          Object_notEqual);
@@ -707,8 +705,9 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "toString",    Object_toString);
     ADD_METHOD(ObjectProto, "print",       Object_print);
     ADD_METHOD(ObjectProto, "println",     Object_println);
-    ADD_METHOD(ObjectProto, "iterMore",    Object_iterMore);
-    ADD_METHOD(ObjectProto, "iterNext",    Object_iterNext);
+    ADD_METHOD(ObjectProto, "rawIterMore", Object_rawIterMore);
+    ADD_METHOD(ObjectProto, "rawIterSlotsNext", Object_rawIterSlotsNext);
+    ADD_METHOD(ObjectProto, "rawIterValueNext", Object_rawIterValueNext);
 
     vm->FnProto = objobject_new(vm);
     vm->FnProto->proto = OBJ_TO_VAL(vm->ObjectProto);
@@ -770,7 +769,7 @@ void core_init_vm(VM* vm)
     vm->ListProto->proto = OBJ_TO_VAL(vm->ObjectProto);
     ADD_METHOD(ListProto, "new", List_new);
     ADD_METHOD(ListProto, "add", List_add);
-    ADD_METHOD(ListProto, "get",  List_get);
+    ADD_METHOD(ListProto, "get", List_get);
     ADD_METHOD(ListProto, "set", List_set);
     ADD_METHOD(ListProto, "del", List_del);
     ADD_METHOD(ListProto, "length", List_length);
@@ -786,6 +785,11 @@ void core_init_vm(VM* vm)
     ADD_OBJECT(&vm->globals, "Fiber",  vm->FiberProto);
     ADD_OBJECT(&vm->globals, "Range",  vm->RangeProto);
     ADD_OBJECT(&vm->globals, "List",   vm->ListProto);
+
+    if (vm_interpret(vm, CORE_SOURCE) != INTERPRET_OK) {
+        fprintf(stderr, "vm_interpret(CORE_SOURCE) not ok.\n");
+        exit(788);
+    }
 
 #undef ADD_OBJECT
 #undef ADD_NATIVE

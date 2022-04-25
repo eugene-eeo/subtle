@@ -1,0 +1,25 @@
+Object.keys = Fn.new{
+    return ObjectSlotsIterator.clone.init(this);
+};
+
+Object.values = Fn.new{
+    return ObjectValueIterator.clone.init(this);
+};
+
+let ObjectSlotsIterator = {
+    init: Fn.new{|obj|
+        this._obj = obj;
+        return this;
+    },
+    iterMore: Fn.new{|v| return this._obj.rawIterMore(v); },
+    iterNext: Fn.new{|v| return this._obj.rawIterSlotsNext(v); }
+};
+
+let ObjectValueIterator = {
+    init: Fn.new{|obj|
+        this._obj = obj;
+        return this;
+    },
+    iterMore: Fn.new{|v| return this._obj.rawIterMore(v); },
+    iterNext: Fn.new{|v| return this._obj.rawIterValueNext(v); }
+};
