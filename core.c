@@ -282,11 +282,13 @@ DEFINE_NATIVE(Object_print) {
     if (!vm_invoke(vm, this, OBJ_TO_VAL(objstring_copy(vm, "toString", 8)), 0, &rv))
         return false;
 
-    Value string_slot = vm_pop(vm);
-    if (!IS_STRING(string_slot))
-        ERROR("Object_print expected .toString to be a string.");
-    fprintf(stdout, "%s", VAL_TO_STRING(string_slot)->chars);
+    Value slot = vm_peek(vm, 0);
+    char* str = IS_STRING(slot)
+        ? VAL_TO_STRING(slot)->chars
+        : "[invalid toString]";
+    fprintf(stdout, "%s", str);
     fflush(stdout);
+    vm_pop(vm);
     RETURN(NIL_VAL);
 }
 
