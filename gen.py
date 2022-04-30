@@ -7,6 +7,6 @@ with open('core.subtle.inc', encoding='utf8', mode='w') as f:
     f.write('#define SUBTLE_CORE_INC_H\n')
     f.write('const char* CORE_SOURCE =\n')
     for line in lines:
-        f.write('"' + line.replace('"', '\"') + '\\n"\n')
+        f.write('"' + line.replace('"', '\\"') + '\\n"\n')
     f.write(';\n')
     f.write('#endif\n')

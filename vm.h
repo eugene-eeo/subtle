@@ -36,6 +36,7 @@ typedef struct VM {
     ObjObject* FiberProto;
     ObjObject* RangeProto;
     ObjObject* ListProto;
+    ObjObject* MapProto;
     // -------------------------
 
     // ---- GC ----
@@ -94,7 +95,8 @@ vm_ensure_stack(VM* vm, size_t n)
 }
 
 // Pushes the given closure onto the call stack. Note that the
-// num_args argument should be the number of _actual_ arguments.
+// num_args argument should be the number of _actual_ arguments,
+// excluding "this".
 // The stack should look like this:
 //
 //                | nargs |

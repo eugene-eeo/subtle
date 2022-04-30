@@ -39,6 +39,7 @@ static void objnative_free(VM*, Obj*);
 static void objfiber_free(VM*, Obj*);
 static void objrange_free(VM*, Obj*);
 static void objlist_free(VM*, Obj*);
+static void objmap_free(VM*, Obj*);
 
 void
 object_free(Obj* obj, VM* vm)
@@ -56,6 +57,7 @@ object_free(Obj* obj, VM* vm)
     case OBJ_FIBER: objfiber_free(vm, obj); break;
     case OBJ_RANGE: objrange_free(vm, obj); break;
     case OBJ_LIST: objlist_free(vm, obj); break;
+    case OBJ_MAP: objmap_free(vm, obj); break;
     }
 }
 
@@ -456,4 +458,48 @@ objlist_free(VM* vm, Obj* obj)
     ObjList* list = (ObjList*)obj;
     FREE_ARRAY(vm, list->values, Value, list->capacity);
     FREE(vm, ObjList, list);
+}
+
+// ObjMap
+// ======
+
+ObjMap*
+objmap_new(VM* vm)
+{
+    ObjMap* map = ALLOCATE_OBJECT(vm, OBJ_MAP, ObjMap);
+    table_init(&map->tbl);
+    return map;
+}
+
+bool
+objmap_has(ObjMap* map, Value key)
+{
+    Value val;
+    return table_get(&map->tbl, key, &val);
+}
+
+bool
+objmap_get(ObjMap* map, Value key, Value* val)
+{
+    return table_get(&map->tbl, key, val);
+}
+
+bool
+objmap_set(ObjMap* map, VM* vm, Value key, Value val)
+{
+    return table_set(&map->tbl, vm, key, val);
+}
+
+bool
+objmap_delete(ObjMap* map, VM* vm, Value key)
+{
+    return table_delete(&map->tbl, vm, key);
+}
+
+void
+objmap_free(VM* vm, Obj* obj)
+{
+    ObjMap* map = (ObjMap*)obj;
+    table_free(&map->tbl, vm);
+    FREE(vm, ObjMap, map);
 }

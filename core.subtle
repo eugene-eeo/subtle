@@ -1,25 +1,31 @@
-Object.keys = Fn.new{
-    return ObjectSlotsIterator.clone.init(this);
-};
-
-Object.values = Fn.new{
-    return ObjectValueIterator.clone.init(this);
-};
-
-let ObjectSlotsIterator = {
-    init: Fn.new{|obj|
+Fn.new{
+let MethodIterator = {
+    init: Fn.new{|obj, slot|
         this._obj = obj;
+        this._slot = slot;
         return this;
     },
     iterMore: Fn.new{|v| return this._obj.rawIterMore(v); },
-    iterNext: Fn.new{|v| return this._obj.rawIterSlotsNext(v); }
+    iterNext: Fn.new{|v|
+        return this._obj
+            .rawGetSlot(this._slot)
+            .callWithThis(this._obj, v);
+    }
 };
 
-let ObjectValueIterator = {
-    init: Fn.new{|obj|
-        this._obj = obj;
-        return this;
-    },
-    iterMore: Fn.new{|v| return this._obj.rawIterMore(v); },
-    iterNext: Fn.new{|v| return this._obj.rawIterValueNext(v); }
+let fromSlot = Fn.new{|slot|
+    return Fn.new{ return MethodIterator.clone.init(this, slot); };
 };
+
+Object.keys   = fromSlot("rawIterSlotsNext");
+Object.values = fromSlot("rawIterValueNext");
+Map.keys      = fromSlot("rawIterKeyNext");
+Map.values    = fromSlot("rawIterValueNext");
+
+List.fromIterator = Fn.new{|it|
+    let list = List.new();
+    for (item in it)
+        list.add(item);
+    return list;
+};
+}.call;

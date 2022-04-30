@@ -29,6 +29,7 @@ void vm_init(VM* vm) {
     vm->FiberProto = NULL;
     vm->RangeProto = NULL;
     vm->ListProto = NULL;
+    vm->MapProto = NULL;
 
     vm->objects = NULL;
     vm->bytes_allocated = 0;
@@ -243,6 +244,7 @@ vm_get_prototype(VM* vm, Value value)
                 case OBJ_FIBER:   return OBJ_TO_VAL(vm->FiberProto);
                 case OBJ_RANGE:   return OBJ_TO_VAL(vm->RangeProto);
                 case OBJ_LIST:    return OBJ_TO_VAL(vm->ListProto);
+                case OBJ_MAP:     return OBJ_TO_VAL(vm->MapProto);
                 default: UNREACHABLE();
             }
         }

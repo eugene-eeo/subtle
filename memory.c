@@ -86,6 +86,7 @@ static void mark_roots(VM* vm) {
     mark_object(vm, (Obj*)vm->FiberProto);
     mark_object(vm, (Obj*)vm->RangeProto);
     mark_object(vm, (Obj*)vm->ListProto);
+    mark_object(vm, (Obj*)vm->MapProto);
 
     table_mark(&vm->globals, vm);
     compiler_mark(vm->compiler, vm);
@@ -132,6 +133,11 @@ static void blacken_object(VM* vm, Obj* obj) {
             ObjList* list = (ObjList*)obj;
             for (size_t i = 0; i < list->size; i++)
                 mark_value(vm, list->values[i]);
+            break;
+        }
+        case OBJ_MAP: {
+            ObjMap* map = (ObjMap*)obj;
+            table_mark(&map->tbl, vm);
             break;
         }
     }

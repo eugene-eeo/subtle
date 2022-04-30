@@ -21,6 +21,7 @@ typedef struct VM VM;
 #define IS_FIBER(value)        (is_object_type(value, OBJ_FIBER))
 #define IS_RANGE(value)        (is_object_type(value, OBJ_RANGE))
 #define IS_LIST(value)         (is_object_type(value, OBJ_LIST))
+#define IS_MAP(value)          (is_object_type(value, OBJ_MAP))
 
 #define OBJ_TYPE(value)        (VAL_TO_OBJ(value)->type)
 
@@ -33,6 +34,7 @@ typedef struct VM VM;
 #define VAL_TO_FIBER(value)    ((ObjFiber*)VAL_TO_OBJ(value))
 #define VAL_TO_RANGE(value)    ((ObjRange*)VAL_TO_OBJ(value))
 #define VAL_TO_LIST(value)     ((ObjList*)VAL_TO_OBJ(value))
+#define VAL_TO_MAP(value)      ((ObjMap*)VAL_TO_OBJ(value))
 
 typedef enum {
     OBJ_STRING,
@@ -44,6 +46,7 @@ typedef enum {
     OBJ_FIBER,
     OBJ_RANGE,
     OBJ_LIST,
+    OBJ_MAP,
 } ObjType;
 
 typedef struct Obj {
@@ -150,6 +153,11 @@ typedef struct ObjList {
     size_t capacity;
 } ObjList;
 
+typedef struct ObjMap {
+    Obj obj;
+    Table tbl;
+} ObjMap;
+
 // Object memory management
 // ========================
 
@@ -216,5 +224,14 @@ Value objlist_get(ObjList* list, size_t idx);
 void objlist_set(ObjList* list, size_t idx, Value v);
 void objlist_del(ObjList* list, VM* vm, size_t idx);
 void objlist_insert(ObjList* list, VM* vm, size_t idx, Value v);
+
+// ObjMap
+// ======
+
+ObjMap* objmap_new(VM* vm);
+bool objmap_has(ObjMap* map, Value key);
+bool objmap_get(ObjMap* map, Value key, Value* value);
+bool objmap_set(ObjMap* map, VM* vm, Value key, Value value);
+bool objmap_delete(ObjMap* map, VM* vm, Value key);
 
 #endif

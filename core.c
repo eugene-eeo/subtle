@@ -49,6 +49,7 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
         case 'f': if (!IS_FIBER(arg)) ARG_ERROR(idx, "a Fiber"); break; \
         case 'r': if (!IS_RANGE(arg)) ARG_ERROR(idx, "a Range"); break; \
         case 'L': if (!IS_LIST(arg)) ARG_ERROR(idx, "a List"); break; \
+        case 'M': if (!IS_MAP(arg)) ARG_ERROR(idx, "a Map"); break; \
         case '*': break; \
         default: UNREACHABLE(); \
     } \
@@ -96,6 +97,41 @@ generic_iterMore(Value arg, size_t length)
     if (idx < 0 || idx >= length)
         return FALSE_VAL;
     return NUMBER_TO_VAL((double) idx);
+}
+
+// generic implementation to check if the table still has any
+// valid entries after entry i.
+static Value
+generic_tableIterNext(Table* table, Value value)
+{
+    int32_t idx = -1;
+    if (IS_NIL(value)) {
+        idx = 0;
+    } else if (IS_NUMBER(value)) {
+        idx = (int32_t) VAL_TO_NUMBER(value);
+        idx++;
+    }
+    if (idx < 0 || idx >= table->capacity)
+        return FALSE_VAL;
+    // Find a valid entry that is >= the given index.
+    for (; idx < table->capacity; idx++)
+        if (!IS_UNDEFINED(table->entries[idx].key))
+            return NUMBER_TO_VAL(idx);
+    return FALSE_VAL;
+}
+
+// generic implementation to get the i-th entry (if it's not deleted)
+// from a table.
+static bool
+generic_tableIterEntry(Table* table, Value value, Entry* entry)
+{
+    int32_t idx;
+    if (!value_to_index(value, table->capacity, false, &idx))
+        return false;
+    if (IS_UNDEFINED(table->entries[idx].key))
+        return false;
+    *entry = table->entries[idx];
+    return true;
 }
 
 // ============================= Object =============================
@@ -246,6 +282,7 @@ DEFINE_NATIVE(Object_toString) {
         case OBJ_FIBER:   fmt = "Fiber_%p"; break;
         case OBJ_RANGE:   fmt = "Range_%p"; break;
         case OBJ_LIST:    fmt = "List_%p"; break;
+        case OBJ_MAP:     fmt = "Map_%p"; break;
         case OBJ_FUNCTION:
         case OBJ_UPVALUE:
             UNREACHABLE();
@@ -298,43 +335,26 @@ DEFINE_NATIVE(Object_println) {
 DEFINE_NATIVE(Object_rawIterMore) {
     ARGSPEC("O*");
     ObjObject* obj = VAL_TO_OBJECT(args[0]);
-    int32_t idx = -1;
-    if (IS_NIL(args[1])) {
-        idx = 0;
-    } else if (IS_NUMBER(args[1])) {
-        idx = (int32_t) VAL_TO_NUMBER(args[1]);
-        idx++;
-    }
-    if (idx < 0 || idx >= obj->slots.capacity)
-        RETURN(FALSE_VAL);
-    // Find a valid entry that is >= the given index.
-    for (; idx < obj->slots.capacity; idx++) {
-        if (!IS_UNDEFINED(obj->slots.entries[idx].key))
-            RETURN(NUMBER_TO_VAL(idx));
-    }
-    RETURN(FALSE_VAL);
+    Value rv = generic_tableIterNext(&obj->slots, args[1]);
+    RETURN(rv);
 }
 
 DEFINE_NATIVE(Object_rawIterSlotsNext) {
     ARGSPEC("ON");
     ObjObject* obj = VAL_TO_OBJECT(args[0]);
-    int32_t idx;
-    if (!value_to_index(args[1], obj->slots.capacity, false, &idx))
-        RETURN(NIL_VAL);
-    if (IS_UNDEFINED(obj->slots.entries[idx].key))
-        RETURN(NIL_VAL);
-    RETURN(obj->slots.entries[idx].key);
+    Entry entry;
+    if (generic_tableIterEntry(&obj->slots, args[1], &entry))
+        RETURN(entry.key);
+    RETURN(NIL_VAL);
 }
 
 DEFINE_NATIVE(Object_rawIterValueNext) {
     ARGSPEC("ON");
     ObjObject* obj = VAL_TO_OBJECT(args[0]);
-    int32_t idx;
-    if (!value_to_index(args[1], obj->slots.capacity, false, &idx))
-        RETURN(NIL_VAL);
-    if (IS_UNDEFINED(obj->slots.entries[idx].key))
-        RETURN(NIL_VAL);
-    RETURN(obj->slots.entries[idx].value);
+    Entry entry;
+    if (generic_tableIterEntry(&obj->slots, args[1], &entry))
+        RETURN(entry.value);
+    RETURN(NIL_VAL);
 }
 
 // ============================= Fn =============================
@@ -645,7 +665,7 @@ DEFINE_NATIVE(List_set) {
     RETURN(OBJ_TO_VAL(list));
 }
 
-DEFINE_NATIVE(List_del) {
+DEFINE_NATIVE(List_delete) {
     ARGSPEC("LN");
     ObjList* list = VAL_TO_LIST(args[0]);
     int32_t idx;
@@ -674,6 +694,62 @@ DEFINE_NATIVE(List_iterMore) {
     ObjList* list = VAL_TO_LIST(args[0]);
     Value rv = generic_iterMore(args[1], list->size);
     RETURN(rv);
+}
+
+// ============================= Map =============================
+
+DEFINE_NATIVE(Map_new) {
+    ObjMap* map = objmap_new(vm);
+    vm_push_root(vm, OBJ_TO_VAL(map));
+    for (int i = 1; i < num_args; i += 2)
+        objmap_set(map, vm, args[i], args[i+1]);
+    vm_pop_root(vm);
+    RETURN(OBJ_TO_VAL(map));
+}
+
+DEFINE_NATIVE(Map_get) {
+    ARGSPEC("M*");
+    Value default_value = NIL_VAL;
+    if (num_args > 1)
+        default_value = args[2];
+    objmap_get(VAL_TO_MAP(args[0]), args[1], &default_value);
+    RETURN(default_value);
+}
+
+DEFINE_NATIVE(Map_set) {
+    ARGSPEC("M**");
+    objmap_set(VAL_TO_MAP(args[0]), vm, args[1], args[2]);
+    RETURN(args[0]);
+}
+
+DEFINE_NATIVE(Map_delete) {
+    ARGSPEC("M*");
+    RETURN(BOOL_TO_VAL(objmap_delete(VAL_TO_MAP(args[0]), vm, args[1])));
+}
+
+DEFINE_NATIVE(Map_rawIterMore) {
+    ARGSPEC("M*");
+    ObjMap* map = VAL_TO_MAP(args[0]);
+    Value rv = generic_tableIterNext(&map->tbl, args[1]);
+    RETURN(rv);
+}
+
+DEFINE_NATIVE(Map_rawIterKeyNext) {
+    ARGSPEC("MN");
+    ObjMap* map = VAL_TO_MAP(args[0]);
+    Entry entry;
+    if (generic_tableIterEntry(&map->tbl, args[1], &entry))
+        RETURN(entry.key);
+    RETURN(NIL_VAL);
+}
+
+DEFINE_NATIVE(Map_rawIterValueNext) {
+    ARGSPEC("MN");
+    ObjMap* map = VAL_TO_MAP(args[0]);
+    Entry entry;
+    if (generic_tableIterEntry(&map->tbl, args[1], &entry))
+        RETURN(entry.value);
+    RETURN(NIL_VAL);
 }
 
 void core_init_vm(VM* vm)
@@ -771,11 +847,21 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ListProto, "add", List_add);
     ADD_METHOD(ListProto, "get", List_get);
     ADD_METHOD(ListProto, "set", List_set);
-    ADD_METHOD(ListProto, "del", List_del);
+    ADD_METHOD(ListProto, "delete", List_delete);
     ADD_METHOD(ListProto, "length", List_length);
     ADD_METHOD(ListProto, "insert", List_insert);
     ADD_METHOD(ListProto, "iterNext", List_get);
     ADD_METHOD(ListProto, "iterMore", List_iterMore);
+
+    vm->MapProto = objobject_new(vm);
+    vm->MapProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    ADD_METHOD(MapProto, "new", Map_new);
+    ADD_METHOD(MapProto, "get", Map_get);
+    ADD_METHOD(MapProto, "set", Map_set);
+    ADD_METHOD(MapProto, "delete", Map_delete);
+    ADD_METHOD(MapProto, "rawIterMore", Map_rawIterMore);
+    ADD_METHOD(MapProto, "rawIterKeyNext", Map_rawIterKeyNext);
+    ADD_METHOD(MapProto, "rawIterValueNext", Map_rawIterValueNext);
 
     ADD_OBJECT(&vm->globals, "Object", vm->ObjectProto);
     ADD_OBJECT(&vm->globals, "Fn",     vm->FnProto);
@@ -785,6 +871,7 @@ void core_init_vm(VM* vm)
     ADD_OBJECT(&vm->globals, "Fiber",  vm->FiberProto);
     ADD_OBJECT(&vm->globals, "Range",  vm->RangeProto);
     ADD_OBJECT(&vm->globals, "List",   vm->ListProto);
+    ADD_OBJECT(&vm->globals, "Map",    vm->MapProto);
 
     if (vm_interpret(vm, CORE_SOURCE) != INTERPRET_OK) {
         fprintf(stderr, "vm_interpret(CORE_SOURCE) not ok.\n");

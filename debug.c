@@ -16,29 +16,18 @@ void debug_print_object(Obj* obj) {
                 printf("fn_%p", (void*)obj);
             }
             break;
-        case OBJ_NATIVE:
-            printf("native_%p", (void*)obj);
-            break;
-        case OBJ_CLOSURE:
-            debug_print_object((Obj*)(((ObjClosure*) obj)->function));
-            break;
-        case OBJ_UPVALUE:
-            printf("upvalue");
-            break;
-        case OBJ_OBJECT:
-            printf("object_%p", (void*)obj);
-            break;
-        case OBJ_FIBER:
-            printf("fiber_%p", (void*)obj);
-            break;
+        case OBJ_NATIVE: printf("native_%p", (void*)obj); break;
+        case OBJ_CLOSURE: debug_print_object((Obj*)(((ObjClosure*) obj)->function)); break;
+        case OBJ_UPVALUE: printf("upvalue"); break;
+        case OBJ_OBJECT: printf("object_%p", (void*)obj); break;
+        case OBJ_FIBER: printf("fiber_%p", (void*)obj); break;
         case OBJ_RANGE: {
             ObjRange* range = (ObjRange*)obj;
             printf("%g...%g", range->current, range->end);
             break;
         }
-        case OBJ_LIST:
-            printf("list_%p", (void*)obj);
-            break;
+        case OBJ_LIST: printf("list_%p", (void*)obj); break;
+        case OBJ_MAP: printf("map_%p", (void*)obj); break;
     }
 }
 
