@@ -17,10 +17,10 @@ let fromSlot = Fn.new{|slot|
     return Fn.new{ return MethodIterator.clone.init(this, slot); };
 };
 
-Object.keys   = fromSlot("rawIterSlotsNext");
-Object.values = fromSlot("rawIterValueNext");
-Map.keys      = fromSlot("rawIterKeyNext");
-Map.values    = fromSlot("rawIterValueNext");
+Object.keys   = fromSlot.call("rawIterSlotsNext");
+Object.values = fromSlot.call("rawIterValueNext");
+Map.keys      = fromSlot.call("rawIterKeyNext");
+Map.values    = fromSlot.call("rawIterValueNext");
 
 List.fromIterator = Fn.new{|it|
     let list = List.new();
