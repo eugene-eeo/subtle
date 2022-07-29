@@ -1,4 +1,6 @@
 Fn.new{
+Object.!= = Fn.new{|o| return ! (this == o); };
+
 let MethodIterator = {
     init: Fn.new{|obj, slot|
         this._obj = obj;
@@ -29,7 +31,22 @@ List.fromIterator = Fn.new{|it|
     return list;
 };
 
-Object.!= = Fn.new{|o| return ! (this == o); };
-# List.!= = Fn.new{|o| return ! (this == o); };
-# Map.!=  = Fn.new{|o| return ! (this == o); };
+List.== = Fn.new{|o|
+    if (Object.rawGetType(o) != "list" || this.length != o.length)
+        return false;
+    for (i in 0...this.length)
+        if (this.get(i) != o.get(i))
+            return false;
+    return true;
+};
+
+Map.== = Fn.new{|o|
+    if (Object.rawGetType(o) != "map" || this.length != o.length)
+        return false;
+    let SENTINEL = {};
+    for (k in this.keys)
+        if (this.get(k) != o.get(k, SENTINEL))
+            return false;
+    return true;
+};
 }.call;
