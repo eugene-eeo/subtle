@@ -28,4 +28,8 @@ List.fromIterator = Fn.new{|it|
         list.add(item);
     return list;
 };
+
+Object.!= = Fn.new{|o| return ! (this == o); };
+# List.!= = Fn.new{|o| return ! (this == o); };
+# Map.!=  = Fn.new{|o| return ! (this == o); };
 }.call;

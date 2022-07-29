@@ -216,10 +216,10 @@ DEFINE_NATIVE(Object_equal) {
     RETURN(BOOL_TO_VAL(value_equal(args[0], args[1])));
 }
 
-DEFINE_NATIVE(Object_notEqual) {
-    ARGSPEC("**");
-    RETURN(BOOL_TO_VAL(!value_equal(args[0], args[1])));
-}
+/* DEFINE_NATIVE(Object_notEqual) { */
+/*     ARGSPEC("**"); */
+/*     RETURN(BOOL_TO_VAL(!value_equal(args[0], args[1]))); */
+/* } */
 
 DEFINE_NATIVE(Object_not) {
     RETURN(BOOL_TO_VAL(!value_truthy(args[0])));
@@ -696,6 +696,35 @@ DEFINE_NATIVE(List_iterMore) {
     RETURN(rv);
 }
 
+DEFINE_NATIVE(List_equal) {
+    ARGSPEC("L*");
+    if (!IS_LIST(args[1]))
+        RETURN(FALSE_VAL);
+
+    ObjList* a = VAL_TO_LIST(args[0]);
+    ObjList* b = VAL_TO_LIST(args[1]);
+
+    if (a->size != b->size)
+        RETURN(FALSE_VAL);
+
+    vm_ensure_stack(vm, 2);
+    for (size_t i = 0; i < a->size; i++) {
+        // a[i] == b[i]?
+        Value xa = a->values[i];
+        Value xb = b->values[i];
+        if (value_equal(xa, xb)) continue;
+        // slower case.
+        vm_push(vm, xa);
+        vm_push(vm, xb);
+        InterpretResult rv;
+        if (!vm_invoke(vm, xa, OBJ_TO_VAL(objstring_copy(vm, "==", 2)), 1, &rv))
+            return rv;
+        if (!value_truthy(vm_pop(vm)))
+            RETURN(FALSE_VAL);
+    }
+    RETURN(TRUE_VAL);
+}
+
 // ============================= Map =============================
 
 DEFINE_NATIVE(Map_new) {
@@ -752,6 +781,50 @@ DEFINE_NATIVE(Map_rawIterValueNext) {
     RETURN(NIL_VAL);
 }
 
+DEFINE_NATIVE(Map_length) {
+    ARGSPEC("M");
+    ObjMap* map = VAL_TO_MAP(args[0]);
+    RETURN(NUMBER_TO_VAL((double) map->tbl.valid));
+}
+
+DEFINE_NATIVE(Map_equal) {
+    ARGSPEC("M*");
+    if (!IS_MAP(args[1]))
+        RETURN(FALSE_VAL);
+
+    ObjMap* a = VAL_TO_MAP(args[0]);
+    ObjMap* b = VAL_TO_MAP(args[1]);
+
+    // we define equality between Maps as follows:
+    //  1. both have the same size.
+    //  2. both have keys which are value_equal()
+    //  3. both have values which are loose_equal()
+
+    if (a->tbl.valid != b->tbl.valid)
+        RETURN(FALSE_VAL);
+
+    vm_ensure_stack(vm, 2);
+    for (size_t i = 0; i < a->tbl.capacity; i++) {
+        Entry ea = a->tbl.entries[i];
+        Value xa = ea.value;
+        Value xb;
+        // invalid entry?
+        if (IS_UNDEFINED(a->tbl.entries[i].key)) continue;
+        // can't find key in b
+        if (!objmap_get(b, ea.key, &xb)) RETURN(FALSE_VAL);
+        // fast case
+        if (value_equal(xa, xb)) continue;
+        vm_push(vm, xa);
+        vm_push(vm, xb);
+        InterpretResult rv;
+        if (!vm_invoke(vm, xa, OBJ_TO_VAL(objstring_copy(vm, "==", 2)), 1, &rv))
+            return rv;
+        if (!value_truthy(vm_pop(vm)))
+            RETURN(FALSE_VAL);
+    }
+    RETURN(TRUE_VAL);
+}
+
 void core_init_vm(VM* vm)
 {
 #define ADD_OBJECT(table, name, obj) (define_on_table(vm, table, name, OBJ_TO_VAL(obj)))
@@ -774,7 +847,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "deleteSlot",  Object_deleteSlot);
     ADD_METHOD(ObjectProto, "same",        Object_same);
     ADD_METHOD(ObjectProto, "==",          Object_equal);
-    ADD_METHOD(ObjectProto, "!=",          Object_notEqual);
+    /* ADD_METHOD(ObjectProto, "!=",          Object_notEqual); */
     ADD_METHOD(ObjectProto, "!",           Object_not);
     ADD_METHOD(ObjectProto, "clone",       Object_clone);
     ADD_METHOD(ObjectProto, "hasAncestor", Object_hasAncestor);
@@ -852,6 +925,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ListProto, "insert", List_insert);
     ADD_METHOD(ListProto, "iterNext", List_get);
     ADD_METHOD(ListProto, "iterMore", List_iterMore);
+    ADD_METHOD(ListProto, "==", List_equal);
 
     vm->MapProto = objobject_new(vm);
     vm->MapProto->proto = OBJ_TO_VAL(vm->ObjectProto);
@@ -859,9 +933,11 @@ void core_init_vm(VM* vm)
     ADD_METHOD(MapProto, "get", Map_get);
     ADD_METHOD(MapProto, "set", Map_set);
     ADD_METHOD(MapProto, "delete", Map_delete);
+    ADD_METHOD(MapProto, "length", Map_length);
     ADD_METHOD(MapProto, "rawIterMore", Map_rawIterMore);
     ADD_METHOD(MapProto, "rawIterKeyNext", Map_rawIterKeyNext);
     ADD_METHOD(MapProto, "rawIterValueNext", Map_rawIterValueNext);
+    ADD_METHOD(MapProto, "==", Map_equal);
 
     ADD_OBJECT(&vm->globals, "Object", vm->ObjectProto);
     ADD_OBJECT(&vm->globals, "Fn",     vm->FnProto);

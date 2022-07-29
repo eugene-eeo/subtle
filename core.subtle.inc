@@ -32,6 +32,10 @@ const char* CORE_SOURCE =
 "        list.add(item);\n"
 "    return list;\n"
 "};\n"
+"\n"
+"Object.!= = Fn.new{|o| return ! (this == o); };\n"
+"# List.!= = Fn.new{|o| return ! (this == o); };\n"
+"# Map.!=  = Fn.new{|o| return ! (this == o); };\n"
 "}.call;\n"
 ;
 #endif
