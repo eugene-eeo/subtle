@@ -214,15 +214,14 @@ DEFINE_NATIVE(Object_same) {
 DEFINE_NATIVE(Object_rawGetType) {
     ARGSPEC("**");
     Value v = args[1];
+    const char* type;
     switch (v.type) {
-    case VALUE_NIL:  RETURN(OBJ_TO_VAL(objstring_copy(vm, "nil", 3)));
-    case VALUE_TRUE: RETURN(OBJ_TO_VAL(objstring_copy(vm, "true", 4)));
-    case VALUE_FALSE: RETURN(OBJ_TO_VAL(objstring_copy(vm, "false", 5)));
-    case VALUE_NUMBER: RETURN(OBJ_TO_VAL(objstring_copy(vm, "number", 3)));
-    case VALUE_OBJ: {
-        Obj* obj = VAL_TO_OBJ(v);
-        const char* type;
-        switch (obj->type) {
+    case VALUE_NIL:    type = "nil"; break;
+    case VALUE_TRUE:   type = "true"; break;
+    case VALUE_FALSE:  type = "false"; break;
+    case VALUE_NUMBER: type = "number"; break;
+    case VALUE_OBJ:
+        switch (VAL_TO_OBJ(v)->type) {
         case OBJ_STRING:  type = "string"; break;
         case OBJ_CLOSURE: type = "fn"; break;
         case OBJ_OBJECT:  type = "object"; break;
@@ -235,10 +234,10 @@ DEFINE_NATIVE(Object_rawGetType) {
         case OBJ_UPVALUE:
             UNREACHABLE();
         }
-        RETURN(OBJ_TO_VAL(objstring_copy(vm, type, strlen(type))));
-    }
+        break;
     default: UNREACHABLE();
     }
+    RETURN(OBJ_TO_VAL(objstring_copy(vm, type, strlen(type))));
 }
 
 DEFINE_NATIVE(Object_equal) {
