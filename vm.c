@@ -153,6 +153,8 @@ void
 vm_push_frame(VM* vm, ObjClosure* closure, int args)
 {
     if (vm->fiber->frames_count > SUBTLE_MAX_FRAMES) {
+        // TODO: vm_push_frame should _probably_ return an error.
+        // this is recoverable in general, if we don't run out of memory.
         fprintf(stderr, "hit max frame count: %d\n", SUBTLE_MAX_FRAMES);
         exit(1);
     }
