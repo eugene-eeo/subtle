@@ -14,6 +14,8 @@
 #include "debug.h"
 #endif
 
+#define SUBTLE_MAX_FRAMES 1024
+
 void vm_init(VM* vm) {
     vm->fiber = NULL;
     vm->can_yield = true;
@@ -150,6 +152,10 @@ runtime_error(VM* vm)
 void
 vm_push_frame(VM* vm, ObjClosure* closure, int args)
 {
+    if (vm->fiber->frames_count > SUBTLE_MAX_FRAMES) {
+        fprintf(stderr, "hit max frame count: %d\n", SUBTLE_MAX_FRAMES);
+        exit(1);
+    }
     Value* stack_start = vm->fiber->stack_top - args - 1;
 
     ObjFunction* function = closure->function;
