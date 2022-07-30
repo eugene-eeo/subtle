@@ -130,7 +130,9 @@ runtime_error(VM* vm)
     ObjFiber* fiber = vm->fiber;
     ObjString* error = fiber->error;
 
-    // Check if we can find a fiber ran with FIBER_TRY
+    // Unwind the fiber stack.
+    // Find a fiber that's ran with FIBER_TRY, and transfer the
+    // error value to the parent.
     while (fiber != NULL) {
         fiber->error = error;
 
@@ -543,6 +545,8 @@ handle_fibers:
                 if (fiber->error != NULL) {
                     runtime_error(vm);
                     fiber = vm->fiber;
+                    // give up: there's no parent fiber to handle
+                    // the current error.
                     if (fiber == NULL)
                         return INTERPRET_RUNTIME_ERROR;
                 }
