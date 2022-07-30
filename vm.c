@@ -309,7 +309,7 @@ pre_invoke(VM* vm, Value obj, Value key, Value* slot, InterpretResult* rv)
     return true;
 }
 
-static inline bool
+static bool
 invoke(VM* vm, Value obj, Value key, int num_args, InterpretResult* rv)
 {
     Value slot_value;

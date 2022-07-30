@@ -35,6 +35,9 @@ benchmark:
 		bench/benchmark_table.c -o build/table_benchmark
 	./build/table_benchmark
 
+profile: core.subtle.inc
+	$(CC) -Og $(MAIN) -pg -o subtle
+
 lint:
 	cppcheck *.c
 	# clang-tidy *.c -checks=performance-*,clang-analyzer-*,-clang-analyzer-cplusplus*
