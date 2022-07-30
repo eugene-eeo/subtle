@@ -17,7 +17,11 @@ void* memory_realloc(VM* vm, void* ptr, size_t old_size, size_t new_size) {
 #ifdef SUBTLE_DEBUG_STRESS_GC
     if (new_size > old_size) memory_collect(vm);
 #else
-    if (vm->bytes_allocated > vm->next_gc) memory_collect(vm);
+    // only trigger a GC when:
+    //  1. we've allocated beyond the next_gc threshold
+    //  2. we're not freeing any objects (since we use memory_realloc
+    //     to free objects during GC).
+    if (new_size != 0 && vm->bytes_allocated > vm->next_gc) memory_collect(vm);
 #endif
 
     if (new_size == 0) {
