@@ -263,14 +263,13 @@ DEFINE_NATIVE(Object_clone) {
 static bool
 has_ancestor(VM* vm, Value src, Value target)
 {
-    bool rv;
     if (value_equal(src, target)) return true;
     if (IS_OBJ(src)) {
         Obj* obj = VAL_TO_OBJ(src);
         if (obj->visited) return false;
         obj->visited = true;
     }
-    rv = has_ancestor(vm, vm_get_prototype(vm, src), target);
+    bool rv = has_ancestor(vm, vm_get_prototype(vm, src), target);
     if (IS_OBJ(src))
         VAL_TO_OBJ(src)->visited = false;
     return rv;
