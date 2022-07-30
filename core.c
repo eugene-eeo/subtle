@@ -192,7 +192,7 @@ DEFINE_NATIVE(Object_hasOwnSlot) {
     ARGSPEC("**");
 
     if (!IS_OBJECT(args[0]))
-        return false;
+        RETURN(FALSE_VAL);
 
     ObjObject* this = VAL_TO_OBJECT(args[0]);
     RETURN(BOOL_TO_VAL(objobject_has(this, args[1])));
