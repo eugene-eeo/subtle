@@ -248,7 +248,8 @@ static int stack_effects[] = {
 static void emit_op(Compiler* compiler, uint8_t op) {
     emit_byte(compiler, op);
     compiler->slot_count += stack_effects[op];
-    ASSERT(compiler->slot_count >= 1, "compiler->slot_count < 1");
+    if (!compiler->parser->had_error)
+        ASSERT(compiler->slot_count >= 1, "compiler->slot_count < 1");
     if (compiler->function->max_slots < compiler->slot_count)
         compiler->function->max_slots = compiler->slot_count;
 }
