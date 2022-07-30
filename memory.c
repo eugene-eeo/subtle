@@ -21,7 +21,7 @@ void* memory_realloc(VM* vm, void* ptr, size_t old_size, size_t new_size) {
     //  1. we've allocated beyond the next_gc threshold
     //  2. we're not freeing any objects (since we use memory_realloc
     //     to free objects during GC).
-    if (new_size != 0 && vm->bytes_allocated > vm->next_gc) memory_collect(vm);
+    if (new_size > old_size && vm->bytes_allocated > vm->next_gc) memory_collect(vm);
 #endif
 
     if (new_size == 0) {
