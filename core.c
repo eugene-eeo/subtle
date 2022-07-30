@@ -735,6 +735,12 @@ DEFINE_NATIVE(Map_new) {
     RETURN(OBJ_TO_VAL(map));
 }
 
+DEFINE_NATIVE(Map_has) {
+    ARGSPEC("M*");
+    bool rv = objmap_has(VAL_TO_MAP(args[0]), args[1]);
+    RETURN(BOOL_TO_VAL(rv));
+}
+
 DEFINE_NATIVE(Map_get) {
     ARGSPEC("M*");
     Value default_value = NIL_VAL;
@@ -891,6 +897,7 @@ void core_init_vm(VM* vm)
     vm->MapProto = objobject_new(vm);
     vm->MapProto->proto = OBJ_TO_VAL(vm->ObjectProto);
     ADD_METHOD(MapProto, "new", Map_new);
+    ADD_METHOD(MapProto, "has", Map_has);
     ADD_METHOD(MapProto, "get", Map_get);
     ADD_METHOD(MapProto, "set", Map_set);
     ADD_METHOD(MapProto, "delete", Map_delete);
