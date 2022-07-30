@@ -32,7 +32,7 @@ void valuearray_mark(ValueArray* va, VM* vm)
 // Hashing
 // =======
 
-static inline uint32_t hash_bits(uint64_t hash) {
+static uint32_t hash_bits(uint64_t hash) {
     hash = ~hash + (hash << 18);
     hash = hash ^ (hash >> 31);
     hash = hash * 21;
