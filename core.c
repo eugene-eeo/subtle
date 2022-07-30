@@ -211,7 +211,7 @@ DEFINE_NATIVE(Object_same) {
     RETURN(BOOL_TO_VAL(value_equal(args[1], args[2])));
 }
 
-DEFINE_NATIVE(Object_rawGetType) {
+DEFINE_NATIVE(Object_rawType) {
     ARGSPEC("**");
     Value v = args[1];
     const char* type;
@@ -808,7 +808,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "hasOwnSlot",  Object_hasOwnSlot);
     ADD_METHOD(ObjectProto, "deleteSlot",  Object_deleteSlot);
     ADD_METHOD(ObjectProto, "same",        Object_same);
-    ADD_METHOD(ObjectProto, "rawGetType",  Object_rawGetType);
+    ADD_METHOD(ObjectProto, "rawType",     Object_rawType);
     ADD_METHOD(ObjectProto, "==",          Object_equal);
     /* ADD_METHOD(ObjectProto, "!=",          Object_notEqual); */
     ADD_METHOD(ObjectProto, "!",           Object_not);

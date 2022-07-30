@@ -33,7 +33,7 @@ List.fromIterator = Fn.new{|it|
 
 List.== = Fn.new{|o|
     if (Object.same(this, o)) return true;
-    if (Object.rawGetType(o) != "list" || this.length != o.length)
+    if (Object.rawType(o) != "list" || this.length != o.length)
         return false;
     for (i in 0...this.length)
         if (this.get(i) != o.get(i))
@@ -43,7 +43,7 @@ List.== = Fn.new{|o|
 
 Map.== = Fn.new{|o|
     if (Object.same(this, o)) return true;
-    if (Object.rawGetType(o) != "map" || this.length != o.length)
+    if (Object.rawType(o) != "map" || this.length != o.length)
         return false;
     let SENTINEL = {};
     for (k in this.keys)
