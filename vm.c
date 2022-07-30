@@ -288,7 +288,7 @@ vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
 //  1) a pre-invoke, which fetches the slot (using getSlot if necessary).
 //  2) activating the slot's value, if necessary.
 static inline bool
-pre_invoke(VM* vm, Value obj, Value key, Value* slot, InterpretResult* rv)
+pre_invoke(VM* vm, Value obj, Value key, Value* slot)
 {
     if (!vm_get_slot(vm, obj, key, slot)) {
         // If there is no such slot following a recursive proto search,
@@ -298,7 +298,7 @@ pre_invoke(VM* vm, Value obj, Value key, Value* slot, InterpretResult* rv)
             vm_ensure_stack(vm, 2);
             vm_push(vm, obj);
             vm_push(vm, key);
-            if (!vm_call(vm, custom_getSlot, 1, rv))
+            if (!vm_call(vm, custom_getSlot, 1))
                 return false;
             *slot = vm_pop(vm);
             return true;
@@ -312,26 +312,22 @@ pre_invoke(VM* vm, Value obj, Value key, Value* slot, InterpretResult* rv)
 }
 
 static bool
-invoke(VM* vm, Value obj, Value key, int num_args, InterpretResult* rv)
+invoke(VM* vm, Value obj, Value key, int num_args)
 {
     Value slot_value;
-    if (!pre_invoke(vm, obj, key, &slot_value, rv)) return false;
+    if (!pre_invoke(vm, obj, key, &slot_value)) return false;
     // The stack is already in the correct form for a method call.
     // We have `obj` followed by `num_args`.
-    if (!complete_call(vm, slot_value, num_args)) {
-        *rv = INTERPRET_RUNTIME_ERROR;
-        return false;
-    }
-    return true;
+    return complete_call(vm, slot_value, num_args);
 }
 
 bool
-vm_invoke(VM* vm, Value obj, Value key, int num_args, InterpretResult* rv)
+vm_invoke(VM* vm, Value obj, Value key, int num_args)
 {
     Value slot_value;
-    if (!pre_invoke(vm, obj, key, &slot_value, rv))
+    if (!pre_invoke(vm, obj, key, &slot_value))
         return false;
-    return vm_call(vm, slot_value, num_args, rv);
+    return vm_call(vm, slot_value, num_args);
 }
 
 // Run the given fiber until fiber->frames_count == top_level.
@@ -524,16 +520,14 @@ run(VM* vm, ObjFiber* fiber, int top_level) {
                 vm_ensure_stack(vm, 1);     // stack: [obj] [val]
                 fiber->stack_top[-1] = key; // stack: [obj] [key]
                 vm_push(vm, val);           // stack: [obj] [key] [val]
-                InterpretResult rv;
-                invoke(vm, obj, vm->setSlot_string, 2, &rv);
+                invoke(vm, obj, vm->setSlot_string, 2);
                 goto handle_fibers;
             }
             case OP_INVOKE: {
                 Value key = READ_CONSTANT();
                 uint8_t num_args = READ_BYTE();
                 Value obj = vm_peek(vm, num_args);
-                InterpretResult rv;
-                invoke(vm, obj, key, num_args, &rv);
+                invoke(vm, obj, key, num_args);
 handle_fibers:
                 fiber = vm->fiber;
                 if (fiber == NULL) return INTERPRET_OK;
@@ -565,31 +559,30 @@ handle_fibers:
 }
 
 bool
-vm_call(VM* vm, Value slot, int num_args, InterpretResult* rv)
+vm_call(VM* vm, Value slot, int num_args)
 {
+    bool rv;
     bool can_yield = vm->can_yield;
     vm->can_yield = false;
     if (IS_CLOSURE(slot)) {
         ObjClosure* closure = VAL_TO_CLOSURE(slot);
         vm_push_frame(vm, closure, num_args);
-        *rv = run(vm, vm->fiber, vm->fiber->frames_count - 1);
+        rv = run(vm, vm->fiber, vm->fiber->frames_count - 1) == INTERPRET_OK;
     } else if (IS_NATIVE(slot)) {
         ObjNative* native = VAL_TO_NATIVE(slot);
-        *rv = native->fn(vm, &vm->fiber->stack_top[-num_args - 1], num_args)
-            ? INTERPRET_OK
-            : INTERPRET_RUNTIME_ERROR;
+        rv = native->fn(vm, &vm->fiber->stack_top[-num_args - 1], num_args);
     } else {
         if (num_args > 0) {
             vm_runtime_error(vm, "Tried to call a non-activatable slot with %d > 0 args.", num_args);
-            *rv = INTERPRET_RUNTIME_ERROR;
+            rv = false;
         } else {
             vm_pop(vm); // pop `this`
             vm_push(vm, slot);
-            *rv = INTERPRET_OK;
+            rv = true;
         }
     }
     vm->can_yield = can_yield;
-    return *rv == INTERPRET_OK;
+    return rv;
 }
 
 InterpretResult vm_interpret(VM* vm, const char* source) {

@@ -111,11 +111,9 @@ void vm_push_frame(VM* vm, ObjClosure* closure, int num_args);
 // slot until completion.
 // Upon return, if the return value is true, the top of the stack
 // will contain the callable's return value.
-bool vm_call(VM* vm, Value callable, int num_args,
-             InterpretResult* rv);
+bool vm_call(VM* vm, Value callable, int num_args);
 
 // Runs the usual invoke path. This uses vm_call internally.
 bool vm_invoke(VM* vm,
-               Value obj, Value slot_name, int num_args,
-               InterpretResult* rv);
+               Value obj, Value slot_name, int num_args);
 #endif

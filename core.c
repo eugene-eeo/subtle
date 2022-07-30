@@ -330,10 +330,9 @@ DEFINE_NATIVE(Object_toString) {
 
 DEFINE_NATIVE(Object_print) {
     Value this = args[0];
-    InterpretResult rv;
     vm_ensure_stack(vm, 1);
     vm_push(vm, this);
-    if (!vm_invoke(vm, this, OBJ_TO_VAL(objstring_copy(vm, "toString", 8)), 0, &rv))
+    if (!vm_invoke(vm, this, OBJ_TO_VAL(objstring_copy(vm, "toString", 8)), 0))
         return false;
 
     Value slot = vm_peek(vm, 0);
@@ -348,10 +347,9 @@ DEFINE_NATIVE(Object_print) {
 
 DEFINE_NATIVE(Object_println) {
     Value this = args[0];
-    InterpretResult rv;
     vm_ensure_stack(vm, 1);
     vm_push(vm, this);
-    if (!vm_invoke(vm, this, OBJ_TO_VAL(objstring_copy(vm, "print", 5)), 0, &rv))
+    if (!vm_invoke(vm, this, OBJ_TO_VAL(objstring_copy(vm, "print", 5)), 0))
         return false;
     vm_pop(vm);
 
