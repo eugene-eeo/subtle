@@ -315,7 +315,11 @@ objfiber_ensure_stack(ObjFiber* fiber, VM* vm, size_t sz)
         return;
 
     Value* old_stack = fiber->stack;
+#ifdef SUBTLE_DEBUG_STRESS_GC
+    size_t new_capacity = required;
+#else
     size_t new_capacity = next_power_of_two(required);
+#endif
     fiber->stack = GROW_ARRAY(vm, fiber->stack, Value,
                               fiber->stack_capacity,
                               new_capacity);
