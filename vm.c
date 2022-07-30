@@ -523,16 +523,12 @@ run(VM* vm, ObjFiber* fiber, int top_level) {
             case OP_OBJECT_SET: {
                 Value key = READ_CONSTANT();
                 Value obj = vm_peek(vm, 1);
-                Value value = vm_peek(vm, 0);
-                Value setSlot_slot;
-                if (!vm_get_slot(vm, obj, vm->setSlot_string, &setSlot_slot)) {
-                    vm_runtime_error(vm, "No setSlot found.");
-                    goto handle_fibers;
-                }
-                vm_ensure_stack(vm, 1);
-                fiber->stack_top[-1] = key;
-                vm_push(vm, value);
-                complete_call(vm, setSlot_slot, 2);
+                Value val = vm_peek(vm, 0);
+                vm_ensure_stack(vm, 1);     // stack: [obj] [val]
+                fiber->stack_top[-1] = key; // stack: [obj] [key]
+                vm_push(vm, val);           // stack: [obj] [key] [val]
+                InterpretResult rv;
+                invoke(vm, obj, vm->setSlot_string, 2, &rv);
                 goto handle_fibers;
             }
             case OP_INVOKE: {
