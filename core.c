@@ -834,19 +834,19 @@ void core_init_vm(VM* vm)
 
     vm->NumberProto = objobject_new(vm);
     vm->NumberProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    ADD_METHOD(NumberProto, "+",     Number_plus);
-    ADD_METHOD(NumberProto, "-",     Number_minus);
-    ADD_METHOD(NumberProto, "*",     Number_multiply);
-    ADD_METHOD(NumberProto, "/",     Number_divide);
-    ADD_METHOD(NumberProto, "<",     Number_lt);
-    ADD_METHOD(NumberProto, ">",     Number_gt);
-    ADD_METHOD(NumberProto, "<=",    Number_leq);
-    ADD_METHOD(NumberProto, ">=",    Number_geq);
-    ADD_METHOD(NumberProto, "neg",   Number_negate);
-    ADD_METHOD(NumberProto, "|",     Number_lor);
-    ADD_METHOD(NumberProto, "&",     Number_land);
-    ADD_METHOD(NumberProto, "..",    Number_inclusiveRange);
-    ADD_METHOD(NumberProto, "...",   Number_exclusiveRange);
+    ADD_METHOD(NumberProto, "+",   Number_plus);
+    ADD_METHOD(NumberProto, "-",   Number_minus);
+    ADD_METHOD(NumberProto, "*",   Number_multiply);
+    ADD_METHOD(NumberProto, "/",   Number_divide);
+    ADD_METHOD(NumberProto, "<",   Number_lt);
+    ADD_METHOD(NumberProto, ">",   Number_gt);
+    ADD_METHOD(NumberProto, "<=",  Number_leq);
+    ADD_METHOD(NumberProto, ">=",  Number_geq);
+    ADD_METHOD(NumberProto, "neg", Number_negate);
+    ADD_METHOD(NumberProto, "|",   Number_lor);
+    ADD_METHOD(NumberProto, "&",   Number_land);
+    ADD_METHOD(NumberProto, "..",  Number_inclusiveRange);
+    ADD_METHOD(NumberProto, "...", Number_exclusiveRange);
 
     vm->StringProto = objobject_new(vm);
     vm->StringProto->proto = OBJ_TO_VAL(vm->ObjectProto);
