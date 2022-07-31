@@ -245,11 +245,6 @@ DEFINE_NATIVE(Object_equal) {
     RETURN(BOOL_TO_VAL(value_equal(args[0], args[1])));
 }
 
-/* DEFINE_NATIVE(Object_notEqual) { */
-/*     ARGSPEC("**"); */
-/*     RETURN(BOOL_TO_VAL(!value_equal(args[0], args[1]))); */
-/* } */
-
 DEFINE_NATIVE(Object_not) {
     RETURN(BOOL_TO_VAL(!value_truthy(args[0])));
 }
@@ -301,23 +296,23 @@ DEFINE_NATIVE(Object_toString) {
         break;
     case VALUE_OBJ: {
         Obj* obj = VAL_TO_OBJ(this);
-        const char* fmt;
+        const char* prefix;
         switch (obj->type) {
         case OBJ_STRING:  RETURN(this);
-        case OBJ_CLOSURE: fmt = "Fn_%p"; break;
-        case OBJ_OBJECT:  fmt = "Object_%p"; break;
-        case OBJ_NATIVE:  fmt = "Native_%p"; break;
-        case OBJ_FIBER:   fmt = "Fiber_%p"; break;
-        case OBJ_RANGE:   fmt = "Range_%p"; break;
-        case OBJ_LIST:    fmt = "List_%p"; break;
-        case OBJ_MAP:     fmt = "Map_%p"; break;
+        case OBJ_CLOSURE: prefix = "Fn"; break;
+        case OBJ_OBJECT:  prefix = "Object"; break;
+        case OBJ_NATIVE:  prefix = "Native"; break;
+        case OBJ_FIBER:   prefix = "Fiber"; break;
+        case OBJ_RANGE:   prefix = "Range"; break;
+        case OBJ_LIST:    prefix = "List"; break;
+        case OBJ_MAP:     prefix = "Map"; break;
         case OBJ_FUNCTION:
         case OBJ_UPVALUE:
             UNREACHABLE();
         }
-        buf_size = snprintf(NULL, 0, fmt, (void*) obj) + 1;
+        buf_size = snprintf(NULL, 0, "%s_%p", prefix, (void*) obj) + 1;
         buffer = ALLOCATE_ARRAY(vm, char, buf_size);
-        snprintf(buffer, buf_size, fmt, (void*) obj);
+        snprintf(buffer, buf_size, "%s_%p", prefix, (void*) obj);
         break;
     }
     default: UNREACHABLE();
@@ -345,19 +340,6 @@ DEFINE_NATIVE(Object_print) {
     RETURN(NIL_VAL);
 }
 
-DEFINE_NATIVE(Object_println) {
-    Value this = args[0];
-    vm_ensure_stack(vm, 1);
-    vm_push(vm, this);
-    if (!vm_invoke(vm, this, OBJ_TO_VAL(objstring_copy(vm, "print", 5)), 0))
-        return false;
-    vm_pop(vm);
-
-    fprintf(stdout, "\n");
-    fflush(stdout);
-    RETURN(NIL_VAL);
-}
-
 DEFINE_NATIVE(Object_rawIterMore) {
     ARGSPEC("O*");
     ObjObject* obj = VAL_TO_OBJECT(args[0]);
@@ -381,6 +363,36 @@ DEFINE_NATIVE(Object_rawIterValueNext) {
     if (generic_tableIterEntry(&obj->slots, args[1], &entry))
         RETURN(entry.value);
     RETURN(NIL_VAL);
+}
+
+DEFINE_NATIVE(Object_new) {
+    ObjObject* obj = objobject_new(vm);
+    obj->proto = args[0];
+    Value rv = OBJ_TO_VAL(obj);
+    // setup a call for obj.init(...).
+    // rather than copy the receiver and arguments and use the
+    // usual vm_call pattern, we "replace" the current call.
+    // currently the stack is:
+    //
+    //  [ proto ] [ arg1 ] ... [ argn ]
+    //
+    // we need:
+    //  [  rv   ] [ arg1 ] ... [ argn ]
+    //
+    args[0] = rv;
+    if (!vm_invoke(vm, rv, OBJ_TO_VAL(objstring_copy(vm, "init", 4)), num_args))
+        return false;
+
+    Value init_rv = vm_pop(vm);
+    if (!IS_NIL(rv))
+        // allow init to return a non-nil value, to signal
+        // that a different object should be returned.
+        init_rv = rv;
+
+    // tempting to use args[0], but args may have changed
+    // due to push/pops in vm_call.
+    vm_push(vm, init_rv);
+    return true;
 }
 
 // ============================= Fn =============================
@@ -846,13 +858,12 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "same",        Object_same);
     ADD_METHOD(ObjectProto, "rawType",     Object_rawType);
     ADD_METHOD(ObjectProto, "==",          Object_equal);
-    /* ADD_METHOD(ObjectProto, "!=",          Object_notEqual); */
     ADD_METHOD(ObjectProto, "!",           Object_not);
     ADD_METHOD(ObjectProto, "clone",       Object_clone);
     ADD_METHOD(ObjectProto, "hasAncestor", Object_hasAncestor);
     ADD_METHOD(ObjectProto, "toString",    Object_toString);
     ADD_METHOD(ObjectProto, "print",       Object_print);
-    ADD_METHOD(ObjectProto, "println",     Object_println);
+    ADD_METHOD(ObjectProto, "new",         Object_new);
     ADD_METHOD(ObjectProto, "rawIterMore", Object_rawIterMore);
     ADD_METHOD(ObjectProto, "rawIterSlotsNext", Object_rawIterSlotsNext);
     ADD_METHOD(ObjectProto, "rawIterValueNext", Object_rawIterValueNext);

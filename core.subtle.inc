@@ -4,6 +4,11 @@
 const char* CORE_SOURCE =
 "Fn.new{\n"
 "Object.!= = Fn.new{|o| return ! (this == o); };\n"
+"Object.println = Fn.new{\n"
+"    this.print;\n"
+"    \"\n\".print;\n"
+"};\n"
+"Object.init = Fn.new{};\n"
 "\n"
 "let MethodIterator = {\n"
 "    init: Fn.new{|obj, slot|\n"
