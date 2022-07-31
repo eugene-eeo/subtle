@@ -381,11 +381,12 @@ objfiber_free(VM* vm, Obj* obj)
 // ========
 
 ObjRange*
-objrange_new(VM* vm, double start, double end)
+objrange_new(VM* vm, double start, double end, bool inclusive)
 {
     ObjRange* range = ALLOCATE_OBJECT(vm, OBJ_RANGE, ObjRange);
-    range->current = start;
+    range->start = start;
     range->end = end;
+    range->inclusive = inclusive;
     return range;
 }
 

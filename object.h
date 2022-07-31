@@ -142,8 +142,9 @@ typedef struct ObjFiber {
 
 typedef struct ObjRange {
     Obj obj;
-    double current;
+    double start;
     double end;
+    bool inclusive;
 } ObjRange;
 
 typedef struct ObjList {
@@ -214,7 +215,7 @@ bool objfiber_is_done(ObjFiber* fiber);
 // ObjRange
 // ========
 
-ObjRange* objrange_new(VM* vm, double start, double end);
+ObjRange* objrange_new(VM* vm, double start, double end, bool inclusive);
 
 // ObjList
 // =======

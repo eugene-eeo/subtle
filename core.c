@@ -462,14 +462,14 @@ DEFINE_NATIVE(Number_inclusiveRange) {
     ARGSPEC("N");
     double start = VAL_TO_NUMBER(args[0]);
     double end = VAL_TO_NUMBER(args[1]);
-    RETURN(OBJ_TO_VAL(objrange_new(vm, start, end + 1)));
+    RETURN(OBJ_TO_VAL(objrange_new(vm, start, end, true)));
 }
 
 DEFINE_NATIVE(Number_exclusiveRange) {
     ARGSPEC("N");
     double start = VAL_TO_NUMBER(args[0]);
     double end = VAL_TO_NUMBER(args[1]);
-    RETURN(OBJ_TO_VAL(objrange_new(vm, start, end)));
+    RETURN(OBJ_TO_VAL(objrange_new(vm, start, end, false)));
 }
 
 // ============================= String =============================
@@ -642,17 +642,40 @@ DEFINE_NATIVE(Fiber_isDone) {
 // ============================= Range =============================
 
 DEFINE_NATIVE(Range_iterMore) {
-    ARGSPEC("r");
+    ARGSPEC("r*");
     ObjRange* range = VAL_TO_RANGE(args[0]);
-    RETURN(BOOL_TO_VAL(range->current < range->end));
+    // nothing to iterate?
+    if (range->start == range->end && !range->inclusive)
+        RETURN(FALSE_VAL);
+
+    double v;
+    if (IS_NIL(args[1])) {
+        // start of the iteration.
+        v = range->start;
+    } else if (IS_NUMBER(args[1])) {
+        v = VAL_TO_NUMBER(args[1]);
+        if (range->start <= range->end) {
+            // 0..5 or 0...5
+            v = v + 1;
+            if (v < range->start) RETURN(FALSE_VAL);
+            if (range->inclusive && v > range->end) RETURN(FALSE_VAL);
+            if (!range->inclusive && v >= range->end) RETURN(FALSE_VAL);
+        } else {
+            // 5..0 or 5...0
+            v = v - 1;
+            if (v > range->start) RETURN(FALSE_VAL);
+            if (range->inclusive && v < range->end) RETURN(FALSE_VAL);
+            if (!range->inclusive && v <= range->end) RETURN(FALSE_VAL);
+        }
+    } else {
+        RETURN(FALSE_VAL);
+    }
+    RETURN(NUMBER_TO_VAL(v));
 }
 
 DEFINE_NATIVE(Range_iterNext) {
-    ARGSPEC("r");
-    ObjRange* range = VAL_TO_RANGE(args[0]);
-    double current = range->current;
-    range->current++;
-    RETURN(NUMBER_TO_VAL(current));
+    ARGSPEC("rN");
+    RETURN(args[1]);
 }
 
 // ============================= List =============================

@@ -23,7 +23,7 @@ void debug_print_object(Obj* obj) {
         case OBJ_FIBER: printf("fiber_%p", (void*)obj); break;
         case OBJ_RANGE: {
             ObjRange* range = (ObjRange*)obj;
-            printf("%g...%g", range->current, range->end);
+            printf("%g%s%g", range->start, range->inclusive ? ".." : "...", range->end);
             break;
         }
         case OBJ_LIST: printf("list_%p", (void*)obj); break;
