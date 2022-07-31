@@ -641,6 +641,16 @@ DEFINE_NATIVE(Fiber_isDone) {
 
 // ============================= Range =============================
 
+DEFINE_NATIVE(Range_start) {
+    ARGSPEC("r");
+    RETURN(NUMBER_TO_VAL(VAL_TO_RANGE(args[0])->start));
+}
+
+DEFINE_NATIVE(Range_end) {
+    ARGSPEC("r");
+    RETURN(NUMBER_TO_VAL(VAL_TO_RANGE(args[0])->end));
+}
+
 DEFINE_NATIVE(Range_iterMore) {
     ARGSPEC("r*");
     ObjRange* range = VAL_TO_RANGE(args[0]);
@@ -900,6 +910,8 @@ void core_init_vm(VM* vm)
 
     vm->RangeProto = objobject_new(vm);
     vm->RangeProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    ADD_METHOD(RangeProto, "start",    Range_start);
+    ADD_METHOD(RangeProto, "end",      Range_end);
     ADD_METHOD(RangeProto, "iterNext", Range_iterNext);
     ADD_METHOD(RangeProto, "iterMore", Range_iterMore);
 
