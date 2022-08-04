@@ -10,5 +10,5 @@ x.getSlot = Fn.new{|k|
         return k;
     };
 };
-Object.rawGetSlot("print")
-      .callWithThis(x);
+Object.rawGetSlot("print").
+    callWithThis(x);
