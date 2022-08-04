@@ -12,7 +12,6 @@ typedef struct {
 typedef enum {
     // Single character tokens
     TOKEN_PLUS, TOKEN_MINUS, TOKEN_TIMES, TOKEN_SLASH,
-    TOKEN_COLON,
     TOKEN_COMMA,
     TOKEN_LPAREN, TOKEN_RPAREN,
     TOKEN_LBRACE, TOKEN_RBRACE,

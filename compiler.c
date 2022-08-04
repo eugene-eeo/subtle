@@ -597,7 +597,7 @@ static void object(Compiler* compiler, bool can_assign) {
             match(compiler, TOKEN_NEWLINE);
             consume_slot(compiler, "Expect a slot name.");
             uint16_t constant = identifier_constant(compiler, &compiler->parser->previous);
-            consume(compiler, TOKEN_COLON, "Expect ':' after slot name.");
+            consume(compiler, TOKEN_EQ, "Expect '=' after slot name.");
             expression(compiler);
             emit_op(compiler, OP_OBJLIT_SET);
             emit_offset(compiler, constant);

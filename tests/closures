@@ -41,8 +41,8 @@ assert outer.call().call() == "outside";
 let outer = Fn.new {
     let x = 0;
     return {
-        add: Fn.new{ x = x + 1; },
-        get: Fn.new{ return x;  }
+        add = Fn.new{ x = x + 1; },
+        get = Fn.new{ return x;  }
     };
 };
 
