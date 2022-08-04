@@ -1,59 +1,59 @@
 Fn.new{
-Object.!= = Fn.new{|o| return ! (this == o); };
+Object.!= = Fn.new{|o| return ! (this == o) }
 Object.println = Fn.new{
-    this.print;
-    "\n".print;
-};
-Object.init = Fn.new{};
+    this.print
+    "\n".print
+}
+Object.init = Fn.new{}
 
 let MethodIterator = {
     init: Fn.new{|obj, slot|
-        this._obj = obj;
-        this._slot = slot;
-        return this;
+        this._obj = obj
+        this._slot = slot
+        return this
     },
-    iterMore: Fn.new{|v| return this._obj.rawIterMore(v); },
+    iterMore: Fn.new{|v| return this._obj.rawIterMore(v) },
     iterNext: Fn.new{|v|
         return this._obj.
             rawGetSlot(this._slot).
-            callWithThis(this._obj, v);
+            callWithThis(this._obj, v)
     }
-};
+}
 
 let fromSlot = Fn.new{|slot|
-    return Fn.new{ return MethodIterator.clone.init(this, slot); };
-};
+    return Fn.new{ return MethodIterator.clone.init(this, slot) }
+}
 
-Object.keys   = fromSlot.call("rawIterSlotsNext");
-Object.values = fromSlot.call("rawIterValueNext");
-Map.keys      = fromSlot.call("rawIterKeyNext");
-Map.values    = fromSlot.call("rawIterValueNext");
+Object.keys   = fromSlot.call("rawIterSlotsNext")
+Object.values = fromSlot.call("rawIterValueNext")
+Map.keys      = fromSlot.call("rawIterKeyNext")
+Map.values    = fromSlot.call("rawIterValueNext")
 
 List.fromIterator = Fn.new{|it|
-    let list = List.new();
+    let list = List.new()
     for (item in it)
-        list.add(item);
-    return list;
-};
+        list.add(item)
+    return list
+}
 
 List.== = Fn.new{|o|
-    if (Object.same(this, o)) return true;
+    if (Object.same(this, o)) return true
     if (Object.rawType(o) != "list" || this.length != o.length)
-        return false;
+        return false
     for (i in 0...this.length)
         if (this.get(i) != o.get(i))
-            return false;
-    return true;
-};
+            return false
+    return true
+}
 
 Map.== = Fn.new{|o|
-    if (Object.same(this, o)) return true;
+    if (Object.same(this, o)) return true
     if (Object.rawType(o) != "map" || this.length != o.length)
-        return false;
-    let SENTINEL = {};
+        return false
+    let SENTINEL = {}
     for (k in this.keys)
         if (this.get(k) != o.get(k, SENTINEL))
-            return false;
-    return true;
-};
-}.call;
+            return false
+    return true
+}
+}.call
