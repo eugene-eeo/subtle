@@ -14,9 +14,9 @@ let MethodIterator = {
     },
     iterMore: Fn.new{|v| return this._obj.rawIterMore(v); },
     iterNext: Fn.new{|v|
-        return this._obj
-            .rawGetSlot(this._slot)
-            .callWithThis(this._obj, v);
+        return this._obj.
+            rawGetSlot(this._slot).
+            callWithThis(this._obj, v);
     }
 };
 

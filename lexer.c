@@ -65,7 +65,8 @@ static bool is_alphanumeric(char ch) {
     return is_alpha(ch) || is_numeric(ch);
 }
 
-static void skip_whitespace(Lexer* lexer) {
+static bool skip_whitespace(Lexer* lexer) {
+    bool seen_newline = false;
     for (;;) {
         char ch = peek(lexer);
         switch (ch) {
@@ -73,6 +74,8 @@ static void skip_whitespace(Lexer* lexer) {
                 // Special handling for '\n': need to increment the
                 // line count.
                 lexer->line++;
+            case ';':
+                seen_newline = true;
             case ' ':
             case '\t':
             case '\r':
@@ -81,11 +84,12 @@ static void skip_whitespace(Lexer* lexer) {
             case '#':
                 // Comments start with '#' and continue until
                 // the end of the line.
+                seen_newline = true;
                 while (!is_at_end(lexer) && peek(lexer) != '\n')
                     advance(lexer);
                 break;
             default:
-                return;
+                return seen_newline;
         }
     }
 }
@@ -177,7 +181,7 @@ static Token variable(Lexer* lexer) {
 }
 
 Token lexer_next(Lexer* lexer) {
-    skip_whitespace(lexer);
+    if (skip_whitespace(lexer)) return make_token(lexer, TOKEN_NEWLINE);
     lexer->start = lexer->current;
     if (is_at_end(lexer)) return make_token(lexer, TOKEN_EOF);
 
@@ -193,7 +197,6 @@ Token lexer_next(Lexer* lexer) {
         case '/': return make_token(lexer, TOKEN_SLASH);
         case ',': return make_token(lexer, TOKEN_COMMA);
         case ':': return make_token(lexer, TOKEN_COLON);
-        case ';': return make_token(lexer, TOKEN_SEMICOLON);
         case '.':
             if (match(lexer, '.'))
                 return make_token(lexer, match(lexer, '.') ? TOKEN_DOTDOTDOT : TOKEN_DOTDOT);

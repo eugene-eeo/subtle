@@ -594,6 +594,7 @@ static void object(Compiler* compiler, bool can_assign) {
     emit_op(compiler, OP_OBJECT);
     if (!check(compiler, TOKEN_RBRACE)) {
         do {
+            match(compiler, TOKEN_NEWLINE);
             consume_slot(compiler, "Expect a slot name.");
             uint16_t constant = identifier_constant(compiler, &compiler->parser->previous);
             consume(compiler, TOKEN_COLON, "Expect ':' after slot name.");
@@ -602,6 +603,7 @@ static void object(Compiler* compiler, bool can_assign) {
             emit_offset(compiler, constant);
         } while (match(compiler, TOKEN_COMMA));
     }
+    match(compiler, TOKEN_NEWLINE);
     consume(compiler, TOKEN_RBRACE, "Expect '}' after items.");
 }
 
@@ -673,6 +675,7 @@ static void invoke(Compiler* compiler, bool can_assign) {
 }
 
 static void dot(Compiler* compiler, bool can_assign) {
+    match(compiler, TOKEN_NEWLINE);
     consume_slot(compiler, "Expect slot name after '.'.");
     invoke(compiler, can_assign);
 }
@@ -740,7 +743,6 @@ static ParseRule rules[] = {
     [TOKEN_MINUS]     = {unary,    binary, PREC_TERM},
     [TOKEN_TIMES]     = {NULL,     binary, PREC_FACTOR},
     [TOKEN_SLASH]     = {NULL,     binary, PREC_FACTOR},
-    [TOKEN_SEMICOLON] = {NULL,     NULL,   PREC_NONE},
     [TOKEN_COMMA]     = {NULL,     NULL,   PREC_NONE},
     [TOKEN_LPAREN]    = {grouping, NULL,   PREC_NONE},
     [TOKEN_RPAREN]    = {NULL,     NULL,   PREC_NONE},
@@ -773,6 +775,7 @@ static ParseRule rules[] = {
     [TOKEN_ELSE]      = {NULL,     NULL,   PREC_NONE},
     [TOKEN_LET]       = {NULL,     NULL,   PREC_NONE},
     [TOKEN_RETURN]    = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_NEWLINE]   = {NULL,     NULL,   PREC_NONE},
     [TOKEN_ERROR]     = {NULL,     NULL,   PREC_NONE},
     [TOKEN_EOF]       = {NULL,     NULL,   PREC_NONE},
 };
@@ -910,26 +913,29 @@ static void let_decl(Compiler* compiler) {
     } else {
         emit_op(compiler, OP_NIL);
     }
-    consume(compiler, TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
 
     define_variable(compiler, global);
 }
 
 static void assert_stmt(Compiler* compiler) {
     expression(compiler);
-    consume(compiler, TOKEN_SEMICOLON, "Expect ';' after expression.");
     emit_op(compiler, OP_ASSERT);
 }
 
 static void block(Compiler* compiler) {
+    match(compiler, TOKEN_NEWLINE);
     begin_block(compiler);
-    while (!check(compiler, TOKEN_EOF) && !check(compiler, TOKEN_RBRACE))
+    bool has_newlines = true;
+    while (!check(compiler, TOKEN_EOF) && !check(compiler, TOKEN_RBRACE) && has_newlines) {
         declaration(compiler);
+        has_newlines = match(compiler, TOKEN_NEWLINE);
+    }
     consume(compiler, TOKEN_RBRACE, "Expect '}' after block.");
     end_block(compiler);
 }
 
 static void block_or_stmt(Compiler* compiler) {
+    match(compiler, TOKEN_NEWLINE);
     if (match(compiler, TOKEN_LBRACE)) {
         block(compiler);
     } else {
@@ -1047,7 +1053,6 @@ static void continue_stmt(Compiler* compiler) {
     }
     pop_to_scope(compiler, compiler->loop->depth);
     emit_loop(compiler, compiler->loop->start);
-    consume(compiler, TOKEN_SEMICOLON, "Expect ';' after 'continue'.");
 }
 
 static void break_stmt(Compiler* compiler) {
@@ -1057,18 +1062,16 @@ static void break_stmt(Compiler* compiler) {
     }
     pop_to_scope(compiler, compiler->loop->depth);
     emit_loop(compiler, compiler->loop->break_jump);
-    consume(compiler, TOKEN_SEMICOLON, "Expect ';' after 'break'.");
 }
 
 static void return_stmt(Compiler* compiler) {
     if (compiler->type == FUNCTION_TYPE_SCRIPT)
         error(compiler, "Cannot return from top-level code.");
 
-    if (match(compiler, TOKEN_SEMICOLON)) {
+    if (check(compiler, TOKEN_NEWLINE)) {
         emit_return(compiler);
     } else {
         expression(compiler);
-        consume(compiler, TOKEN_SEMICOLON, "Expected ';' after expression.");
         emit_op(compiler, OP_RETURN);
     }
 }
@@ -1076,7 +1079,7 @@ static void return_stmt(Compiler* compiler) {
 static void synchronize(Compiler* compiler) {
     compiler->parser->panic_mode = false;
     while (compiler->parser->current.type != TOKEN_EOF) {
-        if (compiler->parser->previous.type == TOKEN_SEMICOLON) return;
+        if (compiler->parser->previous.type == TOKEN_NEWLINE) return;
         switch (compiler->parser->current.type) {
             case TOKEN_LET:
             case TOKEN_WHILE:
@@ -1121,7 +1124,6 @@ static void statement(Compiler* compiler) {
     } else {
         // Expression statement
         expression(compiler);
-        consume(compiler, TOKEN_SEMICOLON, "Expect ';' after expression.");
         emit_op(compiler, OP_POP);
     }
 }
@@ -1136,11 +1138,15 @@ compile(VM* vm, const char* source)
     compiler_init(&compiler, NULL, &parser, vm, FUNCTION_TYPE_SCRIPT);
 
     advance(&compiler);
-    while (!match(&compiler, TOKEN_EOF))
+    match(&compiler, TOKEN_NEWLINE);
+    bool has_newline = true;
+    while (!match(&compiler, TOKEN_EOF) && has_newline) {
         declaration(&compiler);
+        has_newline = match(&compiler, TOKEN_NEWLINE);
+    }
 
     ObjFunction* function = compiler_end(&compiler);
-    consume(&compiler, TOKEN_EOF, "Expect end of expression.");
+    consume(&compiler, TOKEN_EOF, "Expect end of file.");
     return parser.had_error ? NULL : function;
 }
 
