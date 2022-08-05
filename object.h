@@ -116,6 +116,8 @@ typedef struct {
 } CallFrame;
 
 typedef enum {
+    // VM's root fiber -- this fiber cannot be switched to.
+    FIBER_ROOT,
     // This Fiber was ran with a .try(), indicating that the parent
     // fiber will handle the error.
     FIBER_TRY,

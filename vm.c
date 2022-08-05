@@ -593,6 +593,7 @@ InterpretResult vm_interpret(VM* vm, const char* source) {
     ObjClosure* closure = objclosure_new(vm, fn);
     vm_push_root(vm, OBJ_TO_VAL(closure));
     vm->fiber = objfiber_new(vm, closure);
+    vm->fiber->state = FIBER_ROOT;
     vm_pop_root(vm);
     vm_pop_root(vm);
 
