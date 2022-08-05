@@ -1,11 +1,3 @@
-let f = Fiber.current;
-# f.parent.println;
-let g = f.call;
-# f.parent.println;
-# f.println;
-# f.yield;
-g.println;
-
 let get_fiber = Fn.new{
     return Fiber.new{|v|
         while (true) {
@@ -35,10 +27,3 @@ let f = Fiber.new{
 f.call;
 assert !x.hasOwnSlot("b");
 f.call(2);
-
-# let x = {};
-# x.getSlot = Fn.new{|k, v|
-#     k.println;
-#     Fiber.yield;
-# };
-# x.b.println;
