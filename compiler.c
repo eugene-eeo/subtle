@@ -715,6 +715,9 @@ static void binary(Compiler* compiler, bool can_assign) {
     Token op_token = compiler->parser->previous;
     TokenType operator = op_token.type;
     ParseRule* rule = get_rule(operator);
+
+    // allow a newline after the operator.
+    match(compiler, TOKEN_NEWLINE);
     parse_precedence(compiler, (Precedence)(rule->precedence + 1));
 
     switch (operator) {
