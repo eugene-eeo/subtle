@@ -616,6 +616,7 @@ static void block_argument(Compiler* compiler) {
     // Parse the optional parameter list, if any.
     if (match(&c, TOKEN_PIPE)) {
         do {
+            match(compiler, TOKEN_NEWLINE);
             c.function->arity++;
             if (c.function->arity > 255) {
                 error_at_current(&c, "Cannot have more than 255 parameters.");
