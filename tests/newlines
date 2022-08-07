@@ -29,6 +29,15 @@ assert (
     3
 ) == 6
 
+let a;
+(
+    a
+    =
+    1
+    +
+    2
+)
+
 # this exposes a slight inconsistency where space-style
 # method calls, e.g. `Object proto` are not allowed to
 # break multiple lines.

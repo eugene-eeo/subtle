@@ -546,12 +546,16 @@ static void or_(Compiler* compiler, bool can_assign, bool allow_newlines) {
     patch_jump(compiler, else_jump);
 }
 
-static void named_variable(Compiler* compiler, Token* name, bool can_assign) {
+static void named_variable(Compiler* compiler, Token name, bool can_assign, bool allow_newlines) {
+    if (allow_newlines)
+        match(compiler, TOKEN_NEWLINE);
+
     // Check if we can resolve to a local variable.
-    int local = resolve_local(compiler, name);
+    int local = resolve_local(compiler, &name);
     if (local != -1) {
         if (can_assign && match(compiler, TOKEN_EQ)) {
-            expression(compiler, false);
+            match(compiler, TOKEN_NEWLINE);
+            expression(compiler, allow_newlines);
             emit_op(compiler, OP_SET_LOCAL);
             emit_byte(compiler, (uint8_t) local);
         } else {
@@ -562,10 +566,11 @@ static void named_variable(Compiler* compiler, Token* name, bool can_assign) {
     }
 
     // Check if we can resolve it as an upvalue.
-    int upvalue = resolve_upvalue(compiler, name);
+    int upvalue = resolve_upvalue(compiler, &name);
     if (upvalue != -1) {
         if (can_assign && match(compiler, TOKEN_EQ)) {
-            expression(compiler, false);
+            match(compiler, TOKEN_NEWLINE);
+            expression(compiler, allow_newlines);
             emit_op(compiler, OP_SET_UPVALUE);
             emit_byte(compiler, (uint8_t) upvalue);
         } else {
@@ -576,9 +581,10 @@ static void named_variable(Compiler* compiler, Token* name, bool can_assign) {
     }
 
     // Otherwise, it's a global.
-    uint16_t global = identifier_constant(compiler, name);
+    uint16_t global = identifier_constant(compiler, &name);
     if (can_assign && match(compiler, TOKEN_EQ)) {
-        expression(compiler, false);
+        match(compiler, TOKEN_NEWLINE);
+        expression(compiler, allow_newlines);
         emit_op(compiler, OP_SET_GLOBAL);
         emit_offset(compiler, global);
     } else {
@@ -588,7 +594,7 @@ static void named_variable(Compiler* compiler, Token* name, bool can_assign) {
 }
 
 static void variable(Compiler* compiler, bool can_assign, bool allow_newlines) {
-    named_variable(compiler, &compiler->parser->previous, can_assign);
+    named_variable(compiler, compiler->parser->previous, can_assign, allow_newlines);
 }
 
 static void object(Compiler* compiler, bool can_assign, bool allow_newlines) {
