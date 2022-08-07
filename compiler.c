@@ -692,7 +692,9 @@ static void this(Compiler* compiler, bool can_assign) {
 }
 
 static void grouping(Compiler* compiler, bool can_assign) {
+    match(compiler, TOKEN_NEWLINE);
     expression(compiler);
+    match(compiler, TOKEN_NEWLINE);
     consume(compiler, TOKEN_RPAREN, "Expect ')' after expression.");
 }
 

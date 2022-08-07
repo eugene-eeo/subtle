@@ -18,6 +18,11 @@ for (i in 1..10) {
 
 }
 
+assert (
+    1 +
+    2
+) == 3
+
 # this exposes a slight inconsistency where space-style
 # method calls, e.g. `Object proto` are not allowed to
 # break multiple lines.
