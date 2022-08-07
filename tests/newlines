@@ -1,0 +1,29 @@
+# allowed for now :)
+# primarily so that repl works without having to implement multi-line support.
+Fn.new{|a|; return a + 1}
+
+# should be able to break at operators
+assert 1 +
+    2 *
+    3 == 7
+
+for (i in 1..10) {
+
+    # allow for trailing and leading whitespace.
+    # at one point, this was a bug in the compiler.
+    assert i == i
+
+    # another one just to be sure.
+    assert i == i
+
+}
+
+# this exposes a slight inconsistency where space-style
+# method calls, e.g. `Object proto` are not allowed to
+# break multiple lines.
+# whether this is worth implementing something like \
+# is still up in the air.
+assert Object.
+    proto. # nil
+    proto. # Object
+    proto == nil
