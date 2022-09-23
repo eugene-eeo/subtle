@@ -91,7 +91,6 @@ typedef enum {
     PREC_TERM,       // + -
     PREC_FACTOR,     // * /
     PREC_PREFIX,     // ! -
-    PREC_POSTFIX,    // method calls
     PREC_CALL,       // (), .
     PREC_LITERAL,    // literals
 } Precedence;
@@ -651,6 +650,8 @@ static void block_argument(Compiler* compiler) {
 
 static void invoke(Compiler* compiler, bool can_assign, bool allow_newlines) {
     const Token op_token = compiler->parser->previous;
+    if (allow_newlines)
+        match(compiler, TOKEN_NEWLINE);
 
     if (can_assign && match(compiler, TOKEN_EQ)) {
         match(compiler, TOKEN_NEWLINE);
@@ -703,7 +704,6 @@ static void this(Compiler* compiler, bool can_assign, bool allow_newlines) {
 static void grouping(Compiler* compiler, bool can_assign, bool allow_newlines) {
     match(compiler, TOKEN_NEWLINE);
     expression(compiler, true);
-    match(compiler, TOKEN_NEWLINE);
     consume(compiler, TOKEN_RPAREN, "Expect ')' after expression.");
 }
 
@@ -780,12 +780,12 @@ static ParseRule rules[] = {
     [TOKEN_DOTDOTDOT] = {NULL,     binary, PREC_RANGE},
     [TOKEN_NUMBER]    = {number,   NULL,   PREC_NONE},
     [TOKEN_STRING]    = {string,   NULL,   PREC_NONE},
-    [TOKEN_VARIABLE]  = {variable, invoke, PREC_POSTFIX},
-    [TOKEN_NIL]       = {literal,  invoke, PREC_POSTFIX},
-    [TOKEN_TRUE]      = {literal,  invoke, PREC_POSTFIX},
-    [TOKEN_FALSE]     = {literal,  invoke, PREC_POSTFIX},
+    [TOKEN_VARIABLE]  = {variable, invoke, PREC_CALL},
+    [TOKEN_NIL]       = {literal,  invoke, PREC_CALL},
+    [TOKEN_TRUE]      = {literal,  invoke, PREC_CALL},
+    [TOKEN_FALSE]     = {literal,  invoke, PREC_CALL},
     [TOKEN_WHILE]     = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_THIS]      = {this,     invoke, PREC_POSTFIX},
+    [TOKEN_THIS]      = {this,     invoke, PREC_CALL},
     [TOKEN_IF]        = {NULL,     NULL,   PREC_NONE},
     [TOKEN_ELSE]      = {NULL,     NULL,   PREC_NONE},
     [TOKEN_LET]       = {NULL,     NULL,   PREC_NONE},
@@ -816,6 +816,8 @@ static void parse_precedence(Compiler* compiler, Precedence prec, bool allow_new
         advance(compiler);
         ParseFn infix_rule = get_rule(compiler->parser->previous.type)->infix;
         infix_rule(compiler, can_assign, allow_newlines);
+        if (allow_newlines)
+            match(compiler, TOKEN_NEWLINE);
     }
 }
 

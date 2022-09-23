@@ -163,7 +163,7 @@ DEFINE_NATIVE(Object_setSlot) {
     ARGSPEC("O**");
 
     objobject_set(VAL_TO_OBJECT(args[0]), vm, args[1], args[2]);
-    RETURN(NIL_VAL);
+    RETURN(args[2]);
 }
 
 DEFINE_NATIVE(Object_hasSlot) {

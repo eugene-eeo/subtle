@@ -29,7 +29,7 @@ assert (
     3
 ) == 6
 
-let a;
+let a
 (
     a
     =
@@ -38,12 +38,20 @@ let a;
     2
 )
 
-# this exposes a slight inconsistency where space-style
-# method calls, e.g. `Object proto` are not allowed to
-# break multiple lines.
-# whether this is worth implementing something like \
-# is still up in the air.
 assert Object.
     proto. # nil
     proto. # Object
     proto == nil
+
+# mix and match dot/space-style access
+assert (Object
+    proto # nil
+    .proto # Object
+    proto) == nil
+
+let x = {}
+assert (x
+    y
+    = 5
+    ) == 5
+assert x y == 5
