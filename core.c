@@ -163,7 +163,7 @@ DEFINE_NATIVE(Object_setSlot) {
     ARGSPEC("O**");
 
     objobject_set(VAL_TO_OBJECT(args[0]), vm, args[1], args[2]);
-    RETURN(NIL_VAL);
+    RETURN(args[2]);
 }
 
 DEFINE_NATIVE(Object_hasSlot) {
@@ -370,28 +370,15 @@ DEFINE_NATIVE(Object_new) {
     obj->proto = args[0];
     Value rv = OBJ_TO_VAL(obj);
     // setup a call for obj.init(...).
-    // rather than copy the receiver and arguments and use the
-    // usual vm_call pattern, we "replace" the current call.
-    // currently the stack is:
-    //
-    //  [ proto ] [ arg1 ] ... [ argn ]
-    //
-    // we need:
-    //  [  rv   ] [ arg1 ] ... [ argn ]
-    //
+    // rather than copy the receiver and arguments we "replace"
+    // the current call.
+    // we have: [ proto ] [ arg1 ] ... [ argn ]
+    // we need: [  rv   ] [ arg1 ] ... [ argn ]
     args[0] = rv;
-    if (!vm_invoke(vm, rv, OBJ_TO_VAL(objstring_copy(vm, "init", 4)), num_args))
+    if (!vm_invoke(vm, rv, vm->init_string, num_args))
         return false;
-
-    Value init_rv = vm_pop(vm);
-    if (!IS_NIL(rv))
-        // allow init to return a non-nil value, to signal
-        // that a different object should be returned.
-        init_rv = rv;
-
-    // tempting to use args[0], but args may have changed
-    // due to push/pops in vm_call.
-    vm_push(vm, init_rv);
+    vm_pop(vm);
+    vm_push(vm, rv);
     return true;
 }
 
@@ -844,6 +831,7 @@ void core_init_vm(VM* vm)
 
     vm->getSlot_string = OBJ_TO_VAL(objstring_copy(vm, "getSlot", 7));
     vm->setSlot_string = OBJ_TO_VAL(objstring_copy(vm, "setSlot", 7));
+    vm->init_string = OBJ_TO_VAL(objstring_copy(vm, "init", 4));
 
     vm->ObjectProto = objobject_new(vm);
     ADD_METHOD(ObjectProto, "proto",       Object_proto);

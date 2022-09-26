@@ -38,7 +38,7 @@ x.nil = 15;   assert x.nil == 15;
 x.this = 16;  assert x.this == 16;
 
 let seen;
-x = {a:1, b:2, c:3};
+x = {a=1, b=2, c=3};
 
 # keys
 seen = {};

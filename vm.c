@@ -22,6 +22,7 @@ void vm_init(VM* vm) {
 
     vm->getSlot_string = NIL_VAL;
     vm->setSlot_string = NIL_VAL;
+    vm->init_string = NIL_VAL;
 
     vm->ObjectProto = NULL;
     vm->FnProto = NULL;
@@ -287,6 +288,8 @@ vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
 // An Invoke is split into two sections:
 //  1) a pre-invoke, which fetches the slot (using getSlot if necessary).
 //  2) activating the slot's value, if necessary.
+// For performance, we assume that both obj and key are on the stack
+// (or, somewhere we can trace the roots).
 static bool
 pre_invoke(VM* vm, Value obj, Value key, Value* slot)
 {

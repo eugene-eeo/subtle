@@ -351,9 +351,11 @@ objfiber_push_frame(ObjFiber* fiber, VM* vm,
                     ObjClosure* closure, Value* stack_start)
 {
     if (fiber->frames_count + 1 > fiber->frames_capacity) {
+        vm_push_root(vm, OBJ_TO_VAL(closure));
         size_t new_capacity = GROW_CAPACITY(fiber->frames_capacity);
         fiber->frames = GROW_ARRAY(vm, fiber->frames, CallFrame, fiber->frames_capacity, new_capacity);
         fiber->frames_capacity = new_capacity;
+        vm_pop_root(vm);
     }
     CallFrame* frame = &fiber->frames[fiber->frames_count++];
     frame->closure = closure;

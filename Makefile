@@ -59,6 +59,7 @@ run_test:
 	$(RUNNER) ./subtle ./tests/fiber
 	$(RUNNER) ./subtle ./tests/fiber2
 	$(RUNNER) ./subtle ./tests/list
+	$(RUNNER) ./subtle ./tests/newlines
 
 test:
 	make stress

@@ -12,11 +12,9 @@ typedef struct {
 typedef enum {
     // Single character tokens
     TOKEN_PLUS, TOKEN_MINUS, TOKEN_TIMES, TOKEN_SLASH,
-    TOKEN_SEMICOLON,
-    TOKEN_COLON,
     TOKEN_COMMA,
-    TOKEN_LPAREN, TOKEN_RPAREN,
-    TOKEN_LBRACE, TOKEN_RBRACE,
+    TOKEN_LPAREN, TOKEN_RPAREN, // (, )
+    TOKEN_LBRACE, TOKEN_RBRACE, // {, }
     // One-or-two characters
     TOKEN_EQ, TOKEN_EQ_EQ,       // =, ==
     TOKEN_BANG, TOKEN_BANG_EQ,   // !, !=
@@ -45,6 +43,7 @@ typedef enum {
     TOKEN_FOR,
     TOKEN_IN,
 
+    TOKEN_NEWLINE,
     TOKEN_ERROR,
     TOKEN_EOF,
 } TokenType;
