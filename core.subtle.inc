@@ -8,7 +8,6 @@ const char* CORE_SOURCE =
 "    this.print\n"
 "    \"\n\".print\n"
 "}\n"
-"Object.init = Fn.new{}\n"
 "\n"
 "let MethodIterator = {\n"
 "    init = Fn.new{|obj, slot|\n"

@@ -81,6 +81,7 @@ static void mark_roots(VM* vm) {
     // Mark the constants
     mark_value(vm, vm->getSlot_string);
     mark_value(vm, vm->setSlot_string);
+    mark_value(vm, vm->init_string);
 
     // Mark the *Protos
     mark_object(vm, (Obj*)vm->ObjectProto);

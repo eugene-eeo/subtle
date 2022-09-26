@@ -4,7 +4,6 @@ Object.println = Fn.new{
     this.print
     "\n".print
 }
-Object.init = Fn.new{}
 
 let MethodIterator = {
     init = Fn.new{|obj, slot|

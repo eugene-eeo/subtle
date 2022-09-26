@@ -23,9 +23,10 @@ typedef struct VM {
     bool can_yield;
 
     // ---- init'ed by core ----
-    // Constants needed by the VM
+    // Constants needed by the VM or core
     Value getSlot_string;
     Value setSlot_string;
+    Value init_string;
 
     // Core Protos
     ObjObject* ObjectProto;

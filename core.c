@@ -380,7 +380,7 @@ DEFINE_NATIVE(Object_new) {
     //  [  rv   ] [ arg1 ] ... [ argn ]
     //
     args[0] = rv;
-    if (!vm_invoke(vm, rv, OBJ_TO_VAL(objstring_copy(vm, "init", 4)), num_args))
+    if (!vm_invoke(vm, rv, vm->init_string, num_args))
         return false;
 
     Value init_rv = vm_pop(vm);
@@ -844,6 +844,7 @@ void core_init_vm(VM* vm)
 
     vm->getSlot_string = OBJ_TO_VAL(objstring_copy(vm, "getSlot", 7));
     vm->setSlot_string = OBJ_TO_VAL(objstring_copy(vm, "setSlot", 7));
+    vm->init_string = OBJ_TO_VAL(objstring_copy(vm, "init", 4));
 
     vm->ObjectProto = objobject_new(vm);
     ADD_METHOD(ObjectProto, "proto",       Object_proto);
