@@ -370,32 +370,12 @@ DEFINE_NATIVE(Object_new) {
     obj->proto = args[0];
     Value rv = OBJ_TO_VAL(obj);
     // setup a call for obj.init(...).
-    // rather than copy the receiver and arguments and use the
-    // usual vm_call pattern, we "replace" the current call.
-    // currently the stack is:
-    //
-    //  [ proto ] [ arg1 ] ... [ argn ]
-    //
-    // we need:
-    //  [  rv   ] [ arg1 ] ... [ argn ]
-    //
+    // rather than copy the receiver and arguments we "replace"
+    // the current call.
+    // we have: [ proto ] [ arg1 ] ... [ argn ]
+    // we need: [  rv   ] [ arg1 ] ... [ argn ]
     args[0] = rv;
-    if (!vm_invoke(vm, rv, vm->init_string, num_args))
-        return false;
-
-    Value init_rv = vm_pop(vm);
-    if (!IS_NIL(init_rv))
-        // allow init to return a non-nil value, to signal
-        // that a different object should be returned.
-        rv = init_rv;
-
-    // tempting to use args[0], but args may have changed
-    // due to push/pops in vm_call.
-    // it's safe to return the initial rv from earlier here as:
-    // 1. it was on the stack when we call vm_invoke
-    // 2. vm_pop does not GC.
-    vm_push(vm, rv);
-    return true;
+    return vm_invoke(vm, rv, vm->init_string, num_args);
 }
 
 // ============================= Fn =============================
