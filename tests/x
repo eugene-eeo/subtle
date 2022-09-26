@@ -12,3 +12,7 @@ x.getSlot = Fn.new{|k|
 };
 Object.rawGetSlot("print").
     callWithThis(x);
+
+# Object_new
+let x = { init = Fn.new{ return x } }
+assert x new == x

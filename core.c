@@ -384,14 +384,17 @@ DEFINE_NATIVE(Object_new) {
         return false;
 
     Value init_rv = vm_pop(vm);
-    if (!IS_NIL(rv))
+    if (!IS_NIL(init_rv))
         // allow init to return a non-nil value, to signal
         // that a different object should be returned.
-        init_rv = rv;
+        rv = init_rv;
 
     // tempting to use args[0], but args may have changed
     // due to push/pops in vm_call.
-    vm_push(vm, init_rv);
+    // it's safe to return the initial rv from earlier here as:
+    // 1. it was on the stack when we call vm_invoke
+    // 2. vm_pop does not GC.
+    vm_push(vm, rv);
     return true;
 }
 
