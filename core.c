@@ -375,7 +375,11 @@ DEFINE_NATIVE(Object_new) {
     // we have: [ proto ] [ arg1 ] ... [ argn ]
     // we need: [  rv   ] [ arg1 ] ... [ argn ]
     args[0] = rv;
-    return vm_invoke(vm, rv, vm->init_string, num_args);
+    if (!vm_invoke(vm, rv, vm->init_string, num_args))
+        return false;
+    vm_pop(vm);
+    vm_push(vm, rv);
+    return true;
 }
 
 // ============================= Fn =============================
