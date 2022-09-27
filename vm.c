@@ -164,7 +164,9 @@ vm_push_frame(VM* vm, ObjClosure* closure, int args)
     Value* stack_start = vm->fiber->stack_top - args - 1;
 
     ObjFunction* function = closure->function;
+    vm_push_root(vm, OBJ_TO_VAL(closure));
     objfiber_push_frame(vm->fiber, vm, closure, stack_start);
+    vm_pop_root(vm);
     vm_ensure_stack(vm, function->max_slots);
 
     // Fix the number of arguments.
