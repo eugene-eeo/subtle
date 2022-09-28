@@ -664,6 +664,7 @@ static void invoke(Compiler* compiler, bool can_assign, bool allow_newlines) {
     uint8_t num_args = 0;
     // Match the optional arguments.
     if (match(compiler, TOKEN_LPAREN)) {
+        match(compiler, TOKEN_NEWLINE);
         if (!check(compiler, TOKEN_RPAREN)) {
             do {
                 if (num_args == 255)

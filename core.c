@@ -372,8 +372,8 @@ DEFINE_NATIVE(Object_new) {
     // setup a call for obj.init(...).
     // rather than copy the receiver and arguments we "replace"
     // the current call.
-    // we have: [ proto ] [ arg1 ] ... [ argn ]
-    // we need: [  rv   ] [ arg1 ] ... [ argn ]
+    // we have: | proto | arg1 | ... | argn |
+    // we need: |  rv   | arg1 | ... | argn |
     args[0] = rv;
     if (!vm_invoke(vm, rv, vm->init_string, num_args))
         return false;
