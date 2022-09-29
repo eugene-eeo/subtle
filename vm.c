@@ -522,11 +522,26 @@ run(VM* vm, ObjFiber* fiber, int top_level) {
                 Value key = READ_CONSTANT();
                 Value obj = vm_peek(vm, 1);
                 Value val = vm_peek(vm, 0);
-                vm_ensure_stack(vm, 1);     // stack: [obj] [val]
-                fiber->stack_top[-1] = key; // stack: [obj] [key]
-                vm_push(vm, val);           // stack: [obj] [key] [val]
-                invoke(vm, obj, vm->setSlot_string, 2);
-                goto handle_fibers;
+                Value setSlot;
+                if (vm_get_slot(vm, obj, vm->setSlot_string, &setSlot)) {
+                    // custom setSlot -- invoke it.
+                    vm_ensure_stack(vm, 1);     // stack: [obj] [val]
+                    fiber->stack_top[-1] = key; // stack: [obj] [key]
+                    vm_push(vm, val);           // stack: [obj] [key] [val]
+                    invoke(vm, obj, vm->setSlot_string, 2);
+                    goto handle_fibers;
+                } else {
+                    if (IS_OBJECT(obj)) {
+                        objobject_set(VAL_TO_OBJECT(obj), vm, key, val);
+                        vm_pop(vm);
+                        vm_pop(vm);
+                        vm_push(vm, val);
+                        break;
+                    } else {
+                        vm_runtime_error(vm, "Cannot set slot on a non-object.");
+                        goto handle_fibers;
+                    }
+                }
             }
             case OP_INVOKE: {
                 Value key = READ_CONSTANT();
