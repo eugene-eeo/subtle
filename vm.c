@@ -153,7 +153,7 @@ runtime_error(VM* vm)
 }
 
 void
-vm_push_frame(VM* vm, ObjClosure* closure, int args)
+vm_push_frame(VM* vm, ObjClosure* closure, int num_args)
 {
     if (vm->fiber->frames_count > SUBTLE_MAX_FRAMES) {
         // TODO: vm_push_frame should _probably_ return an error.
@@ -161,7 +161,7 @@ vm_push_frame(VM* vm, ObjClosure* closure, int args)
         fprintf(stderr, "hit max frame count: %d\n", SUBTLE_MAX_FRAMES);
         exit(1);
     }
-    Value* stack_start = vm->fiber->stack_top - args - 1;
+    Value* stack_start = vm->fiber->stack_top - num_args - 1;
 
     ObjFunction* function = closure->function;
     vm_push_root(vm, OBJ_TO_VAL(closure));
@@ -172,9 +172,9 @@ vm_push_frame(VM* vm, ObjClosure* closure, int args)
     // Fix the number of arguments.
     // Since -1 arity means a script, we ignore that here.
     if (function->arity != -1) {
-        for (int i = 0; i < function->arity - args; i++) vm_push(vm, NIL_VAL);
-        if (args > function->arity)
-            vm_drop(vm, args - function->arity);
+        for (int i = 0; i < function->arity - num_args; i++) vm_push(vm, NIL_VAL);
+        if (num_args > function->arity)
+            vm_drop(vm, num_args - function->arity);
     }
 }
 

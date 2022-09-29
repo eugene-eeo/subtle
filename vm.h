@@ -105,11 +105,11 @@ vm_ensure_stack(VM* vm, size_t n)
 // excluding "this".
 // The stack should look like this:
 //
-//                | nargs |
-//   +-----+------+-------+
-//   | ... | this |  ...  |
-//   +-----+------+-------+
-//                        ^-- stack_top
+//                | num_args |
+//   +-----+------+----------+
+//   | ... | this |   ...    |
+//   +-----+------+----------+
+//                           ^-- stack_top
 void vm_push_frame(VM* vm, ObjClosure* closure, int num_args);
 
 // Runs the given slot, returning true if the call succeeded
