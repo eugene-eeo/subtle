@@ -1,10 +1,9 @@
-#include "vm.h"
-
 #include "common.h"
 #include "compiler.h"
 #include "memory.h"
 #include "object.h"
 #include "value.h"
+#include "vm.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -17,9 +16,7 @@
 
 #define SUBTLE_MAX_FRAMES 1024
 
-void
-vm_init(VM* vm)
-{
+void vm_init(VM* vm) {
     vm->fiber = NULL;
     vm->can_yield = true;
 
@@ -51,9 +48,7 @@ vm_init(VM* vm)
     vm->compiler = NULL;
 }
 
-void
-vm_free(VM* vm)
-{
+void vm_free(VM* vm) {
     // Note: the loop below will free the *Proto fields.
     Obj* obj = vm->objects;
     while (obj != NULL) {
@@ -69,51 +64,37 @@ vm_free(VM* vm)
     vm_init(vm);
 }
 
-void
-vm_push(VM* vm, Value value)
-{
+void vm_push(VM* vm, Value value) {
     ASSERT(vm->fiber->stack_capacity >= (vm->fiber->stack_top - vm->fiber->stack) + 1,
            "Stack size was not ensured.");
     *vm->fiber->stack_top = value;
     vm->fiber->stack_top++;
 }
 
-Value
-vm_pop(VM* vm)
-{
+Value vm_pop(VM* vm) {
     vm->fiber->stack_top--;
     return *vm->fiber->stack_top;
 }
 
-Value
-vm_peek(VM* vm, int distance)
-{
+Value vm_peek(VM* vm, int distance) {
     return vm->fiber->stack_top[-1 - distance];
 }
 
-void
-vm_drop(VM* vm, int count)
-{
+void vm_drop(VM* vm, int count) {
     vm->fiber->stack_top -= count;
 }
 
-void
-vm_push_root(VM* vm, Value value)
-{
+void vm_push_root(VM* vm, Value value) {
     ASSERT(vm->roots_count < MAX_ROOTS, "vm->roots_count == MAX_ROOTS");
     vm->roots[vm->roots_count] = value;
     vm->roots_count++;
 }
 
-void
-vm_pop_root(VM* vm)
-{
+void vm_pop_root(VM* vm) {
     vm->roots_count--;
 }
 
-void
-vm_runtime_error(VM* vm, const char* format, ...)
-{
+void vm_runtime_error(VM* vm, const char* format, ...) {
     char buffer[256];
     va_list args;
     va_start(args, format);
@@ -131,7 +112,7 @@ print_stack_trace(VM* vm)
     for (ObjFiber* fiber = vm->fiber;
          fiber != NULL;
          fiber = fiber->parent) {
-        fprintf(stderr, "[Fiber %p]\n", (void*)fiber);
+        fprintf(stderr, "[Fiber %p]\n", (void*) fiber);
         for (int i = fiber->frames_count - 1; i >= 0; i--) {
             CallFrame* frame = &fiber->frames[i];
             ObjFunction* function = frame->closure->function;
@@ -260,27 +241,27 @@ Value
 vm_get_prototype(VM* vm, Value value)
 {
     switch (value.type) {
-    case VALUE_NIL:
-    case VALUE_TRUE:
-    case VALUE_FALSE:
-        return OBJ_TO_VAL(vm->ObjectProto);
-    case VALUE_NUMBER:
-        return OBJ_TO_VAL(vm->NumberProto);
-    case VALUE_OBJ: {
-        Obj* object = VAL_TO_OBJ(value);
-        switch (object->type) {
-        case OBJ_STRING: return OBJ_TO_VAL(vm->StringProto);
-        case OBJ_NATIVE: return OBJ_TO_VAL(vm->NativeProto);
-        case OBJ_OBJECT: return ((ObjObject*)object)->proto;
-        case OBJ_CLOSURE: return OBJ_TO_VAL(vm->FnProto);
-        case OBJ_FIBER: return OBJ_TO_VAL(vm->FiberProto);
-        case OBJ_RANGE: return OBJ_TO_VAL(vm->RangeProto);
-        case OBJ_LIST: return OBJ_TO_VAL(vm->ListProto);
-        case OBJ_MAP: return OBJ_TO_VAL(vm->MapProto);
-        default: UNREACHABLE();
+        case VALUE_NIL:
+        case VALUE_TRUE:
+        case VALUE_FALSE:
+            return OBJ_TO_VAL(vm->ObjectProto);
+        case VALUE_NUMBER:
+            return OBJ_TO_VAL(vm->NumberProto);
+        case VALUE_OBJ: {
+            Obj* object = VAL_TO_OBJ(value);
+            switch (object->type) {
+                case OBJ_STRING:  return OBJ_TO_VAL(vm->StringProto);
+                case OBJ_NATIVE:  return OBJ_TO_VAL(vm->NativeProto);
+                case OBJ_OBJECT:  return ((ObjObject*)object)->proto;
+                case OBJ_CLOSURE: return OBJ_TO_VAL(vm->FnProto);
+                case OBJ_FIBER:   return OBJ_TO_VAL(vm->FiberProto);
+                case OBJ_RANGE:   return OBJ_TO_VAL(vm->RangeProto);
+                case OBJ_LIST:    return OBJ_TO_VAL(vm->ListProto);
+                case OBJ_MAP:     return OBJ_TO_VAL(vm->MapProto);
+                default: UNREACHABLE();
+            }
         }
-    }
-    default: UNREACHABLE();
+        default: UNREACHABLE();
     }
 }
 
@@ -355,14 +336,14 @@ vm_invoke(VM* vm, Value obj, Value key, int num_args)
 }
 
 // Run the given fiber until fiber->frames_count == top_level.
-static InterpretResult
-run(VM* vm, ObjFiber* fiber, int top_level)
-{
+static
+InterpretResult
+run(VM* vm, ObjFiber* fiber, int top_level) {
     ObjFiber* original_fiber = fiber;
     CallFrame* frame;
 
 #define REFRESH_FRAME() (frame = &vm->fiber->frames[vm->fiber->frames_count - 1])
-#define READ_BYTE()     (*frame->ip++)
+#define READ_BYTE() (*frame->ip++)
 #define READ_SHORT() \
     (frame->ip += 2, \
      (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
@@ -385,209 +366,209 @@ run(VM* vm, ObjFiber* fiber, int top_level)
                                 (size_t)(frame->ip - frame->closure->function->chunk.code));
 #endif
         switch (READ_BYTE()) {
-        case OP_RETURN: {
-            Value result = vm_pop(vm);
-            close_upvalues(fiber, frame->slots);
-            fiber->frames_count--;
-            fiber->stack_top = frame->slots;
-            if (fiber == original_fiber && fiber->frames_count == top_level) {
-                vm_push(vm, result);
-                return INTERPRET_OK;
-            }
-            if (objfiber_is_done(fiber)) {
-                // Transfer control to the parent fiber.
-                fiber = fiber->parent;
-                vm->fiber = fiber;
-                if (fiber == NULL)
-                    return INTERPRET_OK; // Nothing to do?
-                fiber->stack_top[-1] = result;
-                REFRESH_FRAME();
-            } else {
-                vm_push(vm, result);
-                REFRESH_FRAME();
-            }
-            break;
-        }
-        case OP_CONSTANT: vm_push(vm, READ_CONSTANT()); break;
-        case OP_POP: vm_pop(vm); break;
-        case OP_TRUE: vm_push(vm, BOOL_TO_VAL(true)); break;
-        case OP_FALSE: vm_push(vm, BOOL_TO_VAL(false)); break;
-        case OP_NIL: vm_push(vm, NIL_VAL); break;
-        case OP_DEF_GLOBAL: {
-            Value name = READ_CONSTANT();
-            table_set(&vm->globals, vm, name, vm_peek(vm, 0));
-            vm_pop(vm);
-            break;
-        }
-        case OP_GET_GLOBAL: {
-            Value name = READ_CONSTANT();
-            Value value;
-            if (!table_get(&vm->globals, name, &value)) {
-                vm_runtime_error(vm, "Undefined variable '%s'.", VAL_TO_STRING(name)->chars);
-                goto handle_fibers;
-            }
-            vm_push(vm, value);
-            break;
-        }
-        case OP_SET_GLOBAL: {
-            Value name = READ_CONSTANT();
-            if (table_set(&vm->globals, vm, name, vm_peek(vm, 0))) {
-                table_delete(&vm->globals, vm, name);
-                vm_runtime_error(vm, "Undefined variable '%s'.", VAL_TO_STRING(name)->chars);
-                goto handle_fibers;
-            }
-            break;
-        }
-        case OP_ASSERT: {
-            if (!value_truthy(vm_pop(vm))) {
-                frame->ip--; // To get a correct line number.
-                vm_runtime_error(vm, "Assertion failed.");
-                goto handle_fibers;
-            }
-            break;
-        }
-        case OP_GET_LOCAL: {
-            uint8_t slot = READ_BYTE();
-            vm_push(vm, frame->slots[slot]);
-            break;
-        }
-        case OP_SET_LOCAL: {
-            uint8_t slot = READ_BYTE();
-            frame->slots[slot] = vm_peek(vm, 0);
-            break;
-        }
-        case OP_LOOP: {
-            uint16_t offset = READ_SHORT();
-            frame->ip -= offset;
-            break;
-        }
-        case OP_JUMP: {
-            uint16_t offset = READ_SHORT();
-            frame->ip += offset;
-            break;
-        }
-        case OP_JUMP_IF_FALSE: {
-            uint16_t offset = READ_SHORT();
-            if (!value_truthy(vm_pop(vm)))
-                frame->ip += offset;
-            break;
-        }
-        case OP_OR: {
-            uint16_t offset = READ_SHORT();
-            if (value_truthy(vm_peek(vm, 0)))
-                frame->ip += offset;
-            else
-                vm_pop(vm);
-            break;
-        }
-        case OP_AND: {
-            uint16_t offset = READ_SHORT();
-            if (!value_truthy(vm_peek(vm, 0)))
-                frame->ip += offset;
-            else
-                vm_pop(vm);
-            break;
-        }
-        case OP_CLOSURE: {
-            ObjFunction* fn = VAL_TO_FUNCTION(READ_CONSTANT());
-            ObjClosure* closure = objclosure_new(vm, fn);
-            vm_push(vm, OBJ_TO_VAL(closure));
-            for (int i = 0; i < closure->upvalue_count; i++) {
-                uint8_t is_local = READ_BYTE();
-                uint8_t index = READ_BYTE();
-                if (is_local) {
-                    // If it's a local upvalue, then the captured value
-                    // can be found in the current frame.
-                    closure->upvalues[i] = capture_upvalue(vm, frame->slots + index);
-                } else {
-                    // Otherwise, the non-local upvalue should be
-                    // captured by this frame's upvalues (the compiler
-                    // should add one upvalue to this function).
-                    closure->upvalues[i] = frame->closure->upvalues[index];
+            case OP_RETURN: {
+                Value result = vm_pop(vm);
+                close_upvalues(fiber, frame->slots);
+                fiber->frames_count--;
+                fiber->stack_top = frame->slots;
+                if (fiber == original_fiber && fiber->frames_count == top_level) {
+                    vm_push(vm, result);
+                    return INTERPRET_OK;
                 }
-            }
-            break;
-        }
-        case OP_GET_UPVALUE: {
-            uint8_t slot = READ_BYTE();
-            vm_push(vm, *frame->closure->upvalues[slot]->location);
-            break;
-        }
-        case OP_SET_UPVALUE: {
-            uint8_t slot = READ_BYTE();
-            *frame->closure->upvalues[slot]->location = vm_peek(vm, 0);
-            break;
-        }
-        case OP_CLOSE_UPVALUE: {
-            close_upvalues(fiber, fiber->stack_top - 1);
-            vm_pop(vm);
-            break;
-        }
-        case OP_OBJECT: {
-            ObjObject* object = objobject_new(vm);
-            object->proto = OBJ_TO_VAL(vm->ObjectProto);
-            vm_push(vm, OBJ_TO_VAL(object));
-            break;
-        }
-        case OP_OBJLIT_SET: {
-            Value key = READ_CONSTANT();
-            Value obj = vm_peek(vm, 1);
-            Value value = vm_peek(vm, 0);
-            objobject_set(VAL_TO_OBJECT(obj), vm, key, value);
-            vm_pop(vm); // value
-            break;
-        }
-        case OP_OBJECT_SET: {
-            Value key = READ_CONSTANT();
-            Value obj = vm_peek(vm, 1);
-            Value val = vm_peek(vm, 0);
-            Value setSlot;
-            if (vm_get_slot(vm, obj, vm->setSlot_string, &setSlot)) {
-                // custom setSlot -- invoke it.
-                vm_ensure_stack(vm, 1);     // stack: [obj] [val]
-                fiber->stack_top[-1] = key; // stack: [obj] [key]
-                vm_push(vm, val);           // stack: [obj] [key] [val]
-                invoke(vm, obj, vm->setSlot_string, 2);
-                goto handle_fibers;
-            } else {
-                if (IS_OBJECT(obj)) {
-                    objobject_set(VAL_TO_OBJECT(obj), vm, key, val);
-                    vm_pop(vm);
-                    vm_pop(vm);
-                    vm_push(vm, val);
-                    break;
+                if (objfiber_is_done(fiber)) {
+                    // Transfer control to the parent fiber.
+                    fiber = fiber->parent;
+                    vm->fiber = fiber;
+                    if (fiber == NULL)
+                       return INTERPRET_OK; // Nothing to do?
+                    fiber->stack_top[-1] = result;
+                    REFRESH_FRAME();
                 } else {
-                    vm_runtime_error(vm, "Cannot set slot on a non-object.");
+                    vm_push(vm, result);
+                    REFRESH_FRAME();
+                }
+                break;
+            }
+            case OP_CONSTANT: vm_push(vm, READ_CONSTANT()); break;
+            case OP_POP:      vm_pop(vm); break;
+            case OP_TRUE:     vm_push(vm, BOOL_TO_VAL(true)); break;
+            case OP_FALSE:    vm_push(vm, BOOL_TO_VAL(false)); break;
+            case OP_NIL:      vm_push(vm, NIL_VAL); break;
+            case OP_DEF_GLOBAL: {
+                Value name = READ_CONSTANT();
+                table_set(&vm->globals, vm, name, vm_peek(vm, 0));
+                vm_pop(vm);
+                break;
+            }
+            case OP_GET_GLOBAL: {
+                Value name = READ_CONSTANT();
+                Value value;
+                if (!table_get(&vm->globals, name, &value)) {
+                    vm_runtime_error(vm, "Undefined variable '%s'.", VAL_TO_STRING(name)->chars);
                     goto handle_fibers;
                 }
+                vm_push(vm, value);
+                break;
             }
-        }
-        case OP_INVOKE: {
-            Value key = READ_CONSTANT();
-            uint8_t num_args = READ_BYTE();
-            Value obj = vm_peek(vm, num_args);
-            invoke(vm, obj, key, num_args);
-        handle_fibers:
-            fiber = vm->fiber;
-            if (fiber == NULL) return INTERPRET_OK;
-            if (fiber->error != NULL) {
-                runtime_error(vm);
+            case OP_SET_GLOBAL: {
+                Value name = READ_CONSTANT();
+                if (table_set(&vm->globals, vm, name, vm_peek(vm, 0))) {
+                    table_delete(&vm->globals, vm, name);
+                    vm_runtime_error(vm, "Undefined variable '%s'.", VAL_TO_STRING(name)->chars);
+                    goto handle_fibers;
+                }
+                break;
+            }
+            case OP_ASSERT: {
+                if (!value_truthy(vm_pop(vm))) {
+                    frame->ip--; // To get a correct line number.
+                    vm_runtime_error(vm, "Assertion failed.");
+                    goto handle_fibers;
+                }
+                break;
+            }
+            case OP_GET_LOCAL: {
+                uint8_t slot = READ_BYTE();
+                vm_push(vm, frame->slots[slot]);
+                break;
+            }
+            case OP_SET_LOCAL: {
+                uint8_t slot = READ_BYTE();
+                frame->slots[slot] = vm_peek(vm, 0);
+                break;
+            }
+            case OP_LOOP: {
+                uint16_t offset = READ_SHORT();
+                frame->ip -= offset;
+                break;
+            }
+            case OP_JUMP: {
+                uint16_t offset = READ_SHORT();
+                frame->ip += offset;
+                break;
+            }
+            case OP_JUMP_IF_FALSE: {
+                uint16_t offset = READ_SHORT();
+                if (!value_truthy(vm_pop(vm)))
+                    frame->ip += offset;
+                break;
+            }
+            case OP_OR: {
+                uint16_t offset = READ_SHORT();
+                if (value_truthy(vm_peek(vm, 0)))
+                    frame->ip += offset;
+                else
+                    vm_pop(vm);
+                break;
+            }
+            case OP_AND: {
+                uint16_t offset = READ_SHORT();
+                if (!value_truthy(vm_peek(vm, 0)))
+                    frame->ip += offset;
+                else
+                    vm_pop(vm);
+                break;
+            }
+            case OP_CLOSURE: {
+                ObjFunction* fn = VAL_TO_FUNCTION(READ_CONSTANT());
+                ObjClosure* closure = objclosure_new(vm, fn);
+                vm_push(vm, OBJ_TO_VAL(closure));
+                for (int i = 0; i < closure->upvalue_count; i++) {
+                    uint8_t is_local = READ_BYTE();
+                    uint8_t index = READ_BYTE();
+                    if (is_local) {
+                        // If it's a local upvalue, then the captured value
+                        // can be found in the current frame.
+                        closure->upvalues[i] = capture_upvalue(vm, frame->slots + index);
+                    } else {
+                        // Otherwise, the non-local upvalue should be
+                        // captured by this frame's upvalues (the compiler
+                        // should add one upvalue to this function).
+                        closure->upvalues[i] = frame->closure->upvalues[index];
+                    }
+                }
+                break;
+            }
+            case OP_GET_UPVALUE: {
+                uint8_t slot = READ_BYTE();
+                vm_push(vm, *frame->closure->upvalues[slot]->location);
+                break;
+            }
+            case OP_SET_UPVALUE: {
+                uint8_t slot = READ_BYTE();
+                *frame->closure->upvalues[slot]->location = vm_peek(vm, 0);
+                break;
+            }
+            case OP_CLOSE_UPVALUE: {
+                close_upvalues(fiber, fiber->stack_top - 1);
+                vm_pop(vm);
+                break;
+            }
+            case OP_OBJECT: {
+                ObjObject* object = objobject_new(vm);
+                object->proto = OBJ_TO_VAL(vm->ObjectProto);
+                vm_push(vm, OBJ_TO_VAL(object));
+                break;
+            }
+            case OP_OBJLIT_SET: {
+                Value key = READ_CONSTANT();
+                Value obj = vm_peek(vm, 1);
+                Value value = vm_peek(vm, 0);
+                objobject_set(VAL_TO_OBJECT(obj), vm, key, value);
+                vm_pop(vm); // value
+                break;
+            }
+            case OP_OBJECT_SET: {
+                Value key = READ_CONSTANT();
+                Value obj = vm_peek(vm, 1);
+                Value val = vm_peek(vm, 0);
+                Value setSlot;
+                if (vm_get_slot(vm, obj, vm->setSlot_string, &setSlot)) {
+                    // custom setSlot -- invoke it.
+                    vm_ensure_stack(vm, 1);     // stack: [obj] [val]
+                    fiber->stack_top[-1] = key; // stack: [obj] [key]
+                    vm_push(vm, val);           // stack: [obj] [key] [val]
+                    invoke(vm, obj, vm->setSlot_string, 2);
+                    goto handle_fibers;
+                } else {
+                    if (IS_OBJECT(obj)) {
+                        objobject_set(VAL_TO_OBJECT(obj), vm, key, val);
+                        vm_pop(vm);
+                        vm_pop(vm);
+                        vm_push(vm, val);
+                        break;
+                    } else {
+                        vm_runtime_error(vm, "Cannot set slot on a non-object.");
+                        goto handle_fibers;
+                    }
+                }
+            }
+            case OP_INVOKE: {
+                Value key = READ_CONSTANT();
+                uint8_t num_args = READ_BYTE();
+                Value obj = vm_peek(vm, num_args);
+                invoke(vm, obj, key, num_args);
+handle_fibers:
                 fiber = vm->fiber;
-                // give up: there's no parent fiber to handle
-                // the current error.
-                if (fiber == NULL)
-                    return INTERPRET_RUNTIME_ERROR;
+                if (fiber == NULL) return INTERPRET_OK;
+                if (fiber->error != NULL) {
+                    runtime_error(vm);
+                    fiber = vm->fiber;
+                    // give up: there's no parent fiber to handle
+                    // the current error.
+                    if (fiber == NULL)
+                        return INTERPRET_RUNTIME_ERROR;
+                }
+                if (objfiber_is_done(fiber)) {
+                    fiber = fiber->parent;
+                    vm->fiber = fiber;
+                    if (fiber == NULL)
+                        return INTERPRET_OK; // Nothing to do?
+                }
+                REFRESH_FRAME();
+                break;
             }
-            if (objfiber_is_done(fiber)) {
-                fiber = fiber->parent;
-                vm->fiber = fiber;
-                if (fiber == NULL)
-                    return INTERPRET_OK; // Nothing to do?
-            }
-            REFRESH_FRAME();
-            break;
-        }
-        default: UNREACHABLE();
+            default: UNREACHABLE();
         }
     }
 
@@ -624,9 +605,7 @@ vm_call(VM* vm, Value slot, int num_args)
     return rv;
 }
 
-InterpretResult
-vm_interpret(VM* vm, const char* source)
-{
+InterpretResult vm_interpret(VM* vm, const char* source) {
     ObjFunction* fn = compile(vm, source);
     if (fn == NULL) return INTERPRET_COMPILE_ERROR;
 
