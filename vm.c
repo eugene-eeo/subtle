@@ -336,9 +336,9 @@ vm_invoke(VM* vm, Value obj, Value key, int num_args)
 }
 
 // Run the given fiber until fiber->frames_count == top_level.
-static
-InterpretResult
-run(VM* vm, ObjFiber* fiber, int top_level) {
+static InterpretResult
+run(VM* vm, ObjFiber* fiber, int top_level)
+{
     ObjFiber* original_fiber = fiber;
     CallFrame* frame;
 
@@ -605,7 +605,9 @@ vm_call(VM* vm, Value slot, int num_args)
     return rv;
 }
 
-InterpretResult vm_interpret(VM* vm, const char* source) {
+InterpretResult
+vm_interpret(VM* vm, const char* source)
+{
     ObjFunction* fn = compile(vm, source);
     if (fn == NULL) return INTERPRET_COMPILE_ERROR;
 
