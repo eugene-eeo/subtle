@@ -143,7 +143,6 @@ DEFINE_NATIVE(Object_proto) {
 
 DEFINE_NATIVE(Object_setProto) {
     ARGSPEC("O*");
-
     ObjObject* object = VAL_TO_OBJECT(args[0]);
     object->proto = args[1];
     RETURN(NIL_VAL);
@@ -151,7 +150,6 @@ DEFINE_NATIVE(Object_setProto) {
 
 DEFINE_NATIVE(Object_rawGetSlot) {
     ARGSPEC("**");
-
     Value this = args[0];
     Value slot;
     if (!vm_get_slot(vm, this, args[1], &slot))
@@ -161,14 +159,12 @@ DEFINE_NATIVE(Object_rawGetSlot) {
 
 DEFINE_NATIVE(Object_setSlot) {
     ARGSPEC("O**");
-
     objobject_set(VAL_TO_OBJECT(args[0]), vm, args[1], args[2]);
     RETURN(args[2]);
 }
 
 DEFINE_NATIVE(Object_hasSlot) {
     ARGSPEC("**");
-
     Value slot;
     bool has_slot = vm_get_slot(vm, args[0], args[1], &slot);
     RETURN(BOOL_TO_VAL(has_slot));
@@ -176,7 +172,6 @@ DEFINE_NATIVE(Object_hasSlot) {
 
 DEFINE_NATIVE(Object_getOwnSlot) {
     ARGSPEC("**");
-
     if (!IS_OBJECT(args[0]))
         RETURN(NIL_VAL);
 
@@ -190,17 +185,14 @@ DEFINE_NATIVE(Object_getOwnSlot) {
 
 DEFINE_NATIVE(Object_hasOwnSlot) {
     ARGSPEC("**");
-
     if (!IS_OBJECT(args[0]))
         RETURN(FALSE_VAL);
-
     ObjObject* this = VAL_TO_OBJECT(args[0]);
     RETURN(BOOL_TO_VAL(objobject_has(this, args[1])));
 }
 
 DEFINE_NATIVE(Object_deleteSlot) {
     ARGSPEC("O*");
-
     ObjObject* this = VAL_TO_OBJECT(args[0]);
     bool has_slot = objobject_delete(this, vm, args[1]);
     RETURN(BOOL_TO_VAL(has_slot));
@@ -414,14 +406,12 @@ DEFINE_NATIVE(Fn_callWithThis) {
 
 DEFINE_NATIVE(Native_call) {
     ARGSPEC("n");
-
     ObjNative* native = VAL_TO_NATIVE(args[0]);
     return native->fn(vm, args, num_args);
 }
 
 DEFINE_NATIVE(Native_callWithThis) {
     ARGSPEC("n*");
-
     ObjNative* native = VAL_TO_NATIVE(args[0]);
     for (int i = 0; i < num_args; i++)
         args[i] = args[i + 1];
@@ -453,7 +443,6 @@ DEFINE_NUMBER_METHOD(land,     int32_t, &, NUMBER_TO_VAL)
 
 DEFINE_NATIVE(Number_negate) {
     ARGSPEC("N");
-
     RETURN(NUMBER_TO_VAL(-VAL_TO_NUMBER(args[0])));
 }
 
@@ -478,8 +467,7 @@ DEFINE_NATIVE(Number_exclusiveRange) {
         ARGSPEC("SS"); \
         const char* a = VAL_TO_STRING(args[0])->chars; \
         const char* b = VAL_TO_STRING(args[1])->chars; \
-        int cmp = strcmp(a, b); \
-        RETURN(BOOL_TO_VAL(cmp op 0)); \
+        RETURN(BOOL_TO_VAL(strcmp(a, b) op 0)); \
     }
 
 DEFINE_STRING_METHOD(lt, <)
