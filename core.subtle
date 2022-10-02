@@ -34,25 +34,4 @@ List.fromIterator = Fn.new{|it|
         list.add(item)
     return list
 }
-
-List.== = Fn.new{|o|
-    if (Object.same(this, o)) return true
-    if (Object.rawType(o) != "list" || this.length != o.length)
-        return false
-    for (i in 0...this.length)
-        if (this.get(i) != o.get(i))
-            return false
-    return true
-}
-
-Map.== = Fn.new{|o|
-    if (Object.same(this, o)) return true
-    if (Object.rawType(o) != "map" || this.length != o.length)
-        return false
-    let SENTINEL = {}
-    for (k in this.keys)
-        if (this.get(k) != o.get(k, SENTINEL))
-            return false
-    return true
-}
 }.call

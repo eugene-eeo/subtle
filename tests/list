@@ -1,38 +1,31 @@
-let list = List.new(1,2,3);
-assert list.length == 3;
-for (i in 0...list.length)
-    assert list.get(i) == i + 1;
+let listEq = Fn.new{|a, b|
+    if (a.length != b.length) return false
+    for (i in 0...a.length)
+        if (a.get(i) != b.get(i))
+            return false
+    return true
+}
 
-assert Object.same(list.set(1, 4), list);
-assert list.get(1) == 4;
+let list = List.new(1,2,3)
+
+assert Object.same(list.set(1, 4), list)
+assert listEq.call(list, List.new(1, 4, 3))
 
 list.delete(1);
-assert list.length == 2;
-assert list.get(0) == 1;
-assert list.get(1) == 3;
+assert listEq.call(list, List.new(1, 3))
 
-list.add(0);
-assert list.length == 3;
-assert list.get(0) == 1;
-assert list.get(1) == 3;
-assert list.get(2) == 0;
+list.add(0)
+assert list.length == 3
+assert listEq.call(list, List.new(1, 3, 0))
 
 list.delete(-1);
-assert list.length == 2;
-assert list.get(0) == 1;
-assert list.get(1) == 3;
+assert listEq.call(list, List.new(1, 3))
 
 # test a simple recursive ==
 list.add(list);
-assert list.get(-1) == list;
+assert listEq.call(list, List.new(1, 3, list))
 
-assert List.new(1,2,3) == List.new(1,2,3);
-assert List.new(1,2).insert(1, 3) == List.new(1, 3, 2);
-
-list = List.new();
-for (x in List.new(1,2,3))
-    list.add(x);
-assert list == List.new(1,2,3);
+assert listEq.call(List.new(1,2).insert(1, 3), List.new(1, 3, 2));
 
 # Test compaction
 list = List.new();
