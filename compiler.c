@@ -1002,7 +1002,7 @@ static void load_local(Compiler* compiler, int offset) {
 
 static void for_stmt(Compiler* compiler) {
     // Desugar the following for loop:
-    // for (x in items) { | let _s = items;
+    // for (x = items) {  | let _s = items;
     //    bar;            | let _i = nil;
     // }                  | while (_i = _s.iterMore(_i)) {
     //                    |     let x = _s.iterNext(_i);
@@ -1013,15 +1013,18 @@ static void for_stmt(Compiler* compiler) {
 
     begin_block(compiler);
     consume(compiler, TOKEN_LPAREN, "Expect '(' after 'for'.");
+    match(compiler, TOKEN_NEWLINE);
     consume(compiler, TOKEN_VARIABLE, "Expect loop variable.");
 
     // Remember the loop variable.
     Token loop_var = compiler->parser->previous;
 
-    consume(compiler, TOKEN_IN, "Expect 'in' after loop variable.");
+    match(compiler, TOKEN_NEWLINE);
+    consume(compiler, TOKEN_EQ, "Expect '=' after loop variable.");
+    match(compiler, TOKEN_NEWLINE);
 
     // Evaluate the sequence.
-    expression(compiler, false);
+    expression(compiler, true);
 
     // Check that we have enough space to store the two locals.
     if (compiler->local_count + 2 > MAX_LOCALS) {

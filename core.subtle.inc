@@ -34,7 +34,7 @@ const char* CORE_SOURCE =
 "\n"
 "List.fromIterator = Fn.new{|it|\n"
 "    let list = List.new()\n"
-"    for (item in it)\n"
+"    for (item = it)\n"
 "        list.add(item)\n"
 "    return list\n"
 "}\n"

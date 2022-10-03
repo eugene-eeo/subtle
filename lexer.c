@@ -149,14 +149,7 @@ static TokenType variable_type(Lexer* lexer) {
                 }
             }
             break;
-        case 'i':
-            if (lexer->current - lexer->start >= 2) {
-                switch (lexer->start[1]) {
-                    case 'f': return match_rest(lexer, TOKEN_IF, 2, "f", 0);
-                    case 'n': return match_rest(lexer, TOKEN_IN, 2, "n", 0);
-                }
-            }
-            break;
+        case 'i': return match_rest(lexer, TOKEN_IF, 1, "f", 1);
         case 'l': return match_rest(lexer, TOKEN_LET, 1, "et", 2);
         case 'n': return match_rest(lexer, TOKEN_NIL, 1, "il", 2);
         case 'r': return match_rest(lexer, TOKEN_RETURN, 1, "eturn", 5);

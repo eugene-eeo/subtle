@@ -30,7 +30,7 @@ Map.values    = fromSlot.call("rawIterValueNext")
 
 List.fromIterator = Fn.new{|it|
     let list = List.new()
-    for (item in it)
+    for (item = it)
         list.add(item)
     return list
 }
