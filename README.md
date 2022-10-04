@@ -24,8 +24,8 @@ recursive inheritance a-la IO (cycles in the prototype chain are allowed).
 
 ## running
 
-    $ git clone ...
-    $ cd ...
+    $ git clone https://github.com/eugene-eeo/subtle
+    $ cd subtle
     $ make release
     $ ./subtle
     >
