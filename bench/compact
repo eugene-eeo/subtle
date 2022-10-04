@@ -1,9 +1,8 @@
-let x = Map.new();
-let i;
-let MAX = 4 * 8192;
+let x = Map.new()
+let MAX = 2048
 
-for (i in 0...MAX) {
-    x.set(i, i);
-    for (j in 0...i)
-        assert x.get(j) == j;
+for (i = 0...MAX) {
+    x.set(i toString, i);
+    for (j = 0...i)
+        assert x.get(j toString) == j;
 }
