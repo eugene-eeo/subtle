@@ -756,11 +756,10 @@ DEFINE_NATIVE(Map_has) {
 
 DEFINE_NATIVE(Map_get) {
     ARGSPEC("M*");
-    Value default_value = NIL_VAL;
-    if (num_args > 1)
-        default_value = args[2];
-    objmap_get(VAL_TO_MAP(args[0]), args[1], &default_value);
-    RETURN(default_value);
+    Value rv;
+    if (!objmap_get(VAL_TO_MAP(args[0]), args[1], &rv))
+        rv = (num_args > 1) ? args[2] : NIL_VAL;
+    RETURN(rv);
 }
 
 DEFINE_NATIVE(Map_set) {

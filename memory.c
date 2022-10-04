@@ -6,6 +6,10 @@
 #include "debug.h"
 #endif
 
+#ifdef SUBTLE_MALLOC_TRIM
+#include <malloc.h> // malloc_trim
+#endif
+
 #include <stdio.h>   // perror
 #include <stdlib.h>  // realloc, free
 
@@ -210,6 +214,10 @@ void memory_collect(VM* vm) {
     sweep(vm);
 
     vm->next_gc = vm->bytes_allocated * GC_HEAP_GROW_FACTOR;
+
+#ifdef SUBTLE_MALLOC_TRIM
+    malloc_trim(0);
+#endif
 
 #ifdef SUBTLE_DEBUG_TRACE_ALLOC
     printf("-- gc end\n");
