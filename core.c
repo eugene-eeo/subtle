@@ -172,14 +172,11 @@ DEFINE_NATIVE(Object_hasSlot) {
 
 DEFINE_NATIVE(Object_getOwnSlot) {
     ARGSPEC("**");
+    Value rv;
     if (!IS_OBJECT(args[0]))
         RETURN(NIL_VAL);
-
-    ObjObject* this = VAL_TO_OBJECT(args[0]);
-    Value rv;
-    if (objobject_get(this, args[1], &rv)) {
+    if (objobject_get(VAL_TO_OBJECT(args[0]), args[1], &rv))
         RETURN(rv);
-    }
     RETURN(NIL_VAL);
 }
 
@@ -187,14 +184,12 @@ DEFINE_NATIVE(Object_hasOwnSlot) {
     ARGSPEC("**");
     if (!IS_OBJECT(args[0]))
         RETURN(FALSE_VAL);
-    ObjObject* this = VAL_TO_OBJECT(args[0]);
-    RETURN(BOOL_TO_VAL(objobject_has(this, args[1])));
+    RETURN(BOOL_TO_VAL(objobject_has(VAL_TO_OBJECT(args[0]), args[1])));
 }
 
 DEFINE_NATIVE(Object_deleteSlot) {
     ARGSPEC("O*");
-    ObjObject* this = VAL_TO_OBJECT(args[0]);
-    bool has_slot = objobject_delete(this, vm, args[1]);
+    bool has_slot = objobject_delete(VAL_TO_OBJECT(args[0]), vm, args[1]);
     RETURN(BOOL_TO_VAL(has_slot));
 }
 
@@ -273,8 +268,8 @@ DEFINE_NATIVE(Object_hasAncestor) {
 DEFINE_NATIVE(Object_toString) {
     Value this = args[0];
 
-    ssize_t buf_size;
-    char* buffer;
+    ssize_t num_chars;
+    char buffer[64];
     ObjString* str;
 
     switch (this.type) {
@@ -282,9 +277,9 @@ DEFINE_NATIVE(Object_toString) {
     case VALUE_TRUE: RETURN(OBJ_TO_VAL((Obj*)objstring_copy(vm, "true", 4)));
     case VALUE_FALSE: RETURN(OBJ_TO_VAL((Obj*)objstring_copy(vm, "false", 5)));
     case VALUE_NUMBER:
-        buf_size = snprintf(NULL, 0, "%g", VAL_TO_NUMBER(this)) + 1;
-        buffer = ALLOCATE_ARRAY(vm, char, buf_size);
-        snprintf(buffer, buf_size, "%g", VAL_TO_NUMBER(this));
+        num_chars = snprintf(buffer, sizeof(buffer), "%g", VAL_TO_NUMBER(this));
+        if (num_chars < 0 || num_chars >= sizeof(buffer))
+            ERROR("Error converting number to string, got num_chars: %d.", num_chars);
         break;
     case VALUE_OBJ: {
         Obj* obj = VAL_TO_OBJ(this);
@@ -302,16 +297,15 @@ DEFINE_NATIVE(Object_toString) {
         case OBJ_UPVALUE:
             UNREACHABLE();
         }
-        buf_size = snprintf(NULL, 0, "%s_%p", prefix, (void*) obj) + 1;
-        buffer = ALLOCATE_ARRAY(vm, char, buf_size);
-        snprintf(buffer, buf_size, "%s_%p", prefix, (void*) obj);
+        num_chars = snprintf(buffer, sizeof(buffer), "%s_%p", prefix, (void*) obj);
+        if (num_chars < 0 || num_chars >= sizeof(buffer))
+            ERROR("Error converting object to string, got num_chars: %d.", num_chars);
         break;
     }
     default: UNREACHABLE();
     }
 
-    str = objstring_copy(vm, buffer, buf_size - 1 /* exclude the \0 byte */);
-    FREE_ARRAY(vm, buffer, char, buf_size);
+    str = objstring_copy(vm, buffer, num_chars /* exclude the \0 byte */);
     RETURN(OBJ_TO_VAL(str));
 }
 

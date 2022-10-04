@@ -23,8 +23,6 @@ typedef struct VM VM;
 #define IS_LIST(value)         (is_object_type(value, OBJ_LIST))
 #define IS_MAP(value)          (is_object_type(value, OBJ_MAP))
 
-#define OBJ_TYPE(value)        (VAL_TO_OBJ(value)->type)
-
 #define VAL_TO_STRING(value)   ((ObjString*)VAL_TO_OBJ(value))
 #define VAL_TO_FUNCTION(value) ((ObjFunction*)VAL_TO_OBJ(value))
 #define VAL_TO_UPVALUE(value)  ((ObjUpvalue*)VAL_TO_OBJ(value))
