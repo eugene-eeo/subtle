@@ -528,7 +528,7 @@ run(VM* vm, ObjFiber* fiber, int top_level)
                     vm_ensure_stack(vm, 1);     // stack: [obj] [val]
                     fiber->stack_top[-1] = key; // stack: [obj] [key]
                     vm_push(vm, val);           // stack: [obj] [key] [val]
-                    invoke(vm, obj, vm->setSlot_string, 2);
+                    complete_call(vm, setSlot, 2);
                     goto handle_fibers;
                 } else {
                     if (IS_OBJECT(obj)) {
