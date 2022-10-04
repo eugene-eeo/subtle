@@ -16,11 +16,11 @@ recursive inheritance a-la IO (cycles in the prototype chain are allowed).
     Point.+ = Fn new {|other|  # yes, this is allowed
         return Point new(this x + other x, this y + other y)
     }
-    let p1 = Point.new(1, 2)
-    let p2 = Point.new(3, 4)
+    let p1 = Point new(1, 2)
+    let p2 = Point new(3, 4)
     let result = p1 + p2
-    assert result.x == 4
-    assert result.y == 6
+    assert result x == 4
+    assert result y == 6
 
 ## running
 
