@@ -273,9 +273,9 @@ DEFINE_NATIVE(Object_toString) {
     ObjString* str;
 
     switch (this.type) {
-    case VALUE_NIL:  RETURN(OBJ_TO_VAL(objstring_copy(vm, "nil", 3)));
-    case VALUE_TRUE: RETURN(OBJ_TO_VAL((Obj*)objstring_copy(vm, "true", 4)));
-    case VALUE_FALSE: RETURN(OBJ_TO_VAL((Obj*)objstring_copy(vm, "false", 5)));
+    case VALUE_NIL:   RETURN(OBJ_TO_VAL(objstring_copy(vm, "nil", 3)));
+    case VALUE_TRUE:  RETURN(OBJ_TO_VAL(objstring_copy(vm, "true", 4)));
+    case VALUE_FALSE: RETURN(OBJ_TO_VAL(objstring_copy(vm, "false", 5)));
     case VALUE_NUMBER:
         num_chars = snprintf(buffer, sizeof(buffer), "%g", VAL_TO_NUMBER(this));
         if (num_chars < 0 || num_chars >= sizeof(buffer))
@@ -293,8 +293,7 @@ DEFINE_NATIVE(Object_toString) {
         case OBJ_RANGE:   prefix = "Range"; break;
         case OBJ_LIST:    prefix = "List"; break;
         case OBJ_MAP:     prefix = "Map"; break;
-        case OBJ_FUNCTION:
-        case OBJ_UPVALUE:
+        default:
             UNREACHABLE();
         }
         num_chars = snprintf(buffer, sizeof(buffer), "%s_%p", prefix, (void*) obj);
@@ -441,14 +440,14 @@ DEFINE_NATIVE(Number_negate) {
 }
 
 DEFINE_NATIVE(Number_inclusiveRange) {
-    ARGSPEC("N");
+    ARGSPEC("NN");
     double start = VAL_TO_NUMBER(args[0]);
     double end = VAL_TO_NUMBER(args[1]);
     RETURN(OBJ_TO_VAL(objrange_new(vm, start, end, true)));
 }
 
 DEFINE_NATIVE(Number_exclusiveRange) {
-    ARGSPEC("N");
+    ARGSPEC("NN");
     double start = VAL_TO_NUMBER(args[0]);
     double end = VAL_TO_NUMBER(args[1]);
     RETURN(OBJ_TO_VAL(objrange_new(vm, start, end, false)));
