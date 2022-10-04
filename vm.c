@@ -524,7 +524,6 @@ run(VM* vm, ObjFiber* fiber, int top_level)
                 Value val = vm_peek(vm, 0);
                 Value setSlot;
                 if (vm_get_slot(vm, obj, vm->setSlot_string, &setSlot)) {
-                    // custom setSlot -- invoke it.
                     vm_ensure_stack(vm, 1);     // stack: [obj] [val]
                     fiber->stack_top[-1] = key; // stack: [obj] [key]
                     vm_push(vm, val);           // stack: [obj] [key] [val]
