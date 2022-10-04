@@ -215,10 +215,6 @@ void memory_collect(VM* vm) {
 
     vm->next_gc = vm->bytes_allocated * GC_HEAP_GROW_FACTOR;
 
-#ifdef SUBTLE_MALLOC_TRIM
-    malloc_trim(0);
-#endif
-
 #ifdef SUBTLE_DEBUG_TRACE_ALLOC
     printf("-- gc end\n");
     printf("   collected %zu bytes (from %zu to %zu) next at %zu\n",
