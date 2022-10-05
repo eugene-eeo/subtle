@@ -217,8 +217,7 @@ DEFINE_NATIVE(Object_rawType) {
         case OBJ_RANGE:   type = "range"; break;
         case OBJ_LIST:    type = "list"; break;
         case OBJ_MAP:     type = "map"; break;
-        case OBJ_FUNCTION:
-        case OBJ_UPVALUE:
+        default:
             UNREACHABLE();
         }
         break;
