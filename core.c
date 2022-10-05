@@ -278,7 +278,7 @@ DEFINE_NATIVE(Object_toString) {
     case VALUE_NUMBER:
         num_chars = snprintf(buffer, sizeof(buffer), "%g", VAL_TO_NUMBER(this));
         if (num_chars < 0 || num_chars >= sizeof(buffer))
-            ERROR("Error converting number to string, got num_chars: %d.", num_chars);
+            ERROR("%s error converting number to string, got num_chars: %d.", __func__, num_chars);
         break;
     case VALUE_OBJ: {
         Obj* obj = VAL_TO_OBJ(this);
@@ -292,18 +292,17 @@ DEFINE_NATIVE(Object_toString) {
         case OBJ_RANGE:   prefix = "Range"; break;
         case OBJ_LIST:    prefix = "List"; break;
         case OBJ_MAP:     prefix = "Map"; break;
-        default:
-            UNREACHABLE();
+        default:          UNREACHABLE();
         }
         num_chars = snprintf(buffer, sizeof(buffer), "%s_%p", prefix, (void*) obj);
         if (num_chars < 0 || num_chars >= sizeof(buffer))
-            ERROR("Error converting object to string, got num_chars: %d.", num_chars);
+            ERROR("%s error converting object to string, got num_chars: %d.", __func__, num_chars);
         break;
     }
     default: UNREACHABLE();
     }
 
-    str = objstring_copy(vm, buffer, num_chars /* exclude the \0 byte */);
+    str = objstring_copy(vm, buffer, num_chars);
     RETURN(OBJ_TO_VAL(str));
 }
 
@@ -314,13 +313,12 @@ DEFINE_NATIVE(Object_print) {
     if (!vm_invoke(vm, this, OBJ_TO_VAL(objstring_copy(vm, "toString", 8)), 0))
         return false;
 
-    Value slot = vm_peek(vm, 0);
+    Value slot = vm_pop(vm);
     char* str = IS_STRING(slot)
         ? VAL_TO_STRING(slot)->chars
         : "[invalid toString]";
-    fprintf(stdout, "%s", str);
+    fputs(str, stdout);
     fflush(stdout);
-    vm_pop(vm);
     RETURN(NIL_VAL);
 }
 

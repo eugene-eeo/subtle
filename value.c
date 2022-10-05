@@ -55,21 +55,9 @@ static uint64_t double_to_bits(double d) {
 
 static uint32_t object_hash(Obj* obj)
 {
-    switch (obj->type) {
-        case OBJ_STRING:
-            return ((ObjString*)obj)->hash;
-        case OBJ_CLOSURE:
-        case OBJ_FUNCTION:
-        case OBJ_OBJECT:
-        case OBJ_NATIVE:
-        case OBJ_FIBER:
-        case OBJ_RANGE:
-        case OBJ_LIST:
-        case OBJ_MAP:
-            return hash_bits((uintptr_t)obj);
-        default:
-            UNREACHABLE();
-    }
+    if (obj->type == OBJ_STRING)
+        return ((ObjString*)obj)->hash;
+    return hash_bits((uint64_t)(uintptr_t)obj);
 }
 
 uint32_t value_hash(Value v) {
@@ -86,13 +74,9 @@ uint32_t value_hash(Value v) {
 bool value_equal(Value a, Value b) {
     if (a.type != b.type) return false;
     switch (a.type) {
-        case VALUE_NIL:
-        case VALUE_TRUE:
-        case VALUE_FALSE:
-            return true;
         case VALUE_NUMBER: return VAL_TO_NUMBER(a) == VAL_TO_NUMBER(b);
         case VALUE_OBJ:    return VAL_TO_OBJ(a) == VAL_TO_OBJ(b);
-        default: UNREACHABLE();
+        default:           return true;
     }
 }
 

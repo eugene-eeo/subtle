@@ -251,9 +251,9 @@ vm_get_prototype(VM* vm, Value value)
             Obj* object = VAL_TO_OBJ(value);
             switch (object->type) {
                 case OBJ_STRING:  return OBJ_TO_VAL(vm->StringProto);
-                case OBJ_NATIVE:  return OBJ_TO_VAL(vm->NativeProto);
-                case OBJ_OBJECT:  return ((ObjObject*)object)->proto;
                 case OBJ_CLOSURE: return OBJ_TO_VAL(vm->FnProto);
+                case OBJ_OBJECT:  return ((ObjObject*)object)->proto;
+                case OBJ_NATIVE:  return OBJ_TO_VAL(vm->NativeProto);
                 case OBJ_FIBER:   return OBJ_TO_VAL(vm->FiberProto);
                 case OBJ_RANGE:   return OBJ_TO_VAL(vm->RangeProto);
                 case OBJ_LIST:    return OBJ_TO_VAL(vm->ListProto);
@@ -298,12 +298,12 @@ pre_invoke(VM* vm, Value obj, Value key, Value* slot)
     if (!vm_get_slot(vm, obj, key, slot)) {
         // If there is no such slot following a recursive proto search,
         // we consult the getSlot method.
-        Value custom_getSlot;
-        if (vm_get_slot(vm, obj, vm->getSlot_string, &custom_getSlot)) {
+        Value getSlot;
+        if (vm_get_slot(vm, obj, vm->getSlot_string, &getSlot)) {
             vm_ensure_stack(vm, 2);
             vm_push(vm, obj);
             vm_push(vm, key);
-            if (!vm_call(vm, custom_getSlot, 1))
+            if (!vm_call(vm, getSlot, 1))
                 return false;
             *slot = vm_pop(vm);
             return true;
@@ -320,7 +320,8 @@ static bool
 invoke(VM* vm, Value obj, Value key, int num_args)
 {
     Value slot_value;
-    if (!pre_invoke(vm, obj, key, &slot_value)) return false;
+    if (!pre_invoke(vm, obj, key, &slot_value))
+        return false;
     // The stack is already in the correct form for a method call.
     // We have `obj` followed by `num_args`.
     return complete_call(vm, slot_value, num_args);
@@ -595,8 +596,7 @@ vm_call(VM* vm, Value slot, int num_args)
             vm_runtime_error(vm, "Tried to call a non-activatable slot with %d > 0 args.", num_args);
             rv = false;
         } else {
-            vm_pop(vm); // pop `this`
-            vm_push(vm, slot);
+            vm->fiber->stack_top[-1] = slot;
             rv = true;
         }
     }
