@@ -814,6 +814,7 @@ void core_init_vm(VM* vm)
     vm->init_string = OBJ_TO_VAL(objstring_copy(vm, "init", 4));
 
     vm->ObjectProto = objobject_new(vm);
+    vm->ObjectProto->proto = OBJ_TO_VAL(vm->ObjectProto);
     ADD_METHOD(ObjectProto, "proto",       Object_proto);
     ADD_METHOD(ObjectProto, "setProto",    Object_setProto);
     ADD_METHOD(ObjectProto, "rawGetSlot",  Object_rawGetSlot);
