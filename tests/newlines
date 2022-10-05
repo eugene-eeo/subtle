@@ -43,15 +43,15 @@ let a
 )
 
 assert Object.
-    proto. # nil
     proto. # Object
-    proto == nil
+    proto. # Object
+    proto == Object
 
 # mix and match dot/space-style access
 assert (Object
-    proto # nil
+    proto # Object
     .proto # Object
-    proto) == nil
+    proto) == Object
 
 let x = {}
 assert (x
