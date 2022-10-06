@@ -173,11 +173,9 @@ DEFINE_NATIVE(Object_hasSlot) {
 DEFINE_NATIVE(Object_getOwnSlot) {
     ARGSPEC("**");
     Value rv;
-    if (!IS_OBJECT(args[0]))
-        RETURN(NIL_VAL);
-    if (objobject_get(VAL_TO_OBJECT(args[0]), args[1], &rv))
-        RETURN(rv);
-    RETURN(NIL_VAL);
+    if (!IS_OBJECT(args[0]) || !objobject_get(VAL_TO_OBJECT(args[0]), args[1], &rv))
+        rv = (num_args > 1) ? args[2] : NIL_VAL;
+    RETURN(rv);
 }
 
 DEFINE_NATIVE(Object_hasOwnSlot) {
