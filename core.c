@@ -148,6 +148,10 @@ DEFINE_NATIVE(Object_setProto) {
     RETURN(NIL_VAL);
 }
 
+DEFINE_NATIVE(Object_hash) {
+    RETURN(NUMBER_TO_VAL(value_hash(args[0])));
+}
+
 DEFINE_NATIVE(Object_rawGetSlot) {
     ARGSPEC("**");
     Value this = args[0];
@@ -273,11 +277,18 @@ DEFINE_NATIVE(Object_toString) {
     case VALUE_NIL:   RETURN(OBJ_TO_VAL(objstring_copy(vm, "nil", 3)));
     case VALUE_TRUE:  RETURN(OBJ_TO_VAL(objstring_copy(vm, "true", 4)));
     case VALUE_FALSE: RETURN(OBJ_TO_VAL(objstring_copy(vm, "false", 5)));
-    case VALUE_NUMBER:
-        num_chars = snprintf(buffer, sizeof(buffer), "%g", VAL_TO_NUMBER(this));
+    case VALUE_NUMBER: {
+        // Check if we're printing a "small" integer or not.
+        // This is mainly so that we can read the output of Object_hash.
+        double f = VAL_TO_NUMBER(this);
+        if (f >= INT32_MIN && f <= INT32_MAX && f == (int32_t)f)
+            num_chars = snprintf(buffer, sizeof(buffer), "%d", (int32_t)f);
+        else
+            num_chars = snprintf(buffer, sizeof(buffer), "%g", f);
         if (num_chars < 0 || num_chars >= sizeof(buffer))
             ERROR("%s error converting number to string, got num_chars: %d.", __func__, num_chars);
         break;
+    }
     case VALUE_OBJ: {
         Obj* obj = VAL_TO_OBJ(this);
         const char* prefix;
@@ -417,16 +428,16 @@ DEFINE_NATIVE(Native_callWithThis) {
         RETURN(return_type(a op b)); \
     }
 
-DEFINE_NUMBER_METHOD(plus,     double, +,  NUMBER_TO_VAL)
-DEFINE_NUMBER_METHOD(minus,    double, -,  NUMBER_TO_VAL)
-DEFINE_NUMBER_METHOD(multiply, double, *,  NUMBER_TO_VAL)
-DEFINE_NUMBER_METHOD(divide,   double, /,  NUMBER_TO_VAL)
-DEFINE_NUMBER_METHOD(lt,       double, <,  BOOL_TO_VAL)
-DEFINE_NUMBER_METHOD(gt,       double, >,  BOOL_TO_VAL)
-DEFINE_NUMBER_METHOD(leq,      double, <=, BOOL_TO_VAL)
-DEFINE_NUMBER_METHOD(geq,      double, >=, BOOL_TO_VAL)
-DEFINE_NUMBER_METHOD(lor,      int32_t, |, NUMBER_TO_VAL)
-DEFINE_NUMBER_METHOD(land,     int32_t, &, NUMBER_TO_VAL)
+DEFINE_NUMBER_METHOD(add,  double, +,  NUMBER_TO_VAL)
+DEFINE_NUMBER_METHOD(sub,  double, -,  NUMBER_TO_VAL)
+DEFINE_NUMBER_METHOD(mul,  double, *,  NUMBER_TO_VAL)
+DEFINE_NUMBER_METHOD(div,  double, /,  NUMBER_TO_VAL)
+DEFINE_NUMBER_METHOD(lt,   double, <,  BOOL_TO_VAL)
+DEFINE_NUMBER_METHOD(gt,   double, >,  BOOL_TO_VAL)
+DEFINE_NUMBER_METHOD(leq,  double, <=, BOOL_TO_VAL)
+DEFINE_NUMBER_METHOD(geq,  double, >=, BOOL_TO_VAL)
+DEFINE_NUMBER_METHOD(lor,  int32_t, |, NUMBER_TO_VAL)
+DEFINE_NUMBER_METHOD(land, int32_t, &, NUMBER_TO_VAL)
 #undef DEFINE_NUMBER_METHOD
 
 DEFINE_NATIVE(Number_negate) {
@@ -464,7 +475,7 @@ DEFINE_STRING_METHOD(leq, <=)
 DEFINE_STRING_METHOD(geq, >=)
 #undef DEFINE_STRING_METHOD
 
-DEFINE_NATIVE(String_plus) {
+DEFINE_NATIVE(String_add) {
     ARGSPEC("SS");
     RETURN(OBJ_TO_VAL(objstring_concat(vm,
         VAL_TO_STRING(args[0]),
@@ -813,6 +824,7 @@ void core_init_vm(VM* vm)
     vm->ObjectProto->proto = OBJ_TO_VAL(vm->ObjectProto);
     ADD_METHOD(ObjectProto, "proto",       Object_proto);
     ADD_METHOD(ObjectProto, "setProto",    Object_setProto);
+    ADD_METHOD(ObjectProto, "hash",        Object_hash);
     ADD_METHOD(ObjectProto, "rawGetSlot",  Object_rawGetSlot);
     ADD_METHOD(ObjectProto, "rawSetSlot",  Object_setSlot);
     ADD_METHOD(ObjectProto, "hasSlot",     Object_hasSlot);
@@ -846,10 +858,10 @@ void core_init_vm(VM* vm)
 
     vm->NumberProto = objobject_new(vm);
     vm->NumberProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    ADD_METHOD(NumberProto, "+",   Number_plus);
-    ADD_METHOD(NumberProto, "-",   Number_minus);
-    ADD_METHOD(NumberProto, "*",   Number_multiply);
-    ADD_METHOD(NumberProto, "/",   Number_divide);
+    ADD_METHOD(NumberProto, "+",   Number_add);
+    ADD_METHOD(NumberProto, "-",   Number_sub);
+    ADD_METHOD(NumberProto, "*",   Number_mul);
+    ADD_METHOD(NumberProto, "/",   Number_div);
     ADD_METHOD(NumberProto, "<",   Number_lt);
     ADD_METHOD(NumberProto, ">",   Number_gt);
     ADD_METHOD(NumberProto, "<=",  Number_leq);
@@ -862,7 +874,7 @@ void core_init_vm(VM* vm)
 
     vm->StringProto = objobject_new(vm);
     vm->StringProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    ADD_METHOD(StringProto, "+",      String_plus);
+    ADD_METHOD(StringProto, "+",      String_add);
     ADD_METHOD(StringProto, "length", String_length);
     ADD_METHOD(StringProto, "<",      String_lt);
     ADD_METHOD(StringProto, ">",      String_gt);
