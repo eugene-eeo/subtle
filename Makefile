@@ -1,7 +1,7 @@
 ci: lint test
 
 CCFLAGS=-Wall -pedantic
-CC=gcc $(CCFLAGS)
+CC=gcc
 DEPS=$(shell ls *.c vendor/*.c | grep -v main.c)
 MAIN=$(DEPS) main.c
 
@@ -9,34 +9,34 @@ core.subtle.inc: core.subtle gen.py
 	python3 gen.py
 
 cute: core.subtle.inc
-	$(CC) -DSUBTLE_DEBUG \
+	$(CC) $(CCFLAGS) -DSUBTLE_DEBUG \
 		-DSUBTLE_DEBUG_TRACE_EXECUTION \
 		-DSUBTLE_DEBUG_PRINT_CODE \
 		-DSUBTLE_DEBUG_STRESS_GC \
 		-g -Og $(MAIN) -o subtle
 
 debug: core.subtle.inc
-	$(CC) -DSUBTLE_DEBUG \
+	$(CC) $(CCFLAGS) -DSUBTLE_DEBUG \
 		-DSUBTLE_DEBUG_TRACE_ALLOC \
 		-DSUBTLE_DEBUG_STRESS_GC \
 		-g -Og $(MAIN) -o subtle
 
 release: core.subtle.inc
-	$(CC) -O3 -flto $(MAIN) -o subtle
+	$(CC) $(CCFLAGS) -O3 -flto $(MAIN) -o subtle
 
 stress: core.subtle.inc
-	$(CC) -DSUBTLE_DEBUG \
+	$(CC) $(CCFLAGS) -DSUBTLE_DEBUG \
 		-DSUBTLE_DEBUG_STRESS_GC \
 		-g -Og $(MAIN) -o subtle
 
 benchmark:
 	mkdir -p build
-	$(CC) -O3 $(DEPS) \
+	$(CC) $(CCFLAGS) -O3 $(DEPS) \
 		bench/benchmark_table.c -o build/table_benchmark
 	./build/table_benchmark
 
 profile: core.subtle.inc
-	$(CC) -Og $(MAIN) -pg -o subtle
+	$(CC) $(CCFLAGS) -Og $(MAIN) -pg -o subtle
 
 lint:
 	cppcheck *.c
