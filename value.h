@@ -52,8 +52,8 @@ typedef struct {
 
 typedef struct {
     Value* values;
-    size_t length;
-    size_t capacity;
+    uint32_t length;
+    uint32_t capacity;
 } ValueArray;
 
 void valuearray_init(ValueArray* va);

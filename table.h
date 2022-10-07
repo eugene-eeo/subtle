@@ -21,9 +21,9 @@ typedef struct ObjString ObjString;
 
 typedef struct {
     Entry* entries;
-    size_t count; // Number of valid + tombstone entries
-    size_t valid; // Number of valid entries
-    size_t capacity;
+    uint32_t count; // Number of valid + tombstone entries
+    uint32_t valid; // Number of valid entries
+    uint32_t capacity;
 } Table;
 
 void table_init(Table* table);

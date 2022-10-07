@@ -265,10 +265,10 @@ objnative_free(VM* vm, Obj* obj)
 // ObjFiber
 // ========
 
-static size_t
-next_power_of_two(size_t n)
+static int
+next_power_of_two(int n)
 {
-    size_t m = 1;
+    int m = 1;
     while (m < n)
         m *= 2;
     return m;
@@ -278,10 +278,10 @@ ObjFiber*
 objfiber_new(VM* vm, ObjClosure* closure)
 {
     // Allocate arrays first in case of GC
-    size_t stack_capacity = next_power_of_two(closure->function->max_slots);
+    int stack_capacity = next_power_of_two(closure->function->max_slots);
     Value* stack = ALLOCATE_ARRAY(vm, Value, stack_capacity);
 
-    size_t frames_capacity = 1;
+    int frames_capacity = 1;
     CallFrame* frames = ALLOCATE_ARRAY(vm, CallFrame, frames_capacity);
 
     ObjFiber* fiber = ALLOCATE_OBJECT(vm, OBJ_FIBER, ObjFiber);
@@ -307,18 +307,18 @@ objfiber_new(VM* vm, ObjClosure* closure)
 }
 
 void
-objfiber_ensure_stack(ObjFiber* fiber, VM* vm, size_t sz)
+objfiber_ensure_stack(ObjFiber* fiber, VM* vm, int n)
 {
-    size_t stack_count = fiber->stack_top - fiber->stack;
-    size_t required = stack_count + sz;
+    int stack_count = fiber->stack_top - fiber->stack;
+    int required = stack_count + n;
     if (fiber->stack_capacity >= required)
         return;
 
     Value* old_stack = fiber->stack;
 #ifdef SUBTLE_DEBUG_STRESS_GC
-    size_t new_capacity = required;
+    int new_capacity = required;
 #else
-    size_t new_capacity = next_power_of_two(required);
+    int new_capacity = next_power_of_two(required);
 #endif
     fiber->stack = GROW_ARRAY(vm, fiber->stack, Value,
                               fiber->stack_capacity,
@@ -329,7 +329,7 @@ objfiber_ensure_stack(ObjFiber* fiber, VM* vm, size_t sz)
     // referencing values on the stack.
     if (fiber->stack != old_stack) {
         // Callframes
-        for (size_t i = 0; i < fiber->frames_count; i++) {
+        for (int i = 0; i < fiber->frames_count; i++) {
             CallFrame* frame = &fiber->frames[i];
             frame->slots = fiber->stack + (frame->slots - old_stack);
         }
@@ -351,7 +351,7 @@ objfiber_push_frame(ObjFiber* fiber, VM* vm,
                     ObjClosure* closure, Value* stack_start)
 {
     if (fiber->frames_count + 1 > fiber->frames_capacity) {
-        size_t new_capacity = GROW_CAPACITY(fiber->frames_capacity);
+        int new_capacity = GROW_CAPACITY(fiber->frames_capacity);
         fiber->frames = GROW_ARRAY(vm, fiber->frames, CallFrame, fiber->frames_capacity, new_capacity);
         fiber->frames_capacity = new_capacity;
     }
@@ -410,32 +410,32 @@ objlist_new(VM* vm)
 }
 
 Value
-objlist_get(ObjList* list, size_t idx)
+objlist_get(ObjList* list, uint32_t idx)
 {
     ASSERT(list->size > idx, "list->size <= idx");
     return list->values[idx];
 }
 
 void
-objlist_set(ObjList* list, size_t idx, Value v)
+objlist_set(ObjList* list, uint32_t idx, Value v)
 {
     ASSERT(list->size > idx, "list->size <= idx");
     list->values[idx] = v;
 }
 
 void
-objlist_del(ObjList* list, VM* vm, size_t idx)
+objlist_del(ObjList* list, VM* vm, uint32_t idx)
 {
     ASSERT(list->size > idx, "list->size <= idx");
     // [0] .. [idx] [idx+1] [idx+2] ... [sz]
     // [0] .. [idx+1] [idx+2] .. [sz]
     list->size--;
-    for (size_t i = idx; i < list->size; i++)
+    for (uint32_t i = idx; i < list->size; i++)
         list->values[i] = list->values[i + 1];
     // Compact the list if necessary.
     if (list->capacity > 8
             && list->size * 2 < list->capacity) {
-        size_t new_capacity = SHRINK_CAPACITY(list->capacity);
+        uint32_t new_capacity = SHRINK_CAPACITY(list->capacity);
         list->values = GROW_ARRAY(vm, list->values, Value, list->capacity, new_capacity);
         list->capacity = new_capacity;
     }
@@ -443,16 +443,16 @@ objlist_del(ObjList* list, VM* vm, size_t idx)
 }
 
 void
-objlist_insert(ObjList* list, VM* vm, size_t idx, Value v)
+objlist_insert(ObjList* list, VM* vm, uint32_t idx, Value v)
 {
     ASSERT(list->size >= idx, "list->size < idx");
     if (list->size + 1 > list->capacity) {
-        size_t old_cap = list->capacity;
+        uint32_t old_cap = list->capacity;
         list->capacity = GROW_CAPACITY(list->capacity);
         list->values = GROW_ARRAY(vm, list->values, Value, old_cap, list->capacity);
     }
     list->size++;
-    for (size_t i = list->size - 1; i > idx; i--)
+    for (uint32_t i = list->size - 1; i > idx; i--)
         list->values[i] = list->values[i - 1];
     list->values[idx] = v;
 }

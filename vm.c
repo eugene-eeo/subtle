@@ -116,8 +116,9 @@ print_stack_trace(VM* vm)
         for (int i = fiber->frames_count - 1; i >= 0; i--) {
             CallFrame* frame = &fiber->frames[i];
             ObjFunction* function = frame->closure->function;
-            size_t instruction = frame->ip - function->chunk.code;
-            fprintf(stderr, "\t[line %zu] in %s\n",
+            // -1 as we increment frame->ip on each loop.
+            int instruction = frame->ip - function->chunk.code - 1;
+            fprintf(stderr, "\t[line %u] in %s\n",
                     chunk_get_line(&function->chunk, instruction),
                     function->arity == -1 ? "script" : "fn");
         }
@@ -422,7 +423,6 @@ run(VM* vm, ObjFiber* fiber, int top_level)
             }
             case OP_ASSERT: {
                 if (!value_truthy(vm_pop(vm))) {
-                    frame->ip--; // To get a correct line number.
                     vm_runtime_error(vm, "Assertion failed.");
                     goto handle_fibers;
                 }

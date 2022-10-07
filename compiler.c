@@ -37,9 +37,9 @@ typedef struct Loop {
     // 3. Do the actual looping.
     struct Loop* outer;
     int depth; // Initial depth of the loop.
-    size_t break_jump; // Loop break OP_JUMP.
-    size_t cond_jump;  // Loop condition OP_JUMP_IF_FALSE.
-    size_t start; // Where should the loop jump back to?
+    int break_jump; // Loop break OP_JUMP.
+    int cond_jump;  // Loop condition OP_JUMP_IF_FALSE.
+    int start; // Where should the loop jump back to?
 } Loop;
 
 typedef struct {
@@ -141,7 +141,7 @@ static void error_at(Compiler* compiler, Token* token, const char* message) {
     if (compiler->parser->panic_mode) return;
     compiler->parser->panic_mode = true;
 
-    fprintf(stderr, "[line %zu] Error at ", token->line);
+    fprintf(stderr, "[line %d] Error at ", token->line);
     if (token->type == TOKEN_EOF) {
         fprintf(stderr, "end");
     } else if (token->type == TOKEN_ERROR) {
@@ -258,7 +258,9 @@ static void emit_offset(Compiler* compiler, uint16_t offset) {
 }
 
 static uint16_t make_constant(Compiler* compiler, Value v) {
-    size_t offset = chunk_write_constant(current_chunk(compiler), compiler->vm, v);
+    if (compiler->parser->had_error)
+        return -1;
+    uint32_t offset = chunk_write_constant(current_chunk(compiler), compiler->vm, v);
     if (offset > UINT16_MAX) {
         error(compiler, "Too many constants in one chunk.");
         return 0;
@@ -433,7 +435,7 @@ resolve_upvalue(Compiler* compiler, Token* token)
 // Jumping helpers
 // ===============
 
-static size_t
+static int
 emit_jump(Compiler* compiler, uint8_t op)
 {
     emit_op(compiler, op);
@@ -443,14 +445,14 @@ emit_jump(Compiler* compiler, uint8_t op)
 }
 
 static void
-patch_jump(Compiler* compiler, size_t offset)
+patch_jump(Compiler* compiler, int offset)
 {
     // Compute how many bytes we need to jump over -- accounting
     // for the 2-byte offset after the jump instruction.
     //
     // | OP_JUMP | 0 | 0 | .... | OP_POP |  |
     //             ^-- offset              ^-- chunk->length
-    size_t jump = current_chunk(compiler)->length - offset - 2;
+    int jump = current_chunk(compiler)->length - offset - 2;
     if (jump > UINT16_MAX)
         error(compiler, "Too much code to jump over.");
 
@@ -459,7 +461,7 @@ patch_jump(Compiler* compiler, size_t offset)
 }
 
 static void
-emit_loop(Compiler* compiler, size_t start)
+emit_loop(Compiler* compiler, int start)
 {
     // It's important that this line is here, otherwise we would jump
     // over the wrong number of bytes: the bottom line assumes that
@@ -467,7 +469,7 @@ emit_loop(Compiler* compiler, size_t start)
     emit_op(compiler, OP_LOOP);
 
     // Have to +2 here to account for the VM reading the 2 byte argument.
-    size_t jump = current_chunk(compiler)->length - start + 2;
+    int jump = current_chunk(compiler)->length - start + 2;
     if (jump > UINT16_MAX)
         error(compiler, "Too much code to jump over.");
 
@@ -533,14 +535,14 @@ static void literal(Compiler* compiler, bool can_assign, bool allow_newlines) {
 
 static void and_(Compiler* compiler, bool can_assign, bool allow_newlines) {
     match(compiler, TOKEN_NEWLINE);
-    size_t else_jump = emit_jump(compiler, OP_AND);
+    int else_jump = emit_jump(compiler, OP_AND);
     parse_precedence(compiler, PREC_AND, allow_newlines);
     patch_jump(compiler, else_jump);
 }
 
 static void or_(Compiler* compiler, bool can_assign, bool allow_newlines) {
     match(compiler, TOKEN_NEWLINE);
-    size_t else_jump = emit_jump(compiler, OP_OR);
+    int else_jump = emit_jump(compiler, OP_OR);
     parse_precedence(compiler, PREC_OR, allow_newlines);
     patch_jump(compiler, else_jump);
 }
@@ -838,8 +840,8 @@ static void block_or_stmt(Compiler*);
 static void
 enter_loop(Compiler* compiler, Loop* loop)
 {
-    size_t skip_jump = emit_jump(compiler, OP_JUMP); // (2)
-    size_t break_jump = emit_jump(compiler, OP_JUMP); // (1)
+    int skip_jump = emit_jump(compiler, OP_JUMP); // (2)
+    int break_jump = emit_jump(compiler, OP_JUMP); // (1)
     patch_jump(compiler, skip_jump); // (2)
 
     loop->outer = compiler->loop;
@@ -972,10 +974,10 @@ static void if_stmt(Compiler* compiler) {
     expression(compiler, true);
     consume(compiler, TOKEN_RPAREN, "Expect ')' after condition.");
 
-    size_t else_jump = emit_jump(compiler, OP_JUMP_IF_FALSE);
+    int else_jump = emit_jump(compiler, OP_JUMP_IF_FALSE);
     block_or_stmt(compiler);
 
-    size_t exit_jump = emit_jump(compiler, OP_JUMP);
+    int exit_jump = emit_jump(compiler, OP_JUMP);
 
     patch_jump(compiler, else_jump);
 

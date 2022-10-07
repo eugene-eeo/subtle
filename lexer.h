@@ -6,7 +6,7 @@
 typedef struct {
     const char* start;
     const char* current;
-    size_t line; // current line number
+    int line; // current line number
 } Lexer;
 
 typedef enum {
@@ -51,7 +51,7 @@ typedef struct {
     TokenType type;
     const char* start;
     size_t length;
-    size_t line;
+    int line;
 } Token;
 
 void lexer_init(Lexer* lexer, const char* source);

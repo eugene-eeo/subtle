@@ -70,20 +70,20 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
 
 
 static bool
-value_to_index(Value num, size_t length, bool allow_end, int32_t* idx)
+value_to_index(Value num, uint32_t length, uint32_t* idx)
 {
     ASSERT(IS_NUMBER(num), "!IS_NUMBER(num)");
     int32_t i = (int32_t) VAL_TO_NUMBER(num);
     if (i < 0) i += length;
-    if (i < 0 || (allow_end ? i > length : i >= length))
+    if (i < 0 || i >= length)
         return false;
-    *idx = i;
+    *idx = (uint32_t)i;
     return true;
 }
 
 // A generic implementation of iterMore for sized sequences.
 static Value
-generic_iterMore(Value arg, size_t length)
+generic_iterMore(Value arg, uint32_t length)
 {
     int32_t idx = -1;
     if (IS_NIL(arg)) {
@@ -125,8 +125,8 @@ generic_tableIterNext(Table* table, Value value)
 static bool
 generic_tableIterEntry(Table* table, Value value, Entry* entry)
 {
-    int32_t idx;
-    if (!value_to_index(value, table->capacity, false, &idx))
+    uint32_t idx;
+    if (!value_to_index(value, table->capacity, &idx))
         return false;
     if (IS_UNDEFINED(table->entries[idx].key))
         return false;
@@ -480,8 +480,8 @@ DEFINE_NATIVE(String_length) {
 DEFINE_NATIVE(String_get) {
     ARGSPEC("SN");
     ObjString* s = VAL_TO_STRING(args[0]);
-    int32_t idx;
-    if (value_to_index(args[1], s->length, false, &idx))
+    uint32_t idx;
+    if (value_to_index(args[1], s->length, &idx))
         RETURN(OBJ_TO_VAL(objstring_copy(vm, s->chars + idx, 1)));
     RETURN(NIL_VAL);
 }
@@ -686,8 +686,8 @@ DEFINE_NATIVE(List_add) {
 DEFINE_NATIVE(List_get) {
     ARGSPEC("LN");
     ObjList* list = VAL_TO_LIST(args[0]);
-    int32_t idx;
-    if (value_to_index(args[1], list->size, false, &idx))
+    uint32_t idx;
+    if (value_to_index(args[1], list->size, &idx))
         RETURN(objlist_get(list, idx));
     RETURN(NIL_VAL);
 }
@@ -695,8 +695,8 @@ DEFINE_NATIVE(List_get) {
 DEFINE_NATIVE(List_set) {
     ARGSPEC("LN*");
     ObjList* list = VAL_TO_LIST(args[0]);
-    int32_t idx;
-    if (value_to_index(args[1], list->size, false, &idx))
+    uint32_t idx;
+    if (value_to_index(args[1], list->size, &idx))
         objlist_set(list, idx, args[2]);
     RETURN(OBJ_TO_VAL(list));
 }
@@ -704,8 +704,8 @@ DEFINE_NATIVE(List_set) {
 DEFINE_NATIVE(List_delete) {
     ARGSPEC("LN");
     ObjList* list = VAL_TO_LIST(args[0]);
-    int32_t idx;
-    if (value_to_index(args[1], list->size, false, &idx))
+    uint32_t idx;
+    if (value_to_index(args[1], list->size, &idx))
         objlist_del(list, vm, idx);
     RETURN(OBJ_TO_VAL(list));
 }
@@ -713,8 +713,8 @@ DEFINE_NATIVE(List_delete) {
 DEFINE_NATIVE(List_insert) {
     ARGSPEC("LN*");
     ObjList* list = VAL_TO_LIST(args[0]);
-    int32_t idx;
-    if (value_to_index(args[1], list->size, true, &idx))
+    uint32_t idx;
+    if (value_to_index(args[1], list->size + 1, &idx))
         objlist_insert(list, vm, idx, args[2]);
     RETURN(OBJ_TO_VAL(list));
 }

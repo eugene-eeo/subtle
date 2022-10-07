@@ -18,8 +18,8 @@ void table_free(Table* table, VM* vm) {
     table_init(table);
 }
 
-static Entry* table_find_entry(Entry* entries, size_t capacity, Value key) {
-    size_t index = value_hash(key) & (capacity - 1);
+static Entry* table_find_entry(Entry* entries, uint32_t capacity, Value key) {
+    uint32_t index = value_hash(key) & (capacity - 1);
     Entry* tombstone = NULL;
     // As long as we keep TABLE_MAX_LOAD < 1, we will never have to
     // worry about wrapping around to index, because the table will
@@ -43,14 +43,14 @@ static Entry* table_find_entry(Entry* entries, size_t capacity, Value key) {
     }
 }
 
-static void table_adjust_capacity(Table* table, VM* vm, size_t capacity) {
+static void table_adjust_capacity(Table* table, VM* vm, uint32_t capacity) {
     Entry* entries = ALLOCATE_ARRAY(vm, Entry, capacity);
-    for (size_t i = 0; i < capacity; i++) {
+    for (uint32_t i = 0; i < capacity; i++) {
         entries[i].key = UNDEFINED_VAL;
         entries[i].value = NIL_VAL;
     }
 
-    for (size_t i = 0; i < table->capacity; i++) {
+    for (uint32_t i = 0; i < table->capacity; i++) {
         Entry* src = &table->entries[i];
         if (IS_UNDEFINED(src->key)) continue;
 
@@ -79,7 +79,7 @@ bool table_get(Table* table, Value key, Value* value) {
 
 bool table_set(Table* table, VM* vm, Value key, Value value) {
     if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
-        size_t new_capacity = GROW_CAPACITY(table->capacity);
+        uint32_t new_capacity = GROW_CAPACITY(table->capacity);
         table_adjust_capacity(table, vm, new_capacity);
     }
 
@@ -125,7 +125,7 @@ void table_compact(Table* table, VM* vm) {
         //   ===> 2 * valid < max_load * cap
         //   ===>     valid < max_load * (cap / 2)
         //            ^-- new count       ^--- new capacity
-        size_t new_capacity = SHRINK_CAPACITY(table->capacity);
+        uint32_t new_capacity = SHRINK_CAPACITY(table->capacity);
         table_adjust_capacity(table, vm, new_capacity);
         ASSERT(table->capacity >= 8, "capacity < min_capacity");
     }
@@ -145,7 +145,7 @@ table_find_string(Table* table,
                   const char* chars, size_t length, uint32_t hash)
 {
     if (table->valid == 0) return NULL;
-    size_t index = hash & (table->capacity - 1);
+    uint32_t index = hash & (table->capacity - 1);
     for (;;) {
         Entry* entry = &table->entries[index];
         if (IS_UNDEFINED(entry->key)) {
@@ -165,7 +165,7 @@ table_find_string(Table* table,
 void
 table_mark(Table* table, VM* vm)
 {
-    for (size_t i = 0; i < table->capacity; i++) {
+    for (uint32_t i = 0; i < table->capacity; i++) {
         Entry* entry = &table->entries[i];
         mark_value(vm, entry->key);
         mark_value(vm, entry->value);
@@ -175,7 +175,7 @@ table_mark(Table* table, VM* vm)
 void
 table_remove_white(Table* table, VM* vm)
 {
-    for (size_t i = 0; i < table->capacity; i++) {
+    for (uint32_t i = 0; i < table->capacity; i++) {
         Entry* entry = &table->entries[i];
         if (IS_OBJ(entry->key) && !VAL_TO_OBJ(entry->key)->marked)
             table_delete_key(table, vm, entry->key);

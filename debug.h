@@ -7,6 +7,6 @@
 void debug_print_object(Obj* obj);
 void debug_print_value(Value value);
 void debug_print_chunk(Chunk* chunk);
-size_t debug_print_instruction(Chunk* chunk, size_t offset);
+int debug_print_instruction(Chunk* chunk, int offset);
 
 #endif

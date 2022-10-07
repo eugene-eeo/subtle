@@ -141,7 +141,7 @@ static void blacken_object(VM* vm, Obj* obj) {
         case OBJ_RANGE: break; // Nothing to do here.
         case OBJ_LIST: {
             ObjList* list = (ObjList*)obj;
-            for (size_t i = 0; i < list->size; i++)
+            for (uint32_t i = 0; i < list->size; i++)
                 mark_value(vm, list->values[i]);
             break;
         }

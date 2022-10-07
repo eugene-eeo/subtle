@@ -2,7 +2,7 @@ let x = Map.new()
 let MAX = 2048
 
 for (i = 0...MAX) {
-    x.set(i toString, i);
+    x.set(i toString, i)
     for (j = 0...i)
-        assert x.get(j toString) == j;
+        assert x.get(j toString) == j
 }

@@ -14,7 +14,7 @@ void valuearray_free(ValueArray* va, VM* vm) {
 
 void valuearray_write(ValueArray* va, VM* vm, Value v) {
     if (va->length + 1 > va->capacity) {
-        size_t new_size = GROW_CAPACITY(va->capacity);
+        uint32_t new_size = GROW_CAPACITY(va->capacity);
         va->values = GROW_ARRAY(vm, va->values, Value, va->capacity, new_size);
         va->capacity = new_size;
     }
@@ -25,7 +25,7 @@ void valuearray_write(ValueArray* va, VM* vm, Value v) {
 
 void valuearray_mark(ValueArray* va, VM* vm)
 {
-    for (size_t i = 0; i < va->length; i++)
+    for (uint32_t i = 0; i < va->length; i++)
         mark_value(vm, va->values[i]);
 }
 

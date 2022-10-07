@@ -62,8 +62,8 @@ is_object_type(Value value, ObjType type)
 
 typedef struct ObjString {
     Obj obj;
-    size_t length;
     char* chars;
+    uint32_t length;
     uint32_t hash;
 } ObjString;
 
@@ -115,6 +115,8 @@ typedef struct {
 
 typedef enum {
     // VM's root fiber -- this fiber cannot be switched to.
+    // Internally we pretend that fibers with FIBER_ROOT have
+    // a parent fiber, even though they don't.
     FIBER_ROOT,
     // This Fiber was ran with a .try(), indicating that the parent
     // fiber will handle the error.
@@ -129,11 +131,11 @@ typedef struct ObjFiber {
 
     Value* stack;
     Value* stack_top;
-    size_t stack_capacity;
+    int stack_capacity;
 
     CallFrame* frames;
-    size_t frames_count;
-    size_t frames_capacity;
+    int frames_count;
+    int frames_capacity;
 
     struct ObjFiber* parent;
     ObjUpvalue* open_upvalues;
@@ -150,8 +152,8 @@ typedef struct ObjRange {
 typedef struct ObjList {
     Obj obj;
     Value* values;
-    size_t size;
-    size_t capacity;
+    uint32_t size;
+    uint32_t capacity;
 } ObjList;
 
 typedef struct ObjMap {
@@ -207,7 +209,7 @@ ObjNative* objnative_new(VM* vm, NativeFn fn);
 // ========
 
 ObjFiber* objfiber_new(VM* vm, ObjClosure* closure);
-void objfiber_ensure_stack(ObjFiber* fiber, VM* vm, size_t sz);
+void objfiber_ensure_stack(ObjFiber* fiber, VM* vm, int n);
 CallFrame* objfiber_push_frame(ObjFiber* fiber, VM* vm,
                                ObjClosure* closure, Value* stack_start);
 bool objfiber_is_done(ObjFiber* fiber);
@@ -221,10 +223,10 @@ ObjRange* objrange_new(VM* vm, double start, double end, bool inclusive);
 // =======
 
 ObjList* objlist_new(VM* vm);
-Value objlist_get(ObjList* list, size_t idx);
-void objlist_set(ObjList* list, size_t idx, Value v);
-void objlist_del(ObjList* list, VM* vm, size_t idx);
-void objlist_insert(ObjList* list, VM* vm, size_t idx, Value v);
+Value objlist_get(ObjList* list, uint32_t idx);
+void objlist_set(ObjList* list, uint32_t idx, Value v);
+void objlist_del(ObjList* list, VM* vm, uint32_t idx);
+void objlist_insert(ObjList* list, VM* vm, uint32_t idx, Value v);
 
 // ObjMap
 // ======

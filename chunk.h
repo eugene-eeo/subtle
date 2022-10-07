@@ -35,9 +35,9 @@ enum OpCode {
 
 typedef struct Chunk {
     uint8_t*   code;
-    size_t*    lines;
-    size_t     length;
-    size_t     capacity;
+    int*       lines;
+    int        length;
+    int        capacity;
     ValueArray constants;
     Table      constants_index;
 } Chunk;
@@ -47,10 +47,10 @@ typedef struct VM VM;
 void chunk_init(Chunk* chunk);
 void chunk_done(Chunk* chunk, VM* vm);
 void chunk_free(Chunk* chunk, VM* vm);
-void chunk_write_byte(Chunk* chunk, VM* vm, uint8_t byte, size_t line);
-void chunk_write_offset(Chunk* chunk, VM* vm, uint16_t offset, size_t line);
-size_t chunk_get_line(Chunk* chunk, size_t offset);
-size_t chunk_write_constant(Chunk* chunk, VM* vm, Value v);
+void chunk_write_byte(Chunk* chunk, VM* vm, uint8_t byte, int line);
+void chunk_write_offset(Chunk* chunk, VM* vm, uint16_t offset, int line);
+int chunk_get_line(Chunk* chunk, int offset);
+int chunk_write_constant(Chunk* chunk, VM* vm, Value v);
 void chunk_mark(Chunk* chunk, VM* vm);
 
 #endif
