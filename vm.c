@@ -365,7 +365,7 @@ run(VM* vm, ObjFiber* fiber, int top_level)
         printf("\n");
         // Trace the about-to-be-executed instruction.
         debug_print_instruction(&frame->closure->function->chunk,
-                                (size_t)(frame->ip - frame->closure->function->chunk.code));
+                                frame->ip - frame->closure->function->chunk.code);
 #endif
         switch (READ_BYTE()) {
             case OP_RETURN: {
