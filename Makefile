@@ -72,3 +72,6 @@ vendor_deps:
 	mkdir -p vendor
 	wget 'https://raw.githubusercontent.com/antirez/linenoise/master/linenoise.c' -O vendor/linenoise.c
 	wget 'https://raw.githubusercontent.com/antirez/linenoise/master/linenoise.h' -O vendor/linenoise.h
+
+clangd_index:
+	bear -- make release
