@@ -76,6 +76,7 @@ value_to_index(Value num, uint32_t length, uint32_t* idx)
 {
     ASSERT(IS_NUMBER(num), "!IS_NUMBER(num)");
     int32_t i = (int32_t) VAL_TO_NUMBER(num);
+    if (VAL_TO_NUMBER(num) != i) return false;
     if (i < 0) i += length;
     if (i < 0 || i >= length)
         return false;
