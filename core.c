@@ -84,22 +84,31 @@ value_to_index(Value num, uint32_t length, uint32_t* idx)
     return true;
 }
 
-// A generic implementation of iterMore for sized sequences.
-static Value
-generic_iterMore(Value arg, uint32_t length)
+static bool
+init_index(Value arg, uint32_t length, int32_t* rv)
 {
     int32_t idx = -1;
     if (IS_NIL(arg)) {
         idx = 0;
     } else if (IS_NUMBER(arg)) {
         idx = (int32_t) VAL_TO_NUMBER(arg);
+        if (VAL_TO_NUMBER(arg) != idx) return false;
         idx++;
-    } else {
-        return FALSE_VAL;
     }
     if (idx < 0 || idx >= length)
+        return false;
+    *rv = idx;
+    return true;
+}
+
+// A generic implementation of iterMore for sized sequences.
+static Value
+generic_iterMore(Value arg, uint32_t length)
+{
+    int32_t idx;
+    if (!init_index(arg, length, &idx))
         return FALSE_VAL;
-    return NUMBER_TO_VAL((double) idx);
+    return NUMBER_TO_VAL(idx);
 }
 
 // generic implementation to check if the table still has any
@@ -107,14 +116,8 @@ generic_iterMore(Value arg, uint32_t length)
 static Value
 generic_tableIterNext(Table* table, Value value)
 {
-    int32_t idx = -1;
-    if (IS_NIL(value)) {
-        idx = 0;
-    } else if (IS_NUMBER(value)) {
-        idx = (int32_t) VAL_TO_NUMBER(value);
-        idx++;
-    }
-    if (idx < 0 || idx >= table->capacity)
+    int32_t idx;
+    if (!init_index(value, table->capacity, &idx))
         return FALSE_VAL;
     // Find a valid entry that is >= the given index.
     for (; idx < table->capacity; idx++)
