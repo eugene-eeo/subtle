@@ -530,7 +530,7 @@ run_fiber(VM* vm, ObjFiber* fiber,
     } else {
         // We're resuming the `fiber`. In this case, `fiber`'s stack
         // will be like so, since it has already been suspended (e.g.
-        // from a Fiber.call or Fiber.yield).
+        // from a Fiber.call or Fiber.yield):
         //   +---+-----------+
         //   |...| Fiber_... |
         //   +---+-----------+
