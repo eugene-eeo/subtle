@@ -291,8 +291,10 @@ DEFINE_NATIVE(Object_toString) {
     case VALUE_OBJ: {
         Obj* obj = VAL_TO_OBJ(this);
         int length;
-        // prefix + "_" + "0x" + hex of uintptr_t
-        char buffer[6 + 1 + 2 + sizeof(uintptr_t) * 8 / 4];
+        // Calculate the length (at compile-time) to store an
+        // Object prefix plus the hex representation of the pointer:
+        //   prefix + "_" + "0x" + hex ptr + NUL byte
+        char buffer[6 + 1 + 2 + sizeof(uintptr_t) * 8 / 4 + 1];
         const char* prefix;
 
         switch (obj->type) {
