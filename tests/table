@@ -7,8 +7,8 @@ x.def = 2;
 assert x.abc == 1;
 assert x.def == 2;
 
-assert !x.deleteSlot("ab");
-assert x.deleteSlot("abc");
+assert x.deleteSlot("ab") == x;
+assert x.deleteSlot("abc") == x;
 assert x.ab == nil;
 assert x.abc == nil;
 assert !x.hasOwnSlot("abc");

@@ -160,10 +160,9 @@ DEFINE_NATIVE(Object_hash) {
 
 DEFINE_NATIVE(Object_rawGetSlot) {
     ARGSPEC("**");
-    Value this = args[0];
     Value slot;
-    if (!vm_get_slot(vm, this, args[1], &slot))
-        slot = NIL_VAL;
+    if (!vm_get_slot(vm, args[0], args[1], &slot))
+        slot = (num_args > 1) ? args[2] : NIL_VAL;
     RETURN(slot);
 }
 
@@ -197,8 +196,8 @@ DEFINE_NATIVE(Object_hasOwnSlot) {
 
 DEFINE_NATIVE(Object_deleteSlot) {
     ARGSPEC("O*");
-    bool has_slot = objobject_delete(VAL_TO_OBJECT(args[0]), vm, args[1]);
-    RETURN(BOOL_TO_VAL(has_slot));
+    objobject_delete(VAL_TO_OBJECT(args[0]), vm, args[1]);
+    RETURN(args[0]);
 }
 
 DEFINE_NATIVE(Object_same) {
@@ -780,7 +779,8 @@ DEFINE_NATIVE(Map_set) {
 
 DEFINE_NATIVE(Map_delete) {
     ARGSPEC("M*");
-    RETURN(BOOL_TO_VAL(objmap_delete(VAL_TO_MAP(args[0]), vm, args[1])));
+    objmap_delete(VAL_TO_MAP(args[0]), vm, args[1]);
+    RETURN(args[0]);
 }
 
 DEFINE_NATIVE(Map_rawIterMore) {
