@@ -5,6 +5,7 @@
 #include "memory.h"
 #include "core.subtle.inc"
 
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -61,13 +62,14 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
         return false; \
     } while (false)
 
-#define RETURN(EXPR) \
+#define RETURN(expr) \
     do { \
-        *(vm->fiber->stack_top - num_args - 1) = EXPR; \
+        *(vm->fiber->stack_top - num_args - 1) = expr; \
         vm_drop(vm, num_args); \
         return true; \
     } while (false)
 
+#define CONST_STRING(vm, s) objstring_copy(vm, (s), strlen(s))
 
 static bool
 value_to_index(Value num, uint32_t length, uint32_t* idx)
@@ -200,34 +202,6 @@ DEFINE_NATIVE(Object_same) {
     RETURN(BOOL_TO_VAL(value_equal(args[1], args[2])));
 }
 
-DEFINE_NATIVE(Object_rawType) {
-    ARGSPEC("**");
-    Value v = args[1];
-    const char* type;
-    switch (v.type) {
-    case VALUE_NIL:    type = "nil"; break;
-    case VALUE_TRUE:   type = "true"; break;
-    case VALUE_FALSE:  type = "false"; break;
-    case VALUE_NUMBER: type = "number"; break;
-    case VALUE_OBJ:
-        switch (VAL_TO_OBJ(v)->type) {
-        case OBJ_STRING:  type = "string"; break;
-        case OBJ_CLOSURE: type = "fn"; break;
-        case OBJ_OBJECT:  type = "object"; break;
-        case OBJ_NATIVE:  type = "native"; break;
-        case OBJ_FIBER:   type = "fiber"; break;
-        case OBJ_RANGE:   type = "range"; break;
-        case OBJ_LIST:    type = "list"; break;
-        case OBJ_MAP:     type = "map"; break;
-        default:
-            UNREACHABLE();
-        }
-        break;
-    default: UNREACHABLE();
-    }
-    RETURN(OBJ_TO_VAL(objstring_copy(vm, type, strlen(type))));
-}
-
 DEFINE_NATIVE(Object_equal) {
     ARGSPEC("**");
     RETURN(BOOL_TO_VAL(value_equal(args[0], args[1])));
@@ -266,32 +240,61 @@ DEFINE_NATIVE(Object_hasAncestor) {
     RETURN(BOOL_TO_VAL(has_ancestor(vm, args[0], args[1])));
 }
 
+DEFINE_NATIVE(Object_rawType) {
+    ARGSPEC("**");
+    Value v = args[1];
+    switch (v.type) {
+    case VALUE_NIL:    RETURN(OBJ_TO_VAL(CONST_STRING(vm, "nil")));
+    case VALUE_TRUE:   RETURN(OBJ_TO_VAL(CONST_STRING(vm, "true")));
+    case VALUE_FALSE:  RETURN(OBJ_TO_VAL(CONST_STRING(vm, "false")));
+    case VALUE_NUMBER: RETURN(OBJ_TO_VAL(CONST_STRING(vm, "Number")));
+    case VALUE_OBJ:
+        switch (VAL_TO_OBJ(v)->type) {
+        case OBJ_STRING:  RETURN(OBJ_TO_VAL(CONST_STRING(vm, "String")));
+        case OBJ_CLOSURE: RETURN(OBJ_TO_VAL(CONST_STRING(vm, "Fn")));
+        case OBJ_OBJECT:  RETURN(OBJ_TO_VAL(CONST_STRING(vm, "Object")));
+        case OBJ_NATIVE:  RETURN(OBJ_TO_VAL(CONST_STRING(vm, "Native")));
+        case OBJ_FIBER:   RETURN(OBJ_TO_VAL(CONST_STRING(vm, "Fiber")));
+        case OBJ_RANGE:   RETURN(OBJ_TO_VAL(CONST_STRING(vm, "Range")));
+        case OBJ_LIST:    RETURN(OBJ_TO_VAL(CONST_STRING(vm, "List")));
+        case OBJ_MAP:     RETURN(OBJ_TO_VAL(CONST_STRING(vm, "Map")));
+        default: UNREACHABLE();
+        }
+    default: UNREACHABLE();
+    }
+}
+
+static ObjString*
+num_to_string(VM* vm, double num) {
+    if (isnan(num)) return CONST_STRING(vm, "nan");
+    if (isinf(num)) {
+        if (num > 0) return CONST_STRING(vm, "+inf");
+        else return CONST_STRING(vm, "-inf");
+    }
+    int length;
+    char buffer[24];
+    if (num >= INT32_MIN && num <= INT32_MAX && num == (int32_t)num) {
+        length = sprintf(buffer, "%d", (int32_t)num);
+    } else {
+        length = sprintf(buffer, "%.14g", num);
+    }
+    return objstring_copy(vm, buffer, length);
+}
+
 DEFINE_NATIVE(Object_toString) {
     Value this = args[0];
-
-    ssize_t num_chars;
-    char buffer[64];
-    ObjString* str;
-
     switch (this.type) {
-    case VALUE_NIL:   RETURN(OBJ_TO_VAL(objstring_copy(vm, "nil", 3)));
-    case VALUE_TRUE:  RETURN(OBJ_TO_VAL(objstring_copy(vm, "true", 4)));
-    case VALUE_FALSE: RETURN(OBJ_TO_VAL(objstring_copy(vm, "false", 5)));
-    case VALUE_NUMBER: {
-        // Check if we're printing a "small" integer or not.
-        // This is mainly so that we can read the output of Object_hash.
-        double f = VAL_TO_NUMBER(this);
-        if (f >= INT32_MIN && f <= INT32_MAX && f == (int32_t)f)
-            num_chars = snprintf(buffer, sizeof(buffer), "%d", (int32_t)f);
-        else
-            num_chars = snprintf(buffer, sizeof(buffer), "%g", f);
-        if (num_chars < 0 || num_chars >= sizeof(buffer))
-            ERROR("%s error converting number to string, got num_chars: %d.", __func__, num_chars);
-        break;
-    }
+    case VALUE_NIL:    RETURN(OBJ_TO_VAL(CONST_STRING(vm, "nil")));
+    case VALUE_TRUE:   RETURN(OBJ_TO_VAL(CONST_STRING(vm, "true")));
+    case VALUE_FALSE:  RETURN(OBJ_TO_VAL(CONST_STRING(vm, "false")));
+    case VALUE_NUMBER: RETURN(OBJ_TO_VAL(num_to_string(vm, VAL_TO_NUMBER(this))));
     case VALUE_OBJ: {
         Obj* obj = VAL_TO_OBJ(this);
+        int length;
+        // prefix + "_" + "0x" + hex of uintptr_t
+        char buffer[6 + 1 + 2 + sizeof(uintptr_t) * 8 / 4];
         const char* prefix;
+
         switch (obj->type) {
         case OBJ_STRING:  RETURN(this);
         case OBJ_CLOSURE: prefix = "Fn"; break;
@@ -303,23 +306,19 @@ DEFINE_NATIVE(Object_toString) {
         case OBJ_MAP:     prefix = "Map"; break;
         default:          UNREACHABLE();
         }
-        num_chars = snprintf(buffer, sizeof(buffer), "%s_%p", prefix, (void*) obj);
-        if (num_chars < 0 || num_chars >= sizeof(buffer))
-            ERROR("%s error converting object to string, got num_chars: %d.", __func__, num_chars);
+        length = sprintf(buffer, "%s_%p", prefix, (void*) obj);
+        RETURN(OBJ_TO_VAL(objstring_copy(vm, buffer, length)));
         break;
     }
     default: UNREACHABLE();
     }
-
-    str = objstring_copy(vm, buffer, num_chars);
-    RETURN(OBJ_TO_VAL(str));
 }
 
 DEFINE_NATIVE(Object_print) {
     Value this = args[0];
     vm_ensure_stack(vm, 1);
     vm_push(vm, this);
-    if (!vm_invoke(vm, this, OBJ_TO_VAL(objstring_copy(vm, "toString", 8)), 0))
+    if (!vm_invoke(vm, this, OBJ_TO_VAL(CONST_STRING(vm, "toString")), 0))
         return false;
 
     Value slot = vm_pop(vm);
@@ -816,9 +815,9 @@ void core_init_vm(VM* vm)
 #define ADD_NATIVE(table, name, fn)  (ADD_OBJECT(table, name, objnative_new(vm, fn)))
 #define ADD_METHOD(PROTO, name, fn)  (ADD_NATIVE(&vm->PROTO->slots, name, fn))
 
-    vm->getSlot_string = OBJ_TO_VAL(objstring_copy(vm, "getSlot", 7));
-    vm->setSlot_string = OBJ_TO_VAL(objstring_copy(vm, "setSlot", 7));
-    vm->init_string = OBJ_TO_VAL(objstring_copy(vm, "init", 4));
+    vm->getSlot_string = OBJ_TO_VAL(CONST_STRING(vm, "getSlot"));
+    vm->setSlot_string = OBJ_TO_VAL(CONST_STRING(vm, "setSlot"));
+    vm->init_string = OBJ_TO_VAL(CONST_STRING(vm, "init"));
 
     vm->ObjectProto = objobject_new(vm);
     vm->ObjectProto->proto = OBJ_TO_VAL(vm->ObjectProto);

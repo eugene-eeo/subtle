@@ -32,7 +32,7 @@
             abort(); \
         } while (false)
 #else
-    #define ASSERT(expr, msg) do { } while (false)
+    #define ASSERT(expr, msg) do {} while (false)
     #define UNREACHABLE() __builtin_unreachable()
 #endif
 
