@@ -308,7 +308,6 @@ DEFINE_NATIVE(Object_toString) {
         }
         length = sprintf(buffer, "%s_%p", prefix, (void*) obj);
         RETURN(OBJ_TO_VAL(objstring_copy(vm, buffer, length)));
-        break;
     }
     default: UNREACHABLE();
     }
