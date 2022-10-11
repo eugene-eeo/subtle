@@ -6,6 +6,7 @@
 #include "core.subtle.inc"
 
 #include <math.h>
+#include <float.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -426,23 +427,23 @@ DEFINE_NATIVE(Native_callWithThis) {
 // ============================= Number =============================
 
 #define DEFINE_NUMBER_METHOD(name, cast_to, op, return_type) \
-    DEFINE_NATIVE(Number_##name) {\
+    DEFINE_NATIVE(name) {\
         ARGSPEC("NN"); \
         cast_to a = (cast_to) VAL_TO_NUMBER(args[0]); \
         cast_to b = (cast_to) VAL_TO_NUMBER(args[1]); \
         RETURN(return_type(a op b)); \
     }
 
-DEFINE_NUMBER_METHOD(add,  double, +,  NUMBER_TO_VAL)
-DEFINE_NUMBER_METHOD(sub,  double, -,  NUMBER_TO_VAL)
-DEFINE_NUMBER_METHOD(mul,  double, *,  NUMBER_TO_VAL)
-DEFINE_NUMBER_METHOD(div,  double, /,  NUMBER_TO_VAL)
-DEFINE_NUMBER_METHOD(lt,   double, <,  BOOL_TO_VAL)
-DEFINE_NUMBER_METHOD(gt,   double, >,  BOOL_TO_VAL)
-DEFINE_NUMBER_METHOD(leq,  double, <=, BOOL_TO_VAL)
-DEFINE_NUMBER_METHOD(geq,  double, >=, BOOL_TO_VAL)
-DEFINE_NUMBER_METHOD(lor,  int32_t, |, NUMBER_TO_VAL)
-DEFINE_NUMBER_METHOD(land, int32_t, &, NUMBER_TO_VAL)
+DEFINE_NUMBER_METHOD(Number_add,  double, +,  NUMBER_TO_VAL)
+DEFINE_NUMBER_METHOD(Number_sub,  double, -,  NUMBER_TO_VAL)
+DEFINE_NUMBER_METHOD(Number_mul,  double, *,  NUMBER_TO_VAL)
+DEFINE_NUMBER_METHOD(Number_div,  double, /,  NUMBER_TO_VAL)
+DEFINE_NUMBER_METHOD(Number_lt,   double, <,  BOOL_TO_VAL)
+DEFINE_NUMBER_METHOD(Number_gt,   double, >,  BOOL_TO_VAL)
+DEFINE_NUMBER_METHOD(Number_leq,  double, <=, BOOL_TO_VAL)
+DEFINE_NUMBER_METHOD(Number_geq,  double, >=, BOOL_TO_VAL)
+DEFINE_NUMBER_METHOD(Number_lor,  int32_t, |, NUMBER_TO_VAL)
+DEFINE_NUMBER_METHOD(Number_land, int32_t, &, NUMBER_TO_VAL)
 #undef DEFINE_NUMBER_METHOD
 
 DEFINE_NATIVE(Number_negate) {
@@ -467,17 +468,17 @@ DEFINE_NATIVE(Number_exclusiveRange) {
 // ============================= String =============================
 
 #define DEFINE_STRING_METHOD(name, op) \
-    DEFINE_NATIVE(String_##name) {\
+    DEFINE_NATIVE(name) {\
         ARGSPEC("SS"); \
         const char* a = VAL_TO_STRING(args[0])->chars; \
         const char* b = VAL_TO_STRING(args[1])->chars; \
         RETURN(BOOL_TO_VAL(strcmp(a, b) op 0)); \
     }
 
-DEFINE_STRING_METHOD(lt, <)
-DEFINE_STRING_METHOD(gt, >)
-DEFINE_STRING_METHOD(leq, <=)
-DEFINE_STRING_METHOD(geq, >=)
+DEFINE_STRING_METHOD(String_lt, <)
+DEFINE_STRING_METHOD(String_gt, >)
+DEFINE_STRING_METHOD(String_leq, <=)
+DEFINE_STRING_METHOD(String_geq, >=)
 #undef DEFINE_STRING_METHOD
 
 DEFINE_NATIVE(String_add) {
@@ -821,6 +822,7 @@ void core_init_vm(VM* vm)
 #define ADD_OBJECT(table, name, obj) (define_on_table(vm, table, name, OBJ_TO_VAL(obj)))
 #define ADD_NATIVE(table, name, fn)  (ADD_OBJECT(table, name, objnative_new(vm, fn)))
 #define ADD_METHOD(PROTO, name, fn)  (ADD_NATIVE(&vm->PROTO->slots, name, fn))
+#define ADD_VALUE(PROTO, name, v)    (define_on_table(vm, &vm->PROTO->slots, name, v))
 
     vm->getSlot_string = OBJ_TO_VAL(CONST_STRING(vm, "getSlot"));
     vm->setSlot_string = OBJ_TO_VAL(CONST_STRING(vm, "setSlot"));
@@ -877,6 +879,10 @@ void core_init_vm(VM* vm)
     ADD_METHOD(NumberProto, "&",   Number_land);
     ADD_METHOD(NumberProto, "..",  Number_inclusiveRange);
     ADD_METHOD(NumberProto, "...", Number_exclusiveRange);
+    ADD_VALUE(NumberProto, "largest",  NUMBER_TO_VAL(DBL_MAX));
+    ADD_VALUE(NumberProto, "smallest", NUMBER_TO_VAL(DBL_MIN));
+    ADD_VALUE(NumberProto, "inf",  NUMBER_TO_VAL(INFINITY));
+    ADD_VALUE(NumberProto, "nan",  NUMBER_TO_VAL(NAN));
 
     vm->StringProto = objobject_new(vm);
     vm->StringProto->proto = OBJ_TO_VAL(vm->ObjectProto);
@@ -951,4 +957,5 @@ void core_init_vm(VM* vm)
 #undef ADD_OBJECT
 #undef ADD_NATIVE
 #undef ADD_METHOD
+#undef ADD_VALUE
 }
