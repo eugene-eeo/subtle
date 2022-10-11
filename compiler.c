@@ -205,6 +205,17 @@ static void consume_slot(Compiler* compiler, const char* message) {
         error_at_current(compiler, message);
 }
 
+static bool match_separators(Compiler* compiler) {
+    bool a = match(compiler, TOKEN_NEWLINE);
+    bool b = match(compiler, TOKEN_SEMICOLON);
+    match(compiler, TOKEN_NEWLINE);
+    return a || b;
+}
+
+static void match_newlines(Compiler* compiler) {
+    match(compiler, TOKEN_NEWLINE);
+}
+
 // Bytecode utilities
 // ==================
 
@@ -534,14 +545,14 @@ static void literal(Compiler* compiler, bool can_assign, bool allow_newlines) {
 }
 
 static void and_(Compiler* compiler, bool can_assign, bool allow_newlines) {
-    match(compiler, TOKEN_NEWLINE);
+    match_newlines(compiler);
     int else_jump = emit_jump(compiler, OP_AND);
     parse_precedence(compiler, PREC_AND, allow_newlines);
     patch_jump(compiler, else_jump);
 }
 
 static void or_(Compiler* compiler, bool can_assign, bool allow_newlines) {
-    match(compiler, TOKEN_NEWLINE);
+    match_newlines(compiler);
     int else_jump = emit_jump(compiler, OP_OR);
     parse_precedence(compiler, PREC_OR, allow_newlines);
     patch_jump(compiler, else_jump);
@@ -549,13 +560,13 @@ static void or_(Compiler* compiler, bool can_assign, bool allow_newlines) {
 
 static void named_variable(Compiler* compiler, Token name, bool can_assign, bool allow_newlines) {
     if (allow_newlines)
-        match(compiler, TOKEN_NEWLINE);
+        match_newlines(compiler);
 
     // Check if we can resolve to a local variable.
     int local = resolve_local(compiler, &name);
     if (local != -1) {
         if (can_assign && match(compiler, TOKEN_EQ)) {
-            match(compiler, TOKEN_NEWLINE);
+            match_newlines(compiler);
             expression(compiler, allow_newlines);
             emit_op(compiler, OP_SET_LOCAL);
             emit_byte(compiler, (uint8_t) local);
@@ -570,7 +581,7 @@ static void named_variable(Compiler* compiler, Token name, bool can_assign, bool
     int upvalue = resolve_upvalue(compiler, &name);
     if (upvalue != -1) {
         if (can_assign && match(compiler, TOKEN_EQ)) {
-            match(compiler, TOKEN_NEWLINE);
+            match_newlines(compiler);
             expression(compiler, allow_newlines);
             emit_op(compiler, OP_SET_UPVALUE);
             emit_byte(compiler, (uint8_t) upvalue);
@@ -584,7 +595,7 @@ static void named_variable(Compiler* compiler, Token name, bool can_assign, bool
     // Otherwise, it's a global.
     uint16_t global = identifier_constant(compiler, &name);
     if (can_assign && match(compiler, TOKEN_EQ)) {
-        match(compiler, TOKEN_NEWLINE);
+        match_newlines(compiler);
         expression(compiler, allow_newlines);
         emit_op(compiler, OP_SET_GLOBAL);
         emit_offset(compiler, global);
@@ -603,16 +614,17 @@ static void object(Compiler* compiler, bool can_assign, bool allow_newlines) {
     emit_op(compiler, OP_OBJECT);
     if (!check(compiler, TOKEN_RBRACE)) {
         do {
-            match(compiler, TOKEN_NEWLINE);
+            match_newlines(compiler);
             consume_slot(compiler, "Expect a slot name.");
             uint16_t constant = identifier_constant(compiler, &compiler->parser->previous);
             consume(compiler, TOKEN_EQ, "Expect '=' after slot name.");
-            expression(compiler, false);
+            match_newlines(compiler);
+            expression(compiler, true);
             emit_op(compiler, OP_OBJLIT_SET);
             emit_offset(compiler, constant);
         } while (match(compiler, TOKEN_COMMA));
     }
-    match(compiler, TOKEN_NEWLINE);
+    match_newlines(compiler);
     consume(compiler, TOKEN_RBRACE, "Expect '}' after items.");
 }
 
@@ -625,7 +637,7 @@ static void block_argument(Compiler* compiler) {
     // Parse the optional parameter list, if any.
     if (match(&c, TOKEN_PIPE)) {
         do {
-            match(compiler, TOKEN_NEWLINE);
+            match_newlines(compiler);
             c.function->arity++;
             if (c.function->arity > 255) {
                 error_at_current(&c, "Cannot have more than 255 parameters.");
@@ -653,10 +665,10 @@ static void block_argument(Compiler* compiler) {
 static void invoke(Compiler* compiler, bool can_assign, bool allow_newlines) {
     const Token op_token = compiler->parser->previous;
     if (allow_newlines)
-        match(compiler, TOKEN_NEWLINE);
+        match_newlines(compiler);
 
     if (can_assign && match(compiler, TOKEN_EQ)) {
-        match(compiler, TOKEN_NEWLINE);
+        match_newlines(compiler);
         expression(compiler, allow_newlines);
         emit_op(compiler, OP_OBJECT_SET);
         emit_offset(compiler, identifier_constant(compiler, &op_token));
@@ -666,7 +678,7 @@ static void invoke(Compiler* compiler, bool can_assign, bool allow_newlines) {
     uint8_t num_args = 0;
     // Match the optional arguments.
     if (match(compiler, TOKEN_LPAREN)) {
-        match(compiler, TOKEN_NEWLINE);
+        match_newlines(compiler);
         if (!check(compiler, TOKEN_RPAREN)) {
             do {
                 if (num_args == 255)
@@ -689,7 +701,7 @@ static void invoke(Compiler* compiler, bool can_assign, bool allow_newlines) {
 }
 
 static void dot(Compiler* compiler, bool can_assign, bool allow_newlines) {
-    match(compiler, TOKEN_NEWLINE);
+    match_newlines(compiler);
     consume_slot(compiler, "Expect slot name after '.'.");
     invoke(compiler, can_assign, allow_newlines);
 }
@@ -705,7 +717,7 @@ static void this(Compiler* compiler, bool can_assign, bool allow_newlines) {
 }
 
 static void grouping(Compiler* compiler, bool can_assign, bool allow_newlines) {
-    match(compiler, TOKEN_NEWLINE);
+    match_newlines(compiler);
     expression(compiler, true);
     consume(compiler, TOKEN_RPAREN, "Expect ')' after expression.");
 }
@@ -732,7 +744,7 @@ static void binary(Compiler* compiler, bool can_assign, bool allow_newlines) {
     ParseRule* rule = get_rule(operator);
 
     // allow a newline after the operator.
-    match(compiler, TOKEN_NEWLINE);
+    match_newlines(compiler);
     parse_precedence(compiler, (Precedence)(rule->precedence + 1), allow_newlines);
 
     switch (operator) {
@@ -797,6 +809,7 @@ static ParseRule rules[] = {
     [TOKEN_BREAK]     = {NULL,     NULL,   PREC_NONE},
     [TOKEN_CONTINUE]  = {NULL,     NULL,   PREC_NONE},
     [TOKEN_FOR]       = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_SEMICOLON] = {NULL,     NULL,   PREC_NONE},
     [TOKEN_NEWLINE]   = {NULL,     NULL,   PREC_NONE},
     [TOKEN_ERROR]     = {NULL,     NULL,   PREC_NONE},
     [TOKEN_EOF]       = {NULL,     NULL,   PREC_NONE},
@@ -817,14 +830,14 @@ static void parse_precedence(Compiler* compiler, Precedence prec, bool allow_new
     bool can_assign = prec <= PREC_ASSIGNMENT;
     prefix_rule(compiler, can_assign, allow_newlines);
     if (allow_newlines)
-        match(compiler, TOKEN_NEWLINE);
+        match_newlines(compiler);
 
     while (prec <= get_rule(compiler->parser->current.type)->precedence) {
         advance(compiler);
         ParseFn infix_rule = get_rule(compiler->parser->previous.type)->infix;
         infix_rule(compiler, can_assign, allow_newlines);
         if (allow_newlines)
-            match(compiler, TOKEN_NEWLINE);
+            match_newlines(compiler);
     }
 }
 
@@ -949,12 +962,12 @@ static void assert_stmt(Compiler* compiler) {
 }
 
 static void block(Compiler* compiler) {
-    match(compiler, TOKEN_NEWLINE);
+    match_newlines(compiler);
     begin_block(compiler);
     bool has_newlines = true;
     while (!check(compiler, TOKEN_EOF) && !check(compiler, TOKEN_RBRACE) && has_newlines) {
         declaration(compiler);
-        has_newlines = match(compiler, TOKEN_NEWLINE);
+        has_newlines = match_separators(compiler);
     }
     consume(compiler, TOKEN_RBRACE, "Expect '}' after block.");
     end_block(compiler);
@@ -1097,7 +1110,7 @@ static void return_stmt(Compiler* compiler) {
     if (compiler->type == FUNCTION_TYPE_SCRIPT)
         error(compiler, "Cannot return from top-level code.");
 
-    if (check(compiler, TOKEN_NEWLINE)) {
+    if (check(compiler, TOKEN_NEWLINE) || check(compiler, TOKEN_SEMICOLON)) {
         emit_return(compiler);
     } else {
         expression(compiler, false);
@@ -1109,6 +1122,7 @@ static void synchronize(Compiler* compiler) {
     compiler->parser->panic_mode = false;
     while (compiler->parser->current.type != TOKEN_EOF) {
         if (compiler->parser->previous.type == TOKEN_NEWLINE) return;
+        if (compiler->parser->previous.type == TOKEN_SEMICOLON) return;
         switch (compiler->parser->current.type) {
             case TOKEN_LET:
             case TOKEN_WHILE:
@@ -1171,7 +1185,7 @@ compile(VM* vm, const char* source)
     bool has_newline = true;
     while (!match(&compiler, TOKEN_EOF) && has_newline) {
         declaration(&compiler);
-        has_newline = match(&compiler, TOKEN_NEWLINE);
+        has_newline = match_separators(&compiler);
     }
 
     ObjFunction* function = compiler_end(&compiler);

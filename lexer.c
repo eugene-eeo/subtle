@@ -74,7 +74,6 @@ static bool skip_whitespace(Lexer* lexer) {
                 // Special handling for '\n': need to increment the
                 // line count.
                 lexer->line++;
-            case ';':
                 seen_newline = true;
             case ' ':
             case '\t':
@@ -204,6 +203,7 @@ Token lexer_next(Lexer* lexer) {
         case '&': return make_token(lexer, match(lexer, '&') ? TOKEN_AMP_AMP : TOKEN_AMP);
         case '|': return make_token(lexer, match(lexer, '|') ? TOKEN_PIPE_PIPE : TOKEN_PIPE);
         case '"': return string(lexer);
+        case ';': return make_token(lexer, TOKEN_SEMICOLON);
     }
 
     return error_token(lexer, "Unexpected character.");

@@ -1,6 +1,5 @@
 # allowed for now :)
-# primarily so that repl works without having to implement multi-line support.
-Fn.new{|a|; return a + 1}
+Fn.new{|a| return;}
 
 # should be able to break at operators
 assert 1 +

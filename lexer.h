@@ -42,6 +42,7 @@ typedef enum {
     TOKEN_CONTINUE,
     TOKEN_FOR,
 
+    TOKEN_SEMICOLON,
     TOKEN_NEWLINE,
     TOKEN_ERROR,
     TOKEN_EOF,
