@@ -67,3 +67,14 @@ x a(
     1
 )
 assert x seen
+
+# Newline handling inside an object:
+let x = {
+    u
+    =
+    Object
+    .b.c,
+    d = Object.b.c
+}
+assert x.u == nil
+assert x.d == nil

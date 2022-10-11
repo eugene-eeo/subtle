@@ -617,6 +617,7 @@ static void object(Compiler* compiler, bool can_assign, bool allow_newlines) {
             match_newlines(compiler);
             consume_slot(compiler, "Expect a slot name.");
             uint16_t constant = identifier_constant(compiler, &compiler->parser->previous);
+            match_newlines(compiler);
             consume(compiler, TOKEN_EQ, "Expect '=' after slot name.");
             match_newlines(compiler);
             expression(compiler, true);
