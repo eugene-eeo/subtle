@@ -297,7 +297,7 @@ DEFINE_NATIVE(Object_toString) {
         // Calculate the length (at compile-time) to store an
         // Object prefix plus the hex representation of the pointer:
         //   prefix + "_" + "0x" + hex ptr + NUL byte
-        char buffer[6 + 1 + 2 + sizeof(uintptr_t) * 8 / 4 + 1];
+        char buffer[6 + 1 + 2 + sizeof(void*) * 8 / 4 + 1];
         const char* prefix;
 
         switch (obj->type) {
@@ -371,6 +371,8 @@ DEFINE_NATIVE(Object_new) {
     args[0] = rv;
     if (!vm_invoke(vm, rv, vm->init_string, num_args))
         return false;
+    // at this point, rv is guaranteed to not be GCed as it was
+    // called as the receiver for the init slot.
     vm_pop(vm);
     vm_push(vm, rv);
     return true;
