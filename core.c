@@ -517,10 +517,10 @@ static bool
 run_fiber(VM* vm, ObjFiber* fiber,
           Value value, const char* verb)
 {
-    if (fiber->error != NULL)       ERROR("Cannot %s a fiber with an error.", verb);
-    if (objfiber_is_done(fiber))    ERROR("Cannot %s a finished fiber.", verb);
-    if (fiber->parent != NULL)      ERROR("Cannot %s a fiber with a parent.", verb);
-    if (fiber->state == FIBER_ROOT) ERROR("Cannot %s a root fiber.", verb);
+    if (fiber->error != NULL)       ERROR("Cannot '%s' a fiber with an error.", verb);
+    if (objfiber_is_done(fiber))    ERROR("Cannot '%s' a finished fiber.", verb);
+    if (fiber->parent != NULL)      ERROR("Cannot '%s' a fiber with a parent.", verb);
+    if (fiber->state == FIBER_ROOT) ERROR("Cannot '%s' a root fiber.", verb);
 
     if (fiber->frames_count == 1
         && fiber->frames[0].ip == fiber->frames[0].closure->function->chunk.code) {
