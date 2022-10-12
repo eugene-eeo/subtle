@@ -880,10 +880,10 @@ void core_init_vm(VM* vm)
     ADD_METHOD(NumberProto, "&",   Number_land);
     ADD_METHOD(NumberProto, "..",  Number_inclusiveRange);
     ADD_METHOD(NumberProto, "...", Number_exclusiveRange);
-    ADD_VALUE(NumberProto, "largest",  NUMBER_TO_VAL(DBL_MAX));
-    ADD_VALUE(NumberProto, "smallest", NUMBER_TO_VAL(DBL_MIN));
     ADD_VALUE(NumberProto, "inf",  NUMBER_TO_VAL(INFINITY));
     ADD_VALUE(NumberProto, "nan",  NUMBER_TO_VAL(NAN));
+    ADD_VALUE(NumberProto, "largest",  NUMBER_TO_VAL(DBL_MAX));
+    ADD_VALUE(NumberProto, "smallest", NUMBER_TO_VAL(DBL_MIN));
 
     vm->StringProto = objobject_new(vm);
     vm->StringProto->proto = OBJ_TO_VAL(vm->ObjectProto);
