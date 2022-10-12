@@ -815,7 +815,7 @@ DEFINE_NATIVE(Map_rawIterValueNext) {
 DEFINE_NATIVE(Map_length) {
     ARGSPEC("M");
     ObjMap* map = VAL_TO_MAP(args[0]);
-    RETURN(NUMBER_TO_VAL((double) map->tbl.valid));
+    RETURN(NUMBER_TO_VAL((double) map->tbl.count));
 }
 
 void core_init_vm(VM* vm)

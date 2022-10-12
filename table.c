@@ -9,7 +9,6 @@
 void table_init(Table* table) {
     table->entries = NULL;
     table->count = 0;
-    table->valid = 0;
     table->capacity = 0;
 }
 
@@ -20,11 +19,9 @@ void table_free(Table* table, VM* vm) {
 
 static Entry* table_find_entry(Entry* entries, uint32_t capacity, Value key) {
     uint32_t index = value_hash(key) & (capacity - 1);
+    uint32_t start = index;
     Entry* tombstone = NULL;
-    // As long as we keep TABLE_MAX_LOAD < 1, we will never have to
-    // worry about wrapping around to index, because the table will
-    // always have enough space for empty entries.
-    for (;;) {
+    do {
         Entry* entry = &entries[index];
         if (IS_UNDEFINED(entry->key)) {
             if (IS_NIL(entry->value)) {
@@ -40,7 +37,9 @@ static Entry* table_find_entry(Entry* entries, uint32_t capacity, Value key) {
             return entry;
         }
         index = (index + 1) & (capacity - 1);
-    }
+    } while (index != start);
+    ASSERT(tombstone != NULL, "Table should have empty values or tombstones.");
+    return tombstone;
 }
 
 static void table_adjust_capacity(Table* table, VM* vm, uint32_t capacity) {
@@ -60,15 +59,13 @@ static void table_adjust_capacity(Table* table, VM* vm, uint32_t capacity) {
         dst->value = src->value;
     }
 
-    table->count = table->valid;
-
     FREE_ARRAY(vm, table->entries, Entry, table->capacity);
     table->entries = entries;
     table->capacity = capacity;
 }
 
 bool table_get(Table* table, Value key, Value* value) {
-    if (table->valid == 0) return false;
+    if (table->count == 0) return false;
 
     Entry* entry = table_find_entry(table->entries, table->capacity, key);
     if (IS_UNDEFINED(entry->key)) return false;
@@ -84,13 +81,9 @@ bool table_set(Table* table, VM* vm, Value key, Value value) {
     }
 
     Entry* entry = table_find_entry(table->entries, table->capacity, key);
-    // If we inserted into a new key, then increment count and valid
     bool is_new_key = IS_UNDEFINED(entry->key);
-    if (is_new_key && IS_NIL(entry->value)) {
+    if (is_new_key && IS_NIL(entry->value))
         table->count++;
-        table->valid++;
-    }
-    ASSERT(table->count >= table->valid, "count < valid");
 
     entry->key = key;
     entry->value = value;
@@ -101,7 +94,7 @@ bool table_set(Table* table, VM* vm, Value key, Value value) {
 // Just deletes a key from the table, without compaction
 static
 bool table_delete_key(Table* table, VM* vm, Value key) {
-    if (table->valid == 0) return false;
+    if (table->count == 0) return false;
 
     Entry* entry = table_find_entry(table->entries, table->capacity, key);
     if (IS_UNDEFINED(entry->key)) return false;
@@ -109,7 +102,7 @@ bool table_delete_key(Table* table, VM* vm, Value key) {
     // Leave a tombstone.
     entry->key = UNDEFINED_VAL;
     entry->value = UNDEFINED_VAL;
-    table->valid--;
+    table->count--;
     return true;
 }
 
@@ -117,20 +110,14 @@ static
 void table_compact(Table* table, VM* vm) {
     // Compact the table if necessary.
     if (table->capacity > 8
-            && table->valid * 2 < table->count) {
-        // This is safe to perform. Proof; we know that:
-        //       count <= max_load * cap,
-        //   2 * valid <  count
-        //   ===> 2 * valid < count <= max_load * cap
-        //   ===> 2 * valid < max_load * cap
-        //   ===>     valid < max_load * (cap / 2)
-        //            ^-- new count       ^--- new capacity
+            && table->count * GROW_FACTOR < table->capacity * TABLE_MAX_LOAD) {
+        // count * FACTOR < cap * MAX_LOAD
+        // count < (cap / FACTOR) * MAX_LOAD
         uint32_t new_capacity = SHRINK_CAPACITY(table->capacity);
         table_adjust_capacity(table, vm, new_capacity);
         ASSERT(table->capacity >= 8, "capacity < min_capacity");
     }
 
-    ASSERT(table->count >= table->valid, "count < valid");
     ASSERT(table->count <= table->capacity * TABLE_MAX_LOAD, "count < max_load");
 }
 
@@ -144,9 +131,10 @@ ObjString*
 table_find_string(Table* table,
                   const char* chars, size_t length, uint32_t hash)
 {
-    if (table->valid == 0) return NULL;
+    if (table->count == 0) return NULL;
     uint32_t index = hash & (table->capacity - 1);
-    for (;;) {
+    uint32_t start = index;
+    do {
         Entry* entry = &table->entries[index];
         if (IS_UNDEFINED(entry->key)) {
             if (IS_NIL(entry->value)) return NULL;
@@ -159,7 +147,8 @@ table_find_string(Table* table,
             }
         }
         index = (index + 1) & (table->capacity - 1);
-    }
+    } while (index != start);
+    return NULL;
 }
 
 void

@@ -94,7 +94,7 @@ bool vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value);
 // ==========
 
 // Ensures that we have at least n more slots on the stack.
-inline void
+static inline void
 vm_ensure_stack(VM* vm, int n)
 {
     objfiber_ensure_stack(vm->fiber, vm, n);
