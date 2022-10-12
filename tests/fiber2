@@ -27,3 +27,20 @@ let f = Fiber.new{
 f.call;
 assert !x.hasOwnSlot("b");
 f.call(2);
+
+# checking that Fiber_parent can be called on all
+# fibers correctly.
+let stage
+let root = Fiber current
+let fiber = Fiber new {
+    stage = 1
+    assert root parent == nil
+    assert fiber parent == root
+    Fiber yield(1)
+    stage = 2
+}
+
+assert fiber call == 1
+assert stage == 1
+fiber call
+assert stage == 2

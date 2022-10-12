@@ -559,12 +559,6 @@ handle_fibers:
                     if (fiber == NULL)
                         return INTERPRET_RUNTIME_ERROR;
                 }
-                if (objfiber_is_done(fiber)) {
-                    fiber = fiber->parent;
-                    vm->fiber = fiber;
-                    if (fiber == NULL)
-                        return INTERPRET_OK; // Nothing to do?
-                }
                 REFRESH_FRAME();
                 break;
             }

@@ -588,8 +588,9 @@ DEFINE_NATIVE(Fiber_new) {
 
 DEFINE_NATIVE(Fiber_parent) {
     ARGSPEC("f");
-    RETURN(vm->fiber->parent != NULL
-            ? OBJ_TO_VAL(vm->fiber->parent)
+    ObjFiber* fiber = VAL_TO_FIBER(args[0]);
+    RETURN(fiber->parent != NULL
+            ? OBJ_TO_VAL(fiber->parent)
             : NIL_VAL);
 }
 
