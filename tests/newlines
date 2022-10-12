@@ -78,3 +78,13 @@ let x = {
 }
 assert x.u == nil
 assert x.d == nil
+
+let f = Fn new{|a, b, c|
+    assert a == 1
+    assert b == 2
+    assert c == 3
+}
+f.call(
+    1, 2,
+    3
+)

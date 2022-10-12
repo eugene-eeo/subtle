@@ -679,15 +679,16 @@ static void invoke(Compiler* compiler, bool can_assign, bool allow_newlines) {
     uint8_t num_args = 0;
     // Match the optional arguments.
     if (match(compiler, TOKEN_LPAREN)) {
-        match_newlines(compiler);
         if (!check(compiler, TOKEN_RPAREN)) {
             do {
                 if (num_args == 255)
                     error(compiler, "Cannot have more than 255 arguments.");
+                match_newlines(compiler);
                 expression(compiler, true);
                 num_args++;
             } while (match(compiler, TOKEN_COMMA));
         }
+        match_newlines(compiler);
         consume(compiler, TOKEN_RPAREN, "Expect ')' after arguments.");
     }
     // Match a function block at the end.
