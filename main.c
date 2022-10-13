@@ -14,10 +14,11 @@ static void repl(VM* vm) {
     linenoiseSetMultiLine(1);
     linenoiseHistorySetMaxLen(100);
 
+    ObjMap* globals = vm_new_globals(vm);
     char* line = NULL;
     while ((line = linenoise("> ")) != NULL) {
         linenoiseHistoryAdd(line);
-        vm_interpret(vm, line);
+        vm_interpret(vm, globals, line);
         linenoiseFree(line);
     }
 }
@@ -59,7 +60,7 @@ static int run_file(VM* vm, const char* filename)
     if (source == NULL)
         return FILE_ERROR;
 
-    InterpretResult res = vm_interpret(vm, source);
+    InterpretResult res = vm_interpret(vm, NULL, source);
     free((void*)source);
 
     if (res == INTERPRET_RUNTIME_ERROR) return RUNTIME_ERROR;

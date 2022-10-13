@@ -85,7 +85,7 @@ void vm_drop(VM* vm, int count);
 void vm_push_root(VM* vm, Value value);
 void vm_pop_root(VM* vm);
 void vm_runtime_error(VM* vm, const char* format, ...);
-InterpretResult vm_interpret(VM* vm, const char* source);
+InterpretResult vm_interpret(VM* vm, ObjMap* globals, const char* source);
 
 // Object system
 // =============
@@ -126,5 +126,5 @@ bool vm_invoke(VM* vm,
                Value obj, Value slot_name, int num_args);
 
 ObjMap* vm_new_globals(VM* vm);
-ObjClosure* vm_compile_in_module(VM* vm, Value module_id, const char* source);
+ObjClosure* vm_compile_in_module(VM* vm, Value module_id, ObjMap* globals, const char* source);
 #endif

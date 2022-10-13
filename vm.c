@@ -650,10 +650,13 @@ vm_new_globals(VM* vm)
 }
 
 ObjClosure*
-vm_compile_in_module(VM* vm, Value module_id, const char* source)
+vm_compile_in_module(VM* vm, Value module_id, ObjMap* globals, const char* source)
 {
+    if (globals == NULL)
+        globals = vm_new_globals(vm);
+    vm_push_root(vm, OBJ_TO_VAL(globals));
     vm_define_module(vm, module_id);
-    ObjMap* globals = vm_new_globals(vm);
+    vm_pop_root(vm); // globals
     ObjFunction* fn = compile(vm, globals, module_id, source);
     if (fn == NULL)
         return NULL;
@@ -665,9 +668,9 @@ vm_compile_in_module(VM* vm, Value module_id, const char* source)
 }
 
 InterpretResult
-vm_interpret(VM* vm, const char* source)
+vm_interpret(VM* vm, ObjMap* globals, const char* source)
 {
-    ObjClosure* closure = vm_compile_in_module(vm, NIL_VAL, source);
+    ObjClosure* closure = vm_compile_in_module(vm, NIL_VAL, globals, source);
     if (closure == NULL)
         return INTERPRET_COMPILE_ERROR;
 

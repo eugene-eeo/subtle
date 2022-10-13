@@ -388,7 +388,7 @@ DEFINE_NATIVE(Object_require) {
     if (objmap_get(vm->modules, module_id, &rv))
         RETURN(rv);
     // oopsie: need to run it here...
-    ObjClosure* closure = vm_compile_in_module(vm, args[1], "return {x=1}");
+    ObjClosure* closure = vm_compile_in_module(vm, args[1], NULL, "return {x=1}");
     if (closure == NULL)
         ERROR("error compiling module '%s'", VAL_TO_STRING(args[1])->chars);
     vm_push_frame(vm, closure, 0);
@@ -959,7 +959,7 @@ void core_init_vm(VM* vm)
 
     vm->modules = objmap_new(vm);
 
-    if (vm_interpret(vm, CORE_SOURCE) != INTERPRET_OK) {
+    if (vm_interpret(vm, NULL, CORE_SOURCE) != INTERPRET_OK) {
         fprintf(stderr, "vm_interpret(CORE_SOURCE) not ok.\n");
         exit(788);
     }
