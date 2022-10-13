@@ -572,7 +572,7 @@ DEFINE_NATIVE(Fiber_yield) {
 DEFINE_NATIVE(Fiber_abort) {
     ARGSPEC("*S");
     vm->fiber->error = VAL_TO_STRING(vm_pop(vm));
-    return true;
+    return false;
 }
 
 DEFINE_NATIVE(Fiber_new) {
