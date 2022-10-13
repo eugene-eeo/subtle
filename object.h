@@ -67,12 +67,19 @@ typedef struct ObjString {
     uint32_t hash;
 } ObjString;
 
+typedef struct ObjMap {
+    Obj obj;
+    Table tbl;
+} ObjMap;
+
 typedef struct {
     Obj obj;
     int max_slots; // Max slots required by this function.
     int arity;     // If the arity is -1, then this is a script.
     int upvalue_count;
     Chunk chunk;
+    ObjMap* globals;
+    Value module_id;
 } ObjFunction;
 
 typedef struct ObjUpvalue {
@@ -156,11 +163,6 @@ typedef struct ObjList {
     uint32_t capacity;
 } ObjList;
 
-typedef struct ObjMap {
-    Obj obj;
-    Table tbl;
-} ObjMap;
-
 // Object memory management
 // ========================
 
@@ -179,7 +181,7 @@ ObjString* objstring_concat(VM* vm, ObjString* a, ObjString* b);
 // ObjFunction
 // ===========
 
-ObjFunction* objfunction_new(VM* vm);
+ObjFunction* objfunction_new(VM* vm, ObjMap* globals, Value module_id);
 
 // ObjUpvalue
 // ==========

@@ -45,17 +45,20 @@ typedef struct VM {
     ObjObject* MapProto;
     // -------------------------
 
+    // ---- Modules ----
+    // Map of module IDs to Values.
+    // The core module will have ID nil.
+    ObjMap* modules;
+
     // ---- GC ----
     Obj* objects;
     size_t bytes_allocated;
     size_t next_gc;
-    // The gray_* information encodes the gray stack used by the GC.
-    // The mark-sweep GC uses a tricolour abstraction:
+    // In our mark-sweep GC, objects can be in 3 colours:
     //   1. Black objects are marked, and already processed.
     //   2. Gray objects are marked but not processed (their links
-    //      still need to be traversed).
-    //   3. White objects are everything else.
-    // We put gray objects in gray_stack, and pop it off one-by-one.
+    //      still need to be traversed). They are placed in gray_stack.
+    //   3. White objects are unmarked.
     int gray_capacity;
     int gray_count;
     Obj** gray_stack;
@@ -65,7 +68,6 @@ typedef struct VM {
     // ------------
 
     Table strings; // String interning
-    Table globals; // Globals
 
     // The compiler currently used to compile source, so that
     // if a GC happens during compilation, we can track roots.
@@ -122,4 +124,7 @@ bool vm_call(VM* vm, Value callable, int num_args);
 // Runs the usual invoke path. This uses vm_call internally.
 bool vm_invoke(VM* vm,
                Value obj, Value slot_name, int num_args);
+
+ObjMap* vm_new_globals(VM* vm);
+ObjClosure* vm_compile_in_module(VM* vm, Value module_id, const char* source);
 #endif

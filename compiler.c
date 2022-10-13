@@ -113,11 +113,18 @@ parser_init(Parser* parser, const char* source)
 
 static void
 compiler_init(Compiler* compiler, Compiler* enclosing,
-              Parser* parser, VM* vm, FunctionType type)
+              Parser* parser, VM* vm, FunctionType type,
+              ObjMap* globals, Value module_id)
 {
     compiler->enclosing = enclosing;
     compiler->parser = parser;
-    compiler->function = objfunction_new(vm);
+
+    vm_push_root(vm, module_id);
+    vm_push_root(vm, OBJ_TO_VAL(globals));
+    compiler->function = objfunction_new(vm, globals, module_id);
+    vm_pop_root(vm); // globals
+    vm_pop_root(vm); // module_id
+
     if (type == FUNCTION_TYPE_SCRIPT)
         compiler->function->arity = -1;
 
@@ -632,7 +639,9 @@ static void object(Compiler* compiler, bool can_assign, bool allow_newlines) {
 static void block_argument(Compiler* compiler) {
     Compiler c;
     compiler_init(&c, compiler, compiler->parser,
-                  compiler->vm, FUNCTION_TYPE_FUNCTION);
+                  compiler->vm, FUNCTION_TYPE_FUNCTION,
+                  compiler->function->globals,
+                  compiler->function->module_id);
     begin_block(&c);
 
     // Parse the optional parameter list, if any.
@@ -1109,9 +1118,6 @@ static void break_stmt(Compiler* compiler) {
 }
 
 static void return_stmt(Compiler* compiler) {
-    if (compiler->type == FUNCTION_TYPE_SCRIPT)
-        error(compiler, "Cannot return from top-level code.");
-
     if (check(compiler, TOKEN_NEWLINE) || check(compiler, TOKEN_SEMICOLON)) {
         emit_return(compiler);
     } else {
@@ -1174,13 +1180,14 @@ static void statement(Compiler* compiler) {
 }
 
 ObjFunction*
-compile(VM* vm, const char* source)
+compile(VM* vm, ObjMap* globals, Value module_id, const char* source)
 {
     Parser parser;
     parser_init(&parser, source);
 
     Compiler compiler;
-    compiler_init(&compiler, NULL, &parser, vm, FUNCTION_TYPE_SCRIPT);
+    compiler_init(&compiler, NULL, &parser, vm, FUNCTION_TYPE_SCRIPT,
+                  globals, module_id);
 
     advance(&compiler);
     match(&compiler, TOKEN_NEWLINE);

@@ -7,7 +7,7 @@
 typedef struct VM VM;
 typedef struct Compiler Compiler;
 
-ObjFunction* compile(VM* vm, const char* source);
+ObjFunction* compile(VM* vm, ObjMap* globals, Value module_id, const char* source);
 void compiler_mark(Compiler* compiler, VM* vm);
 
 #endif

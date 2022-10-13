@@ -34,6 +34,8 @@ void vm_init(VM* vm) {
     vm->ListProto = NULL;
     vm->MapProto = NULL;
 
+    vm->modules = NULL;
+
     vm->objects = NULL;
     vm->bytes_allocated = 0;
     vm->next_gc = 1024 * 1024;
@@ -43,7 +45,6 @@ void vm_init(VM* vm) {
     vm->roots_count = 0;
 
     table_init(&vm->strings);
-    table_init(&vm->globals);
 
     vm->compiler = NULL;
 }
@@ -57,7 +58,6 @@ void vm_free(VM* vm) {
         obj = next;
     }
     table_free(&vm->strings, vm);
-    table_free(&vm->globals, vm);
     free(vm->gray_stack);
     // Check that our memory accounting is correct.
     ASSERT(vm->bytes_allocated == 0, "bytes_allocated != 0");
@@ -371,6 +371,14 @@ run(VM* vm, ObjFiber* fiber, int top_level)
             case OP_RETURN: {
                 Value result = vm_pop(vm);
                 close_upvalues(fiber, frame->slots);
+                if (frame->closure->function->arity == -1) {
+                    // save the result to module_id
+                    vm_push_root(vm, result);
+                    objmap_set(vm->modules, vm,
+                               frame->closure->function->module_id,
+                               result);
+                    vm_pop_root(vm);
+                }
                 fiber->frames_count--;
                 fiber->stack_top = frame->slots;
                 if (fiber == original_fiber && fiber->frames_count == top_level) {
@@ -398,14 +406,14 @@ run(VM* vm, ObjFiber* fiber, int top_level)
             case OP_NIL:      vm_push(vm, NIL_VAL); break;
             case OP_DEF_GLOBAL: {
                 Value name = READ_CONSTANT();
-                table_set(&vm->globals, vm, name, vm_peek(vm, 0));
+                objmap_set(frame->closure->function->globals, vm, name, vm_peek(vm, 0));
                 vm_pop(vm);
                 break;
             }
             case OP_GET_GLOBAL: {
                 Value name = READ_CONSTANT();
                 Value value;
-                if (!table_get(&vm->globals, name, &value)) {
+                if (!objmap_get(frame->closure->function->globals, name, &value)) {
                     vm_runtime_error(vm, "Undefined variable '%s'.", VAL_TO_STRING(name)->chars);
                     goto handle_fibers;
                 }
@@ -414,8 +422,8 @@ run(VM* vm, ObjFiber* fiber, int top_level)
             }
             case OP_SET_GLOBAL: {
                 Value name = READ_CONSTANT();
-                if (table_set(&vm->globals, vm, name, vm_peek(vm, 0))) {
-                    table_delete(&vm->globals, vm, name);
+                if (objmap_set(frame->closure->function->globals, vm, name, vm_peek(vm, 0))) {
+                    objmap_delete(frame->closure->function->globals, vm, name);
                     vm_runtime_error(vm, "Undefined variable '%s'.", VAL_TO_STRING(name)->chars);
                     goto handle_fibers;
                 }
@@ -598,18 +606,74 @@ vm_call(VM* vm, Value slot, int num_args)
     return rv;
 }
 
-InterpretResult
-vm_interpret(VM* vm, const char* source)
+// vm_define_module ensures that the given [module_id] is added to
+// the vm's modules. Returns whether the module is new.
+bool
+vm_define_module(VM* vm, Value module_id)
 {
-    ObjFunction* fn = compile(vm, source);
-    if (fn == NULL) return INTERPRET_COMPILE_ERROR;
+    Value v;
+    if (objmap_get(vm->modules, module_id, &v))
+        return false;
+    vm_push_root(vm, module_id);
+    objmap_set(vm->modules, vm, module_id, NIL_VAL);
+    vm_pop_root(vm);
+    return true;
+}
+
+static void
+define_on_table(VM* vm, Table* tbl, const char* name, Value v)
+{
+    vm_push_root(vm, v);
+    Value k = OBJ_TO_VAL(objstring_copy(vm, name, strlen(name)));
+    vm_push_root(vm, k);
+    table_set(tbl, vm, k, v);
+    vm_pop_root(vm); // k
+    vm_pop_root(vm); // v
+}
+
+ObjMap*
+vm_new_globals(VM* vm)
+{
+    ObjMap* globals = objmap_new(vm);
+    vm_push_root(vm, OBJ_TO_VAL(globals));
+    define_on_table(vm, &globals->tbl, "Object", OBJ_TO_VAL(vm->ObjectProto));
+    define_on_table(vm, &globals->tbl, "Fn",     OBJ_TO_VAL(vm->FnProto));
+    define_on_table(vm, &globals->tbl, "Native", OBJ_TO_VAL(vm->NativeProto));
+    define_on_table(vm, &globals->tbl, "Number", OBJ_TO_VAL(vm->NumberProto));
+    define_on_table(vm, &globals->tbl, "String", OBJ_TO_VAL(vm->StringProto));
+    define_on_table(vm, &globals->tbl, "Fiber",  OBJ_TO_VAL(vm->FiberProto));
+    define_on_table(vm, &globals->tbl, "Range",  OBJ_TO_VAL(vm->RangeProto));
+    define_on_table(vm, &globals->tbl, "List",   OBJ_TO_VAL(vm->ListProto));
+    define_on_table(vm, &globals->tbl, "Map",    OBJ_TO_VAL(vm->MapProto));
+    vm_pop_root(vm);
+    return globals;
+}
+
+ObjClosure*
+vm_compile_in_module(VM* vm, Value module_id, const char* source)
+{
+    vm_define_module(vm, module_id);
+    ObjMap* globals = vm_new_globals(vm);
+    ObjFunction* fn = compile(vm, globals, module_id, source);
+    if (fn == NULL)
+        return NULL;
 
     vm_push_root(vm, OBJ_TO_VAL(fn));
     ObjClosure* closure = objclosure_new(vm, fn);
+    vm_pop_root(vm); // fn
+    return closure;
+}
+
+InterpretResult
+vm_interpret(VM* vm, const char* source)
+{
+    ObjClosure* closure = vm_compile_in_module(vm, NIL_VAL, source);
+    if (closure == NULL)
+        return INTERPRET_COMPILE_ERROR;
+
     vm_push_root(vm, OBJ_TO_VAL(closure));
     vm->fiber = objfiber_new(vm, closure);
     vm->fiber->state = FIBER_ROOT;
-    vm_pop_root(vm);
     vm_pop_root(vm);
 
     InterpretResult result = run(vm, vm->fiber, 0);

@@ -379,6 +379,22 @@ DEFINE_NATIVE(Object_new) {
     return true;
 }
 
+DEFINE_NATIVE(Object_require) {
+    ARGSPEC("*S");
+    Value module_id = args[1];
+    // check if the module is already defined.
+    // otherwise we have to load and run it.
+    Value rv;
+    if (objmap_get(vm->modules, module_id, &rv))
+        RETURN(rv);
+    // oopsie: need to run it here...
+    ObjClosure* closure = vm_compile_in_module(vm, args[1], "return {x=1}");
+    if (closure == NULL)
+        ERROR("error compiling module '%s'", VAL_TO_STRING(args[1])->chars);
+    vm_push_frame(vm, closure, 0);
+    return true;
+}
+
 // ============================= Fn =============================
 
 DEFINE_NATIVE(Fn_new) {
@@ -853,6 +869,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "rawIterMore", Object_rawIterMore);
     ADD_METHOD(ObjectProto, "rawIterSlotsNext", Object_rawIterSlotsNext);
     ADD_METHOD(ObjectProto, "rawIterValueNext", Object_rawIterValueNext);
+    ADD_METHOD(ObjectProto, "require",          Object_require);
 
     vm->FnProto = objobject_new(vm);
     vm->FnProto->proto = OBJ_TO_VAL(vm->ObjectProto);
@@ -940,15 +957,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(MapProto, "rawIterKeyNext", Map_rawIterKeyNext);
     ADD_METHOD(MapProto, "rawIterValueNext", Map_rawIterValueNext);
 
-    ADD_OBJECT(&vm->globals, "Object", vm->ObjectProto);
-    ADD_OBJECT(&vm->globals, "Fn",     vm->FnProto);
-    ADD_OBJECT(&vm->globals, "Native", vm->NativeProto);
-    ADD_OBJECT(&vm->globals, "Number", vm->NumberProto);
-    ADD_OBJECT(&vm->globals, "String", vm->StringProto);
-    ADD_OBJECT(&vm->globals, "Fiber",  vm->FiberProto);
-    ADD_OBJECT(&vm->globals, "Range",  vm->RangeProto);
-    ADD_OBJECT(&vm->globals, "List",   vm->ListProto);
-    ADD_OBJECT(&vm->globals, "Map",    vm->MapProto);
+    vm->modules = objmap_new(vm);
 
     if (vm_interpret(vm, CORE_SOURCE) != INTERPRET_OK) {
         fprintf(stderr, "vm_interpret(CORE_SOURCE) not ok.\n");

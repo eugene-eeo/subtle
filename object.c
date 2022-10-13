@@ -137,12 +137,14 @@ objstring_concat(VM* vm, ObjString* a, ObjString* b)
 // ===========
 
 ObjFunction*
-objfunction_new(VM* vm)
+objfunction_new(VM* vm, ObjMap* globals, Value module_id)
 {
     ObjFunction* fn = ALLOCATE_OBJECT(vm, OBJ_FUNCTION, ObjFunction);
     fn->max_slots = 0;
     fn->arity = 0;
     fn->upvalue_count = 0;
+    fn->globals = globals;
+    fn->module_id = module_id;
     chunk_init(&fn->chunk);
     return fn;
 }

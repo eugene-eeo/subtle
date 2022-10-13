@@ -98,7 +98,7 @@ static void mark_roots(VM* vm) {
     mark_object(vm, (Obj*)vm->ListProto);
     mark_object(vm, (Obj*)vm->MapProto);
 
-    table_mark(&vm->globals, vm);
+    mark_object(vm, (Obj*)vm->modules);
     compiler_mark(vm->compiler, vm);
 }
 
@@ -117,6 +117,7 @@ static void blacken_object(VM* vm, Obj* obj) {
         case OBJ_FUNCTION: {
             ObjFunction* function = (ObjFunction*)obj;
             chunk_mark(&function->chunk, vm);
+            mark_object(vm, (Obj*)function->globals);
             break;
         }
         case OBJ_UPVALUE:
