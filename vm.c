@@ -342,14 +342,22 @@ static InterpretResult
 run(VM* vm, ObjFiber* fiber, int top_level)
 {
     ObjFiber* original_fiber = fiber;
+    uint8_t* ip;
     CallFrame* frame;
+    ObjFunction* function;
 
-#define REFRESH_FRAME() (frame = &vm->fiber->frames[vm->fiber->frames_count - 1])
-#define READ_BYTE() (*frame->ip++)
+#define STORE_FRAME() (frame->ip = ip)
+#define REFRESH_FRAME() \
+    do { \
+        frame = &vm->fiber->frames[vm->fiber->frames_count - 1]; \
+        function = frame->closure->function; \
+        ip = frame->ip; \
+    } while(false)
+#define READ_BYTE() (*ip++)
 #define READ_SHORT() \
-    (frame->ip += 2, \
-     (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
-#define READ_CONSTANT() (frame->closure->function->chunk.constants.values[READ_SHORT()])
+    (ip += 2, \
+     (uint16_t)((ip[-2] << 8) | ip[-1]))
+#define READ_CONSTANT() (function->chunk.constants.values[READ_SHORT()])
 
     // Actually start running the code here.
     REFRESH_FRAME();
@@ -364,18 +372,18 @@ run(VM* vm, ObjFiber* fiber, int top_level)
         }
         printf("\n");
         // Trace the about-to-be-executed instruction.
-        debug_print_instruction(&frame->closure->function->chunk,
-                                frame->ip - frame->closure->function->chunk.code);
+        debug_print_instruction(&function->chunk,
+                                ip - function->chunk.code);
 #endif
         switch (READ_BYTE()) {
             case OP_RETURN: {
                 Value result = vm_pop(vm);
                 close_upvalues(fiber, frame->slots);
-                if (frame->closure->function->arity == -1) {
+                if (function->arity == -1) {
                     // save the result to module_id
                     vm_push_root(vm, result);
                     objmap_set(vm->modules, vm,
-                               frame->closure->function->module_id,
+                               function->module_id,
                                result);
                     vm_pop_root(vm);
                 }
@@ -406,14 +414,15 @@ run(VM* vm, ObjFiber* fiber, int top_level)
             case OP_NIL:      vm_push(vm, NIL_VAL); break;
             case OP_DEF_GLOBAL: {
                 Value name = READ_CONSTANT();
-                objmap_set(frame->closure->function->globals, vm, name, vm_peek(vm, 0));
+                objmap_set(function->globals, vm, name, vm_peek(vm, 0));
                 vm_pop(vm);
                 break;
             }
             case OP_GET_GLOBAL: {
                 Value name = READ_CONSTANT();
                 Value value;
-                if (!objmap_get(frame->closure->function->globals, name, &value)) {
+                if (!objmap_get(function->globals, name, &value)) {
+                    STORE_FRAME();
                     vm_runtime_error(vm, "Undefined variable '%s'.", VAL_TO_STRING(name)->chars);
                     goto handle_fibers;
                 }
@@ -422,8 +431,9 @@ run(VM* vm, ObjFiber* fiber, int top_level)
             }
             case OP_SET_GLOBAL: {
                 Value name = READ_CONSTANT();
-                if (objmap_set(frame->closure->function->globals, vm, name, vm_peek(vm, 0))) {
-                    objmap_delete(frame->closure->function->globals, vm, name);
+                if (objmap_set(function->globals, vm, name, vm_peek(vm, 0))) {
+                    objmap_delete(function->globals, vm, name);
+                    STORE_FRAME();
                     vm_runtime_error(vm, "Undefined variable '%s'.", VAL_TO_STRING(name)->chars);
                     goto handle_fibers;
                 }
@@ -431,6 +441,7 @@ run(VM* vm, ObjFiber* fiber, int top_level)
             }
             case OP_ASSERT: {
                 if (!value_truthy(vm_pop(vm))) {
+                    STORE_FRAME();
                     vm_runtime_error(vm, "Assertion failed.");
                     goto handle_fibers;
                 }
@@ -448,24 +459,24 @@ run(VM* vm, ObjFiber* fiber, int top_level)
             }
             case OP_LOOP: {
                 uint16_t offset = READ_SHORT();
-                frame->ip -= offset;
+                ip -= offset;
                 break;
             }
             case OP_JUMP: {
                 uint16_t offset = READ_SHORT();
-                frame->ip += offset;
+                ip += offset;
                 break;
             }
             case OP_JUMP_IF_FALSE: {
                 uint16_t offset = READ_SHORT();
                 if (!value_truthy(vm_pop(vm)))
-                    frame->ip += offset;
+                    ip += offset;
                 break;
             }
             case OP_OR: {
                 uint16_t offset = READ_SHORT();
                 if (value_truthy(vm_peek(vm, 0)))
-                    frame->ip += offset;
+                    ip += offset;
                 else
                     vm_pop(vm);
                 break;
@@ -473,7 +484,7 @@ run(VM* vm, ObjFiber* fiber, int top_level)
             case OP_AND: {
                 uint16_t offset = READ_SHORT();
                 if (!value_truthy(vm_peek(vm, 0)))
-                    frame->ip += offset;
+                    ip += offset;
                 else
                     vm_pop(vm);
                 break;
@@ -536,6 +547,7 @@ run(VM* vm, ObjFiber* fiber, int top_level)
                     vm_ensure_stack(vm, 1);     // stack: [obj] [val]
                     fiber->stack_top[-1] = key; // stack: [obj] [key]
                     vm_push(vm, val);           // stack: [obj] [key] [val]
+                    STORE_FRAME();
                     complete_call(vm, setSlot, 2);
                     goto handle_fibers;
                 } else {
@@ -546,6 +558,7 @@ run(VM* vm, ObjFiber* fiber, int top_level)
                         vm_push(vm, val);
                         break;
                     } else {
+                        STORE_FRAME();
                         vm_runtime_error(vm, "Cannot set slot on a non-object.");
                         goto handle_fibers;
                     }
@@ -555,6 +568,7 @@ run(VM* vm, ObjFiber* fiber, int top_level)
                 Value key = READ_CONSTANT();
                 uint8_t num_args = READ_BYTE();
                 Value obj = vm_peek(vm, num_args);
+                STORE_FRAME();
                 invoke(vm, obj, key, num_args);
 handle_fibers:
                 fiber = vm->fiber;
