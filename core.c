@@ -206,7 +206,7 @@ DEFINE_NATIVE(Object_same) {
     RETURN(BOOL_TO_VAL(value_equal(args[1], args[2])));
 }
 
-DEFINE_NATIVE(Object_equal) {
+DEFINE_NATIVE(Object_eq) {
     ARGSPEC("**");
     RETURN(BOOL_TO_VAL(value_equal(args[0], args[1])));
 }
@@ -843,7 +843,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "deleteSlot",  Object_deleteSlot);
     ADD_METHOD(ObjectProto, "same",        Object_same);
     ADD_METHOD(ObjectProto, "rawType",     Object_rawType);
-    ADD_METHOD(ObjectProto, "==",          Object_equal);
+    ADD_METHOD(ObjectProto, "==",          Object_eq);
     ADD_METHOD(ObjectProto, "!",           Object_not);
     ADD_METHOD(ObjectProto, "clone",       Object_clone);
     ADD_METHOD(ObjectProto, "hasAncestor", Object_hasAncestor);
