@@ -115,7 +115,7 @@ print_stack_trace(VM* vm)
         fprintf(stderr, "[Fiber %p]\n", (void*) fiber);
         for (int i = fiber->frames_count - 1; i >= 0; i--) {
             CallFrame* frame = &fiber->frames[i];
-            ObjFunction* function = frame->closure->function;
+            ObjFn* function = frame->closure->function;
             // -1 as we increment frame->ip on each loop.
             int instruction = frame->ip - function->chunk.code - 1;
             fprintf(stderr, "\t[line %u] in %s\n",
@@ -164,7 +164,7 @@ vm_push_frame(VM* vm, ObjClosure* closure, int num_args)
     }
     Value* stack_start = vm->fiber->stack_top - num_args - 1;
 
-    ObjFunction* function = closure->function;
+    ObjFn* function = closure->function;
     vm_push_root(vm, OBJ_TO_VAL(closure));
     objfiber_push_frame(vm->fiber, vm, closure, stack_start);
     vm_pop_root(vm);
@@ -471,7 +471,7 @@ run(VM* vm, ObjFiber* fiber, int top_level)
                 break;
             }
             case OP_CLOSURE: {
-                ObjFunction* fn = VAL_TO_FUNCTION(READ_CONSTANT());
+                ObjFn* fn = VAL_TO_FN(READ_CONSTANT());
                 ObjClosure* closure = objclosure_new(vm, fn);
                 vm_push(vm, OBJ_TO_VAL(closure));
                 for (int i = 0; i < closure->upvalue_count; i++) {
@@ -601,7 +601,7 @@ vm_call(VM* vm, Value slot, int num_args)
 InterpretResult
 vm_interpret(VM* vm, const char* source)
 {
-    ObjFunction* fn = compile(vm, source);
+    ObjFn* fn = compile(vm, source);
     if (fn == NULL) return INTERPRET_COMPILE_ERROR;
 
     vm_push_root(vm, OBJ_TO_VAL(fn));

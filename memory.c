@@ -114,8 +114,8 @@ static void blacken_object(VM* vm, Obj* obj) {
     switch (obj->type) {
         case OBJ_STRING: break; // Nothing to do here.
         case OBJ_NATIVE: break; // Nothing to do here.
-        case OBJ_FUNCTION: {
-            ObjFunction* function = (ObjFunction*)obj;
+        case OBJ_FN: {
+            ObjFn* function = (ObjFn*)obj;
             chunk_mark(&function->chunk, vm);
             break;
         }

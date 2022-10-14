@@ -31,7 +31,7 @@ object_allocate(VM* vm, ObjType type, size_t sz)
 }
 
 static void objstring_free(VM*, Obj*);
-static void objfunction_free(VM*, Obj*);
+static void objfn_free(VM*, Obj*);
 static void objupvalue_free(VM*, Obj*);
 static void objclosure_free(VM*, Obj*);
 static void objobject_free(VM*, Obj*);
@@ -49,7 +49,7 @@ object_free(Obj* obj, VM* vm)
 #endif
     switch (obj->type) {
     case OBJ_STRING: objstring_free(vm, obj); break;
-    case OBJ_FUNCTION: objfunction_free(vm, obj); break;
+    case OBJ_FN: objfn_free(vm, obj); break;
     case OBJ_UPVALUE: objupvalue_free(vm, obj); break;
     case OBJ_CLOSURE: objclosure_free(vm, obj); break;
     case OBJ_OBJECT: objobject_free(vm, obj); break;
@@ -133,13 +133,13 @@ objstring_concat(VM* vm, ObjString* a, ObjString* b)
     return objstring_new(vm, chars, length, hash);
 }
 
-// ObjFunction
-// ===========
+// ObjFn
+// =====
 
-ObjFunction*
-objfunction_new(VM* vm)
+ObjFn*
+objfn_new(VM* vm)
 {
-    ObjFunction* fn = ALLOCATE_OBJECT(vm, OBJ_FUNCTION, ObjFunction);
+    ObjFn* fn = ALLOCATE_OBJECT(vm, OBJ_FN, ObjFn);
     fn->max_slots = 0;
     fn->arity = 0;
     fn->upvalue_count = 0;
@@ -148,11 +148,11 @@ objfunction_new(VM* vm)
 }
 
 static void
-objfunction_free(VM* vm, Obj* obj)
+objfn_free(VM* vm, Obj* obj)
 {
-    ObjFunction* fn = (ObjFunction*)obj;
+    ObjFn* fn = (ObjFn*)obj;
     chunk_free(&fn->chunk, vm);
-    FREE(vm, ObjFunction, fn);
+    FREE(vm, ObjFn, fn);
 }
 
 // ObjUpvalue
@@ -179,7 +179,7 @@ objupvalue_free(VM* vm, Obj* obj)
 // ==========
 
 ObjClosure*
-objclosure_new(VM* vm, ObjFunction* fn)
+objclosure_new(VM* vm, ObjFn* fn)
 {
     ObjUpvalue** upvalues = ALLOCATE_ARRAY(vm, ObjUpvalue*, fn->upvalue_count);
     for (int i = 0; i < fn->upvalue_count; i++)

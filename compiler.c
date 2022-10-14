@@ -15,6 +15,7 @@
 
 #define MAX_LOCALS   UINT8_MAX
 #define MAX_UPVALUES UINT8_MAX
+#define MAX_ARGS     INT8_MAX
 
 typedef enum {
     FUNCTION_TYPE_SCRIPT,
@@ -62,7 +63,7 @@ typedef struct Compiler {
     Parser* parser;
 
     // Where are we compiling to?
-    ObjFunction* function;
+    ObjFn* function;
     FunctionType type;
 
     // Keep track of the number of stack slots currently
@@ -117,7 +118,7 @@ compiler_init(Compiler* compiler, Compiler* enclosing,
 {
     compiler->enclosing = enclosing;
     compiler->parser = parser;
-    compiler->function = objfunction_new(vm);
+    compiler->function = objfn_new(vm);
     if (type == FUNCTION_TYPE_SCRIPT)
         compiler->function->arity = -1;
 
@@ -303,7 +304,7 @@ static void emit_return(Compiler* compiler) {
     emit_op(compiler, OP_RETURN);
 }
 
-static ObjFunction*
+static ObjFn*
 compiler_end(Compiler* compiler)
 {
     emit_return(compiler);
@@ -639,10 +640,9 @@ static void block_argument(Compiler* compiler) {
     if (match(&c, TOKEN_PIPE)) {
         do {
             match_newlines(compiler);
+            if (c.function->arity == MAX_ARGS)
+                error_at_current(&c, "Cannot have more than 127 parameters.");
             c.function->arity++;
-            if (c.function->arity > 255) {
-                error_at_current(&c, "Cannot have more than 255 parameters.");
-            }
             uint8_t constant = parse_variable(&c, "Expect parameter name.");
             define_variable(&c, constant);
             c.slot_count++;
@@ -652,7 +652,7 @@ static void block_argument(Compiler* compiler) {
     block(&c);
     end_block(&c);
 
-    ObjFunction* fn = compiler_end(&c);
+    ObjFn* fn = compiler_end(&c);
     uint16_t idx = make_constant(compiler, OBJ_TO_VAL(fn));
     emit_op(compiler, OP_CLOSURE);
     emit_offset(compiler, idx);
@@ -681,8 +681,6 @@ static void invoke(Compiler* compiler, bool can_assign, bool allow_newlines) {
     if (match(compiler, TOKEN_LPAREN)) {
         if (!check(compiler, TOKEN_RPAREN)) {
             do {
-                if (num_args == 255)
-                    error(compiler, "Cannot have more than 255 arguments.");
                 match_newlines(compiler);
                 expression(compiler, true);
                 num_args++;
@@ -691,10 +689,10 @@ static void invoke(Compiler* compiler, bool can_assign, bool allow_newlines) {
         match_newlines(compiler);
         consume(compiler, TOKEN_RPAREN, "Expect ')' after arguments.");
     }
+    if (num_args >= MAX_ARGS)
+        error(compiler, "Cannot have more than 127 arguments.");
     // Match a function block at the end.
     if (match(compiler, TOKEN_LBRACE)) {
-        if (num_args == 255)
-            error(compiler, "Cannot have more than 255 arguments.");
         num_args++;
         block_argument(compiler);
     }
@@ -1173,7 +1171,7 @@ static void statement(Compiler* compiler) {
     }
 }
 
-ObjFunction*
+ObjFn*
 compile(VM* vm, const char* source)
 {
     Parser parser;
@@ -1190,7 +1188,7 @@ compile(VM* vm, const char* source)
         has_newline = match_separators(&compiler);
     }
 
-    ObjFunction* function = compiler_end(&compiler);
+    ObjFn* function = compiler_end(&compiler);
     consume(&compiler, TOKEN_EOF, "Expect end of file.");
     return parser.had_error ? NULL : function;
 }

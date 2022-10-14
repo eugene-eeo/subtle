@@ -9,8 +9,8 @@ void debug_print_object(Obj* obj) {
         case OBJ_STRING:
             printf("\"%s\"", ((ObjString*) obj)->chars);
             break;
-        case OBJ_FUNCTION:
-            if (((ObjFunction*)obj)->arity == -1) {
+        case OBJ_FN:
+            if (((ObjFn*)obj)->arity == -1) {
                 printf("script");
             } else {
                 printf("fn_%p", (void*)obj);
@@ -111,7 +111,7 @@ int debug_print_instruction(Chunk* chunk, int index) {
             debug_print_value(chunk->constants.values[offset]);
             printf("\n");
 
-            ObjFunction* fn = VAL_TO_FUNCTION(chunk->constants.values[offset]);
+            ObjFn* fn = VAL_TO_FN(chunk->constants.values[offset]);
             for (int j = 0; j < fn->upvalue_count; j++) {
                 uint8_t is_local = chunk->code[index++];
                 uint8_t upvalue_idx = chunk->code[index++];
