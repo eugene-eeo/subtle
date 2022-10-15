@@ -2,10 +2,11 @@
 # the VM; it just serves as a file for regression tests.
 
 # 93de905 stress test vm_push_frame
-let x = Object.clone(nil);
+let x = Object.clone();
 x.setSlot = Object.rawGetSlot("rawSetSlot");
 x.setProto(x);
 x.getSlot = Fn.new{|k|
+    assert k == "toString"
     return Fn.new{
         return k;
     };

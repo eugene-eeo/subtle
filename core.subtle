@@ -27,7 +27,7 @@ let MethodIterator = {
 }
 
 let fromSlot = Fn.new{|slot|
-    return Fn.new{ return MethodIterator.clone.init(this, slot) }
+    return Fn.new{ return MethodIterator.new(this, slot) }
 }
 
 Object.rawEntryFromIndex = Fn.new{|i|

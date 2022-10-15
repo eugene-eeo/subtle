@@ -31,7 +31,7 @@ const char* CORE_SOURCE =
 "}\n"
 "\n"
 "let fromSlot = Fn.new{|slot|\n"
-"    return Fn.new{ return MethodIterator.clone.init(this, slot) }\n"
+"    return Fn.new{ return MethodIterator.new(this, slot) }\n"
 "}\n"
 "\n"
 "Object.rawEntryFromIndex = Fn.new{|i|\n"

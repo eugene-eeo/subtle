@@ -1,9 +1,10 @@
 #include "core.h"
-#include "value.h"
+
+#include "core.subtle.inc"
+#include "memory.h"
 #include "object.h"
 #include "table.h"
-#include "memory.h"
-#include "core.subtle.inc"
+#include "value.h"
 
 #include <math.h>
 #include <float.h>
