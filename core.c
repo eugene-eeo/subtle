@@ -44,15 +44,15 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
         ERROR("%s expected %d args, got %d instead.", __func__, idx, num_args); \
     Value arg = args[idx]; \
     switch (ch) { \
-        case 'O': if (!IS_OBJECT(arg)) ARG_ERROR(idx, "an Object"); break; \
-        case 'S': if (!IS_STRING(arg)) ARG_ERROR(idx, "a String"); break; \
-        case 'N': if (!IS_NUMBER(arg)) ARG_ERROR(idx, "a Number"); break; \
-        case 'n': if (!IS_NATIVE(arg)) ARG_ERROR(idx, "a Native"); break; \
+        case 'O': if (!IS_OBJECT(arg))  ARG_ERROR(idx, "an Object"); break; \
+        case 'S': if (!IS_STRING(arg))  ARG_ERROR(idx, "a String"); break; \
+        case 'N': if (!IS_NUMBER(arg))  ARG_ERROR(idx, "a Number"); break; \
+        case 'n': if (!IS_NATIVE(arg))  ARG_ERROR(idx, "a Native"); break; \
         case 'F': if (!IS_CLOSURE(arg)) ARG_ERROR(idx, "an Fn"); break; \
-        case 'f': if (!IS_FIBER(arg)) ARG_ERROR(idx, "a Fiber"); break; \
-        case 'r': if (!IS_RANGE(arg)) ARG_ERROR(idx, "a Range"); break; \
-        case 'L': if (!IS_LIST(arg)) ARG_ERROR(idx, "a List"); break; \
-        case 'M': if (!IS_MAP(arg)) ARG_ERROR(idx, "a Map"); break; \
+        case 'f': if (!IS_FIBER(arg))   ARG_ERROR(idx, "a Fiber"); break; \
+        case 'r': if (!IS_RANGE(arg))   ARG_ERROR(idx, "a Range"); break; \
+        case 'L': if (!IS_LIST(arg))    ARG_ERROR(idx, "a List"); break; \
+        case 'M': if (!IS_MAP(arg))     ARG_ERROR(idx, "a Map"); break; \
         case '*': break; \
         default: UNREACHABLE(); \
     } \
