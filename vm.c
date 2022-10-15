@@ -317,17 +317,6 @@ pre_invoke(VM* vm, Value obj, Value key, Value* slot)
     return true;
 }
 
-static bool
-invoke(VM* vm, Value obj, Value key, int num_args)
-{
-    Value slot_value;
-    if (!pre_invoke(vm, obj, key, &slot_value))
-        return false;
-    // The stack is already in the correct form for a method call.
-    // We have `obj` followed by `num_args`.
-    return complete_call(vm, slot_value, num_args);
-}
-
 bool
 vm_invoke(VM* vm, Value obj, Value key, int num_args)
 {
@@ -547,7 +536,11 @@ run(VM* vm, ObjFiber* fiber, int top_level)
                 Value key = READ_CONSTANT();
                 uint8_t num_args = READ_BYTE();
                 Value obj = vm_peek(vm, num_args);
-                invoke(vm, obj, key, num_args);
+                Value slot;
+                if (pre_invoke(vm, obj, key, &slot))
+                    // The stack is already in the correct form for a method call.
+                    // We have `obj` followed by `num_args`.
+                    complete_call(vm, slot, num_args);
 handle_fibers:
                 fiber = vm->fiber;
                 if (fiber == NULL) return INTERPRET_OK;
