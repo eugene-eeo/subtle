@@ -22,7 +22,7 @@ debug: core.subtle.inc
 		-g -Og $(MAIN) -o subtle
 
 release: core.subtle.inc
-	$(CC) $(CCFLAGS) -O3 -flto=auto $(MAIN) -o subtle
+	$(CC) $(CCFLAGS) -O2 -flto=auto $(MAIN) -o subtle
 
 stress: core.subtle.inc
 	$(CC) $(CCFLAGS) -DSUBTLE_DEBUG \
