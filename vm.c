@@ -577,6 +577,8 @@ handle_fibers:
                 // run the closure "as usual"
                 frame->closure = VAL_TO_CLOSURE(slot);
                 frame->ip = VAL_TO_CLOSURE(slot)->function->chunk.code;
+                // TODO: call objfiber_ensure_stack here, to ensure the
+                // fiber has enough space for the upcoming call.
                 break;
             }
             default: UNREACHABLE();
