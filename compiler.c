@@ -96,7 +96,14 @@ typedef enum {
     PREC_LITERAL,    // literals
 } Precedence;
 
-typedef void (*ParseFn)(Compiler* compiler, bool can_assign, bool allow_newlines);
+// ExprType is the type of the parsed expression.
+// Used for TCO support.
+typedef enum {
+    EXPR_INVOKE,
+    EXPR_OTHER,
+} ExprType;
+
+typedef ExprType (*ParseFn)(Compiler* compiler, bool can_assign, bool allow_newlines);
 
 typedef struct {
     ParseFn prefix;
@@ -254,6 +261,7 @@ static int stack_effects[] = {
     [OP_OBJECT_SET] = -1,
     [OP_OBJLIT_SET] = -1,
     [OP_INVOKE] = 0,
+    [OP_TAIL_INVOKE] = 0,
 };
 
 static void emit_op(Compiler* compiler, uint8_t op) {
@@ -517,46 +525,51 @@ invoke_string_method(Compiler* compiler, const char* method, int num_args)
 static void block(Compiler*);
 static uint16_t parse_variable(Compiler*, const char* msg);
 static void define_variable(Compiler*, uint16_t);
-static void expression(Compiler*, bool);
-static void parse_precedence(Compiler*, Precedence, bool);
+static ExprType expression(Compiler*, bool);
+static ExprType parse_precedence(Compiler*, Precedence, bool);
 static ParseRule* get_rule(TokenType);
 
 
-static void string(Compiler* compiler, bool can_assign, bool allow_newlines) {
+static ExprType string(Compiler* compiler, bool can_assign, bool allow_newlines) {
     ObjString* str = objstring_copy(
         compiler->vm,
         compiler->parser->previous.start + 1,
         compiler->parser->previous.length - 2
         );
     emit_constant(compiler, OBJ_TO_VAL(str));
+    return EXPR_OTHER;
 }
 
-static void number(Compiler* compiler, bool can_assign, bool allow_newlines) {
+static ExprType number(Compiler* compiler, bool can_assign, bool allow_newlines) {
     double value = strtod(compiler->parser->previous.start, NULL);
     emit_constant(compiler, NUMBER_TO_VAL(value));
+    return EXPR_OTHER;
 }
 
-static void literal(Compiler* compiler, bool can_assign, bool allow_newlines) {
+static ExprType literal(Compiler* compiler, bool can_assign, bool allow_newlines) {
     switch (compiler->parser->previous.type) {
         case TOKEN_TRUE:  emit_op(compiler, OP_TRUE); break;
         case TOKEN_FALSE: emit_op(compiler, OP_FALSE); break;
         case TOKEN_NIL:   emit_op(compiler, OP_NIL); break;
         default: UNREACHABLE();
     }
+    return EXPR_OTHER;
 }
 
-static void and_(Compiler* compiler, bool can_assign, bool allow_newlines) {
+static ExprType and_(Compiler* compiler, bool can_assign, bool allow_newlines) {
     match_newlines(compiler);
     int else_jump = emit_jump(compiler, OP_AND);
     parse_precedence(compiler, PREC_AND, allow_newlines);
     patch_jump(compiler, else_jump);
+    return EXPR_OTHER;
 }
 
-static void or_(Compiler* compiler, bool can_assign, bool allow_newlines) {
+static ExprType or_(Compiler* compiler, bool can_assign, bool allow_newlines) {
     match_newlines(compiler);
     int else_jump = emit_jump(compiler, OP_OR);
     parse_precedence(compiler, PREC_OR, allow_newlines);
     patch_jump(compiler, else_jump);
+    return EXPR_OTHER;
 }
 
 static void named_variable(Compiler* compiler, Token name, bool can_assign, bool allow_newlines) {
@@ -606,11 +619,12 @@ static void named_variable(Compiler* compiler, Token name, bool can_assign, bool
     }
 }
 
-static void variable(Compiler* compiler, bool can_assign, bool allow_newlines) {
+static ExprType variable(Compiler* compiler, bool can_assign, bool allow_newlines) {
     named_variable(compiler, compiler->parser->previous, can_assign, allow_newlines);
+    return EXPR_OTHER;
 }
 
-static void object(Compiler* compiler, bool can_assign, bool allow_newlines) {
+static ExprType object(Compiler* compiler, bool can_assign, bool allow_newlines) {
     // Object literal.
     emit_op(compiler, OP_OBJECT);
     if (!check(compiler, TOKEN_RBRACE)) {
@@ -628,6 +642,7 @@ static void object(Compiler* compiler, bool can_assign, bool allow_newlines) {
     }
     match_newlines(compiler);
     consume(compiler, TOKEN_RBRACE, "Expect '}' after items.");
+    return EXPR_OTHER;
 }
 
 static void block_argument(Compiler* compiler) {
@@ -663,7 +678,7 @@ static void block_argument(Compiler* compiler) {
     }
 }
 
-static void invoke(Compiler* compiler, bool can_assign, bool allow_newlines) {
+static ExprType invoke(Compiler* compiler, bool can_assign, bool allow_newlines) {
     const Token op_token = compiler->parser->previous;
     if (allow_newlines)
         match_newlines(compiler);
@@ -673,7 +688,7 @@ static void invoke(Compiler* compiler, bool can_assign, bool allow_newlines) {
         expression(compiler, allow_newlines);
         emit_op(compiler, OP_OBJECT_SET);
         emit_offset(compiler, identifier_constant(compiler, &op_token));
-        return;
+        return EXPR_OTHER;
     }
 
     uint8_t num_args = 0;
@@ -698,15 +713,16 @@ static void invoke(Compiler* compiler, bool can_assign, bool allow_newlines) {
     }
 
     invoke_token_method(compiler, &op_token, num_args);
+    return EXPR_INVOKE;
 }
 
-static void dot(Compiler* compiler, bool can_assign, bool allow_newlines) {
+static ExprType dot(Compiler* compiler, bool can_assign, bool allow_newlines) {
     match_newlines(compiler);
     consume_slot(compiler, "Expect slot name after '.'.");
-    invoke(compiler, can_assign, allow_newlines);
+    return invoke(compiler, can_assign, allow_newlines);
 }
 
-static void this(Compiler* compiler, bool can_assign, bool allow_newlines) {
+static ExprType this(Compiler* compiler, bool can_assign, bool allow_newlines) {
     if (compiler->type == FUNCTION_TYPE_SCRIPT) {
         error(compiler, "Cannot use 'this' in top-level code.");
     }
@@ -714,15 +730,17 @@ static void this(Compiler* compiler, bool can_assign, bool allow_newlines) {
     // Remember that we put this slot aside in compiler_init.
     emit_op(compiler, OP_GET_LOCAL);
     emit_byte(compiler, 0);
+    return EXPR_OTHER;
 }
 
-static void grouping(Compiler* compiler, bool can_assign, bool allow_newlines) {
+static ExprType grouping(Compiler* compiler, bool can_assign, bool allow_newlines) {
     match_newlines(compiler);
-    expression(compiler, true);
+    ExprType t = expression(compiler, true);
     consume(compiler, TOKEN_RPAREN, "Expect ')' after expression.");
+    return t;
 }
 
-static void unary(Compiler* compiler, bool can_assign, bool allow_newlines) {
+static ExprType unary(Compiler* compiler, bool can_assign, bool allow_newlines) {
     Token op_token = compiler->parser->previous;
     TokenType operator = op_token.type;
     // Compile the operand.
@@ -730,15 +748,16 @@ static void unary(Compiler* compiler, bool can_assign, bool allow_newlines) {
     switch (operator) {
         case TOKEN_MINUS:
             invoke_string_method(compiler, "neg", 0);
-            return;
+            break;
         case TOKEN_BANG:
             invoke_token_method(compiler, &op_token, 0);
             break;
         default: UNREACHABLE();
     }
+    return EXPR_OTHER;
 }
 
-static void binary(Compiler* compiler, bool can_assign, bool allow_newlines) {
+static ExprType binary(Compiler* compiler, bool can_assign, bool allow_newlines) {
     Token op_token = compiler->parser->previous;
     TokenType operator = op_token.type;
     ParseRule* rule = get_rule(operator);
@@ -766,6 +785,7 @@ static void binary(Compiler* compiler, bool can_assign, bool allow_newlines) {
             break;
         default: UNREACHABLE();
     }
+    return EXPR_OTHER;
 }
 
 static ParseRule rules[] = {
@@ -815,30 +835,32 @@ static ParseRule rules[] = {
     [TOKEN_EOF]       = {NULL,     NULL,   PREC_NONE},
 };
 
-static void expression(Compiler* compiler, bool allow_newlines) {
-    parse_precedence(compiler, PREC_ASSIGNMENT, allow_newlines);
+static ExprType expression(Compiler* compiler, bool allow_newlines) {
+    return parse_precedence(compiler, PREC_ASSIGNMENT, allow_newlines);
 }
 
-static void parse_precedence(Compiler* compiler, Precedence prec, bool allow_newlines) {
+static ExprType parse_precedence(Compiler* compiler, Precedence prec, bool allow_newlines) {
     advance(compiler);
     ParseFn prefix_rule = get_rule(compiler->parser->previous.type)->prefix;
     if (prefix_rule == NULL) {
         error(compiler, "Expected an expression.");
-        return;
+        return EXPR_OTHER;
     }
 
+    ExprType t;
     bool can_assign = prec <= PREC_ASSIGNMENT;
-    prefix_rule(compiler, can_assign, allow_newlines);
+    t = prefix_rule(compiler, can_assign, allow_newlines);
     if (allow_newlines)
         match_newlines(compiler);
 
     while (prec <= get_rule(compiler->parser->current.type)->precedence) {
         advance(compiler);
         ParseFn infix_rule = get_rule(compiler->parser->previous.type)->infix;
-        infix_rule(compiler, can_assign, allow_newlines);
+        t = infix_rule(compiler, can_assign, allow_newlines);
         if (allow_newlines)
             match_newlines(compiler);
     }
+    return t;
 }
 
 static ParseRule* get_rule(TokenType type) {
@@ -1113,7 +1135,14 @@ static void return_stmt(Compiler* compiler) {
     if (check(compiler, TOKEN_NEWLINE) || check(compiler, TOKEN_SEMICOLON)) {
         emit_return(compiler);
     } else {
-        expression(compiler, false);
+        ExprType t = expression(compiler, false);
+        if (t == EXPR_INVOKE) {
+            // Patch the previous OP_INVOKE to be an OP_TAIL_INVOKE instead,
+            // and adjust the stack requirements accordingly.
+            Chunk* chunk = &compiler->function->chunk;
+            chunk->code[chunk->length - 4] = OP_TAIL_INVOKE;
+            /* return; */
+        }
         emit_op(compiler, OP_RETURN);
     }
 }

@@ -1,4 +1,5 @@
 #include "debug.h"
+#include "chunk.h"
 #include "value.h"
 #include "object.h"
 
@@ -131,6 +132,17 @@ int debug_print_instruction(Chunk* chunk, int index) {
             uint16_t constant = (uint16_t)(chunk->code[index++] << 8);
             constant |= chunk->code[index++];
             printf("%-16s %4d ", "OP_INVOKE", constant);
+            debug_print_value(chunk->constants.values[constant]);
+            uint8_t num_args = chunk->code[index++];
+            printf(" (%u args)", num_args);
+            printf("\n");
+            return index;
+        }
+        case OP_TAIL_INVOKE: {
+            index++;
+            uint16_t constant = (uint16_t)(chunk->code[index++] << 8);
+            constant |= chunk->code[index++];
+            printf("%-16s %4d ", "OP_TAIL_INVOKE", constant);
             debug_print_value(chunk->constants.values[constant]);
             uint8_t num_args = chunk->code[index++];
             printf(" (%u args)", num_args);

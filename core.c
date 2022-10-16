@@ -951,10 +951,10 @@ void core_init_vm(VM* vm)
     ADD_OBJECT(&vm->globals, "List",   vm->ListProto);
     ADD_OBJECT(&vm->globals, "Map",    vm->MapProto);
 
-    if (vm_interpret(vm, CORE_SOURCE) != INTERPRET_OK) {
-        fprintf(stderr, "vm_interpret(CORE_SOURCE) not ok.\n");
-        exit(788);
-    }
+    /* if (vm_interpret(vm, CORE_SOURCE) != INTERPRET_OK) { */
+    /*     fprintf(stderr, "vm_interpret(CORE_SOURCE) not ok.\n"); */
+    /*     exit(788); */
+    /* } */
 
 #undef ADD_OBJECT
 #undef ADD_NATIVE

@@ -555,6 +555,30 @@ handle_fibers:
                 REFRESH_FRAME();
                 break;
             }
+            case OP_TAIL_INVOKE: {
+                Value key = READ_CONSTANT();
+                uint8_t num_args = READ_BYTE();
+                Value obj = vm_peek(vm, num_args);
+                Value slot;
+                if (!pre_invoke(vm, obj, key, &slot))
+                    goto handle_fibers;
+                // TCO
+                // first copy the arguments over.
+                Value* new_args = &fiber->stack_top[-num_args];
+                frame->slots[0] = obj;
+                for (int i = 0; i < num_args; i++)
+                    frame->slots[i+1] = new_args[i];
+                fiber->stack_top -= (1 + num_args);
+                if (!IS_CLOSURE(slot)) {
+                    fiber->frames_count--;
+                    complete_call(vm, slot, num_args);
+                    goto handle_fibers;
+                }
+                // run the closure "as usual"
+                frame->closure = VAL_TO_CLOSURE(slot);
+                frame->ip = VAL_TO_CLOSURE(slot)->function->chunk.code;
+                break;
+            }
             default: UNREACHABLE();
         }
     }

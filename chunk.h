@@ -31,6 +31,7 @@ enum OpCode {
     OP_OBJECT_SET,
     OP_OBJLIT_SET,
     OP_INVOKE,
+    OP_TAIL_INVOKE, // similar to OP_INVOKE but with TCO
 };
 
 typedef struct Chunk {

@@ -1,0 +1,15 @@
+# let f = {
+#     u = Fn new {|x|
+#         x println
+#         if (x > 0)
+#             return this u(x-1)
+#     }
+# }
+# f u(5)
+
+
+let f = Fn new {|x|
+    if (x > 0)
+        return f call(x-1)
+}
+f call(1)
