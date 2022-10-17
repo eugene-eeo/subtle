@@ -563,12 +563,23 @@ handle_fibers:
                 if (!pre_invoke(vm, obj, key, &slot))
                     goto handle_fibers;
                 // TCO
-                // first copy the arguments over.
+                // first close any upvalues.
+                close_upvalues(fiber, frame->slots);
+                // then copy the arguments over.
                 Value* new_args = &fiber->stack_top[-num_args];
                 frame->slots[0] = obj;
                 for (int i = 0; i < num_args; i++)
                     frame->slots[i+1] = new_args[i];
-                fiber->stack_top -= (1 + num_args);
+                fiber->stack_top = (frame->slots + 1 + num_args);
+#ifdef SUBTLE_DEBUG_TRACE_EXECUTION
+        // Trace the stack.
+        for (Value* vptr = fiber->stack; vptr != fiber->stack_top; vptr++) {
+            printf("[ ");
+            debug_print_value(*vptr);
+            printf(" ]");
+        }
+        printf("\n");
+#endif
                 if (!IS_CLOSURE(slot)) {
                     fiber->frames_count--;
                     complete_call(vm, slot, num_args);
@@ -577,8 +588,7 @@ handle_fibers:
                 // run the closure "as usual"
                 frame->closure = VAL_TO_CLOSURE(slot);
                 frame->ip = VAL_TO_CLOSURE(slot)->function->chunk.code;
-                // TODO: call objfiber_ensure_stack here, to ensure the
-                // fiber has enough space for the upcoming call.
+                vm_ensure_stack(vm, VAL_TO_CLOSURE(slot)->function->max_slots - (1 + num_args));
                 break;
             }
             default: UNREACHABLE();

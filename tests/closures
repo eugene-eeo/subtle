@@ -30,6 +30,7 @@ outer.call();
 let outer = Fn.new {
     let x = "outside";
     return Fn.new {
+        x println
         assert x == "outside";
         return x;
     };
