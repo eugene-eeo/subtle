@@ -1141,7 +1141,8 @@ static void return_stmt(Compiler* compiler) {
             // and adjust the stack requirements accordingly.
             Chunk* chunk = &compiler->function->chunk;
             chunk->code[chunk->length - 4] = OP_TAIL_INVOKE;
-            /* return; */
+            // We still keep the OP_RETURN around if it's a TCO-ed call, so
+            // that the vm can bail-out if necessary.
         }
         emit_op(compiler, OP_RETURN);
     }
