@@ -60,6 +60,7 @@ run_test:
 	$(RUNNER) ./subtle ./tests/fiber2
 	$(RUNNER) ./subtle ./tests/list
 	$(RUNNER) ./subtle ./tests/newlines
+	$(RUNNER) ./subtle ./tests/tco
 
 test:
 	make stress

@@ -1,12 +1,10 @@
-# let f = {
-#     u = Fn new {|x|
-#         x println
-#         if (x > 0)
-#             return this u(x-1)
-#     }
-# }
-# f u(5)
-
+let F = {
+    u = Fn new {|x|
+        if (x > 0)
+            return this u(x-1)
+    }
+}
+F u(1024 * 100)
 
 let f = Fn new {|x|
     if (x > 0)
