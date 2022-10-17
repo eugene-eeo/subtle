@@ -12,4 +12,4 @@ let f = Fn new {|x|
     if (x > 0)
         return f call(x-1)
 }
-f call(1)
+f call(1024 * 100)
