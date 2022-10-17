@@ -565,7 +565,7 @@ handle_fibers:
                     goto handle_fibers;
                 // whether we can perform a TCO or not.
                 // we can do it iff:
-                // 1. the slot is a closure
+                // 1. the slot is a closure, OR
                 // 2. the slot is the Fn_call native
                 if (!(IS_CLOSURE(slot) ||
                         (IS_NATIVE(slot) && VAL_TO_NATIVE(slot)->fn == vm->fn_call))) {
