@@ -32,6 +32,7 @@ typedef struct VM {
     Value getSlot_string;
     Value setSlot_string;
     Value init_string;
+    NativeFn fn_call;
 
     // Core Protos
     ObjObject* ObjectProto;

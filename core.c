@@ -857,6 +857,7 @@ void core_init_vm(VM* vm)
 
     vm->FnProto = objobject_new(vm);
     vm->FnProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    vm->fn_call = Fn_call;
     ADD_METHOD(FnProto, "new",          Fn_new);
     ADD_METHOD(FnProto, "call",         Fn_call);
     ADD_METHOD(FnProto, "callWithThis", Fn_callWithThis);

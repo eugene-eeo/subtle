@@ -23,6 +23,7 @@ void vm_init(VM* vm) {
     vm->getSlot_string = NIL_VAL;
     vm->setSlot_string = NIL_VAL;
     vm->init_string = NIL_VAL;
+    vm->fn_call = NULL;
 
     vm->ObjectProto = NULL;
     vm->FnProto = NULL;
@@ -562,8 +563,17 @@ handle_fibers:
                 Value slot;
                 if (!pre_invoke(vm, obj, key, &slot))
                     goto handle_fibers;
+                // whether we can perform a TCO or not.
+                // we can do it iff:
+                // 1. the slot is a closure
+                // 2. the slot is the Fn_call native
+                if (!(IS_CLOSURE(slot) ||
+                        (IS_NATIVE(slot) && VAL_TO_NATIVE(slot)->fn == vm->fn_call))) {
+                    complete_call(vm, slot, num_args);
+                    goto handle_fibers;
+                }
                 // TCO
-                // first close any upvalues.
+                // first close any upvalues; pretend we're doing a return.
                 close_upvalues(fiber, frame->slots);
                 // then copy the arguments over.
                 Value* new_args = &fiber->stack_top[-num_args];
@@ -571,15 +581,6 @@ handle_fibers:
                 for (int i = 0; i < num_args; i++)
                     frame->slots[i+1] = new_args[i];
                 fiber->stack_top = (frame->slots + 1 + num_args);
-#ifdef SUBTLE_DEBUG_TRACE_EXECUTION
-        // Trace the stack.
-        for (Value* vptr = fiber->stack; vptr != fiber->stack_top; vptr++) {
-            printf("[ ");
-            debug_print_value(*vptr);
-            printf(" ]");
-        }
-        printf("\n");
-#endif
                 if (!IS_CLOSURE(slot)) {
                     fiber->frames_count--;
                     complete_call(vm, slot, num_args);

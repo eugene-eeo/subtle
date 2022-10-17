@@ -1,0 +1,5 @@
+let Fiber1 = Fiber new {|k| return Fiber.yield(k) }
+let Fiber2 = Fiber new {|k| return Fiber1.call(k) }
+let Fiber3 = Fiber new {|k| return Fiber2.call(k) }
+let Fiber4 = Fiber new {|k| return Fiber3.call(k) }
+Fiber4.call("hello").println
