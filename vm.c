@@ -154,6 +154,18 @@ runtime_error(VM* vm)
     vm->fiber = NULL;
 }
 
+static void
+fix_arguments(VM* vm, ObjFn* fn, int num_args)
+{
+    // Fix the number of arguments.
+    // Since -1 arity means a script, we ignore that here.
+    if (fn->arity == -1) return;
+
+    for (int i = 0; i < fn->arity - num_args; i++) vm_push(vm, NIL_VAL);
+    if (num_args > fn->arity)
+        vm_drop(vm, num_args - fn->arity);
+}
+
 void
 vm_push_frame(VM* vm, ObjClosure* closure, int num_args)
 {
@@ -170,14 +182,7 @@ vm_push_frame(VM* vm, ObjClosure* closure, int num_args)
     objfiber_push_frame(vm->fiber, vm, closure, stack_start);
     vm_pop_root(vm);
     vm_ensure_stack(vm, function->max_slots);
-
-    // Fix the number of arguments.
-    // Since -1 arity means a script, we ignore that here.
-    if (function->arity != -1) {
-        for (int i = 0; i < function->arity - num_args; i++) vm_push(vm, NIL_VAL);
-        if (num_args > function->arity)
-            vm_drop(vm, num_args - function->arity);
-    }
+    fix_arguments(vm, function, num_args);
 }
 
 static bool
@@ -584,9 +589,11 @@ handle_fibers:
                 fiber->stack_top = (frame->slots + 1 + num_args);
                 // run the closure "as usual"
                 ObjClosure* closure = VAL_TO_CLOSURE(IS_CLOSURE(slot) ? slot : obj);
+                ObjFn* fn = closure->function;
                 frame->closure = closure;
-                frame->ip = closure->function->chunk.code;
-                vm_ensure_stack(vm, closure->function->max_slots - (1 + num_args));
+                frame->ip = fn->chunk.code;
+                fix_arguments(vm, fn, num_args);
+                vm_ensure_stack(vm, fn->max_slots - (fiber->stack_top - frame->slots));
                 break;
             }
             default: UNREACHABLE();

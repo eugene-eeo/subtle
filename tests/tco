@@ -11,3 +11,20 @@ let f = Fn new {|x|
         return f call(x-1)
 }
 f call(1024 * 100)
+
+# TCO with more args supplied
+let f = Fn new {|n, b|
+    if (n == 0) return
+    assert b == nil
+    return f.call(n-1)
+}
+f call(3)
+
+# TCO with fewer args supplied
+let f = Fn new {|n, b, c|
+    if (n == 0) return
+    assert b == 2
+    assert c == nil
+    return f.call(n-1, b)
+}
+f call(3, 2)
