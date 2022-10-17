@@ -566,7 +566,7 @@ handle_fibers:
                 // whether we can perform a TCO or not.
                 // we can do it iff:
                 // 1. the slot is a closure, OR
-                // 2. the slot is the Fn_call native
+                // 2. `this` is a closure AND the slot is the Fn_call native
                 if (!(IS_CLOSURE(slot) ||
                         (IS_NATIVE(slot)
                          && IS_CLOSURE(obj)
@@ -578,17 +578,15 @@ handle_fibers:
                 // first close any upvalues; pretend we're doing a return.
                 close_upvalues(fiber, frame->slots);
                 // then copy the arguments over.
-                Value* new_args = &fiber->stack_top[-num_args];
                 frame->slots[0] = obj;
                 for (int i = 0; i < num_args; i++)
-                    frame->slots[i+1] = new_args[i];
+                    frame->slots[1 + i] = fiber->stack_top[-num_args + i];
                 fiber->stack_top = (frame->slots + 1 + num_args);
-                if (!IS_CLOSURE(slot))
-                    slot = obj;
                 // run the closure "as usual"
-                frame->closure = VAL_TO_CLOSURE(slot);
-                frame->ip = VAL_TO_CLOSURE(slot)->function->chunk.code;
-                vm_ensure_stack(vm, VAL_TO_CLOSURE(slot)->function->max_slots - (1 + num_args));
+                ObjClosure* closure = VAL_TO_CLOSURE(IS_CLOSURE(slot) ? slot : obj);
+                frame->closure = closure;
+                frame->ip = closure->function->chunk.code;
+                vm_ensure_stack(vm, closure->function->max_slots - (1 + num_args));
                 break;
             }
             default: UNREACHABLE();
