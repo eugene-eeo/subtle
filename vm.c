@@ -568,10 +568,10 @@ handle_fibers:
                 Value slot;
                 if (!pre_invoke(vm, obj, key, &slot))
                     goto handle_fibers;
-                // whether we can perform a TCO or not.
-                // we can do it iff:
+                // we can perform a TCO iff:
                 // 1. the slot is a closure, OR
                 // 2. `this` is a closure AND the slot is the Fn_call native
+                // otherwise, we fall back to the same behavior as OP_INVOKE.
                 if (!(IS_CLOSURE(slot) ||
                         (IS_NATIVE(slot)
                          && IS_CLOSURE(obj)
@@ -579,15 +579,15 @@ handle_fibers:
                     complete_call(vm, slot, num_args);
                     goto handle_fibers;
                 }
-                // TCO
+                // we're able to do TCO.
                 // first close any upvalues; pretend we're doing a return.
                 close_upvalues(fiber, frame->slots);
-                // then copy the arguments over.
+                // copy the arguments over.
                 frame->slots[0] = obj;
                 for (int i = 0; i < num_args; i++)
                     frame->slots[1 + i] = fiber->stack_top[-num_args + i];
                 fiber->stack_top = (frame->slots + 1 + num_args);
-                // run the closure "as usual"
+                // run the closure in the current frame.
                 ObjClosure* closure = VAL_TO_CLOSURE(IS_CLOSURE(slot) ? slot : obj);
                 ObjFn* fn = closure->function;
                 frame->closure = closure;
