@@ -568,7 +568,9 @@ handle_fibers:
                 // 1. the slot is a closure, OR
                 // 2. the slot is the Fn_call native
                 if (!(IS_CLOSURE(slot) ||
-                        (IS_NATIVE(slot) && VAL_TO_NATIVE(slot)->fn == vm->fn_call))) {
+                        (IS_NATIVE(slot)
+                         && IS_CLOSURE(obj)
+                         && VAL_TO_NATIVE(slot)->fn == vm->fn_call))) {
                     complete_call(vm, slot, num_args);
                     goto handle_fibers;
                 }
@@ -581,11 +583,8 @@ handle_fibers:
                 for (int i = 0; i < num_args; i++)
                     frame->slots[i+1] = new_args[i];
                 fiber->stack_top = (frame->slots + 1 + num_args);
-                if (!IS_CLOSURE(slot)) {
-                    fiber->frames_count--;
-                    complete_call(vm, slot, num_args);
-                    goto handle_fibers;
-                }
+                if (!IS_CLOSURE(slot))
+                    slot = obj;
                 // run the closure "as usual"
                 frame->closure = VAL_TO_CLOSURE(slot);
                 frame->ip = VAL_TO_CLOSURE(slot)->function->chunk.code;
