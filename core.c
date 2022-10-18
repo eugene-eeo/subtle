@@ -116,7 +116,7 @@ generic_iterMore(Value arg, uint32_t length)
 // generic implementation to check if the table still has any
 // valid entries after entry i.
 static Value
-generic_tableIterNext(Table* table, Value value)
+generic_tableIterMore(Table* table, Value value)
 {
     int32_t idx;
     if (!init_index(value, table->capacity, &idx))
@@ -339,7 +339,7 @@ DEFINE_NATIVE(Object_print) {
 DEFINE_NATIVE(Object_rawIterMore) {
     ARGSPEC("O*");
     ObjObject* obj = VAL_TO_OBJECT(args[0]);
-    Value rv = generic_tableIterNext(&obj->slots, args[1]);
+    Value rv = generic_tableIterMore(&obj->slots, args[1]);
     RETURN(rv);
 }
 
@@ -791,7 +791,7 @@ DEFINE_NATIVE(Map_delete) {
 DEFINE_NATIVE(Map_rawIterMore) {
     ARGSPEC("M*");
     ObjMap* map = VAL_TO_MAP(args[0]);
-    Value rv = generic_tableIterNext(&map->tbl, args[1]);
+    Value rv = generic_tableIterMore(&map->tbl, args[1]);
     RETURN(rv);
 }
 
