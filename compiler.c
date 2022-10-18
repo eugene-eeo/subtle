@@ -699,13 +699,13 @@ static ExprType invoke(Compiler* compiler, bool can_assign, bool allow_newlines)
                 match_newlines(compiler);
                 expression(compiler, true);
                 num_args++;
+                if (num_args > MAX_ARGS)
+                    error(compiler, "Cannot have more than 127 arguments.");
             } while (match(compiler, TOKEN_COMMA));
         }
         match_newlines(compiler);
         consume(compiler, TOKEN_RPAREN, "Expect ')' after arguments.");
     }
-    if (num_args >= MAX_ARGS)
-        error(compiler, "Cannot have more than 127 arguments.");
     // Match a function block at the end.
     if (match(compiler, TOKEN_LBRACE)) {
         num_args++;
