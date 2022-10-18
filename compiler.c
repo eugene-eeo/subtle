@@ -691,16 +691,16 @@ static ExprType invoke(Compiler* compiler, bool can_assign, bool allow_newlines)
         return EXPR_OTHER;
     }
 
-    uint8_t num_args = 0;
+    int num_args = 0;
     // Match the optional arguments.
     if (match(compiler, TOKEN_LPAREN)) {
         if (!check(compiler, TOKEN_RPAREN)) {
             do {
                 match_newlines(compiler);
                 expression(compiler, true);
-                num_args++;
-                if (num_args > MAX_ARGS)
+                if (num_args == MAX_ARGS)
                     error(compiler, "Cannot have more than 127 arguments.");
+                num_args++;
             } while (match(compiler, TOKEN_COMMA));
         }
         match_newlines(compiler);
