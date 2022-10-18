@@ -111,6 +111,7 @@ typedef struct {
     ObjClosure* closure;
     uint8_t* ip;
     Value* slots;
+    bool did_tco;
 } CallFrame;
 
 typedef enum {

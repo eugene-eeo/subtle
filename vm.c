@@ -119,6 +119,8 @@ print_stack_trace(VM* vm)
             ObjFn* function = frame->closure->function;
             // -1 as we increment frame->ip on each loop.
             int instruction = frame->ip - function->chunk.code - 1;
+            if (frame->did_tco)
+                fprintf(stderr, "\t[...] in tail call\n");
             fprintf(stderr, "\t[line %u] in %s\n",
                     chunk_get_line(&function->chunk, instruction),
                     function->arity == -1 ? "script" : "fn");
@@ -160,10 +162,14 @@ fix_arguments(VM* vm, ObjFn* fn, int num_args)
     // Fix the number of arguments.
     // Since -1 arity means a script, we ignore that here.
     if (fn->arity == -1) return;
-
-    for (int i = 0; i < fn->arity - num_args; i++) vm_push(vm, NIL_VAL);
-    if (num_args > fn->arity)
+    if (num_args > fn->arity) {
         vm_drop(vm, num_args - fn->arity);
+        return;
+    }
+    while (num_args < fn->arity) {
+        vm_push(vm, NIL_VAL);
+        num_args++;
+    }
 }
 
 void
@@ -592,6 +598,7 @@ handle_fibers:
                 ObjFn* fn = closure->function;
                 frame->closure = closure;
                 frame->ip = fn->chunk.code;
+                frame->did_tco = true;
                 fix_arguments(vm, fn, num_args);
                 vm_ensure_stack(vm, fn->max_slots - (fiber->stack_top - frame->slots));
                 break;

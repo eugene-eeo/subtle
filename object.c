@@ -361,6 +361,7 @@ objfiber_push_frame(ObjFiber* fiber, VM* vm,
     frame->closure = closure;
     frame->ip = closure->function->chunk.code;
     frame->slots = stack_start;
+    frame->did_tco = false;
     return frame;
 }
 
