@@ -78,6 +78,7 @@ typedef enum {
 // Used for TCO support.
 typedef enum {
     EXPR_INVOKE,
+    EXPR_DEFINE,
     EXPR_OTHER,
 } ExprType;
 
@@ -197,14 +198,14 @@ static void emit_byte(Compiler* compiler, uint8_t b) {
 }
 
 static int stack_effects[] = {
-    [OP_RETURN] = -1,
+    [OP_RETURN] = 0,
     [OP_CONSTANT] = 1,
     [OP_POP] = -1,
     [OP_TRUE] = 1,
     [OP_FALSE] = 1,
     [OP_NIL] = 1,
     [OP_ETHER] = 1,
-    [OP_DEF_GLOBAL] = 0,
+    [OP_DEF_GLOBAL] = -1,
     [OP_GET_GLOBAL] = 1,
     [OP_SET_GLOBAL] = 0,
     [OP_ASSERT] = -1,
@@ -227,6 +228,7 @@ static int stack_effects[] = {
 };
 
 static void emit_op(Compiler* compiler, uint8_t op) {
+    /* printf("op: %d slots: %d effect: %d\n", op, compiler->slot_count, stack_effects[op]); */
     emit_byte(compiler, op);
     compiler->slot_count += stack_effects[op];
     if (!compiler->parser->had_error)
@@ -512,7 +514,7 @@ static void define_variable(Compiler* compiler, uint16_t global) {
     emit_offset(compiler, global);
 }
 
-static void named_variable(Compiler* compiler, Token name, bool can_assign, bool allow_newlines) {
+static ExprType named_variable(Compiler* compiler, Token name, bool can_assign, bool allow_newlines) {
     if (allow_newlines)
         match_newlines(compiler);
 
@@ -524,7 +526,7 @@ static void named_variable(Compiler* compiler, Token name, bool can_assign, bool
         match_newlines(compiler);
         expression(compiler, allow_newlines);
         define_variable(compiler, global);
-        return;
+        return EXPR_DEFINE;
     }
 
     // Check if we can resolve to a local variable.
@@ -539,7 +541,7 @@ static void named_variable(Compiler* compiler, Token name, bool can_assign, bool
             emit_op(compiler, OP_GET_LOCAL);
             emit_byte(compiler, (uint8_t) local);
         }
-        return;
+        return EXPR_OTHER;
     }
 
     // Check if we can resolve it as an upvalue.
@@ -554,7 +556,7 @@ static void named_variable(Compiler* compiler, Token name, bool can_assign, bool
             emit_op(compiler, OP_GET_UPVALUE);
             emit_byte(compiler, (uint8_t) upvalue);
         }
-        return;
+        return EXPR_OTHER;
     }
 
     // Otherwise, it's a global.
@@ -568,11 +570,11 @@ static void named_variable(Compiler* compiler, Token name, bool can_assign, bool
         emit_op(compiler, OP_GET_GLOBAL);
         emit_offset(compiler, global);
     }
+    return EXPR_OTHER;
 }
 
 static ExprType variable(Compiler* compiler, bool can_assign, bool allow_newlines) {
-    named_variable(compiler, compiler->parser->previous, can_assign, allow_newlines);
-    return EXPR_OTHER;
+    return named_variable(compiler, compiler->parser->previous, can_assign, allow_newlines);
 }
 
 static ExprType object(Compiler* compiler, bool can_assign, bool allow_newlines) {
@@ -674,7 +676,6 @@ static ExprType closure(Compiler* compiler, bool can_assign, bool allow_newlines
                   compiler->vm, FUNCTION_TYPE_FUNCTION);
     begin_block(&c);
     block(&c);
-    end_block(&c);
     finalise_closure(compiler, &c);
     return EXPR_OTHER;
 }
@@ -837,7 +838,7 @@ static void block(Compiler* compiler) {
     bool once = false;
 
     while (!check(compiler, TOKEN_EOF) && !check(compiler, TOKEN_RBOX)) {
-        if (once)
+        if (once && t != EXPR_DEFINE)
             emit_op(compiler, OP_POP);
         once = true;
         t = expression(compiler, false);
@@ -867,8 +868,8 @@ compile(VM* vm, const char* source)
     match(&compiler, TOKEN_NEWLINE);
     bool has_newline = true;
     while (!match(&compiler, TOKEN_EOF) && has_newline) {
-        expression(&compiler, false);
-        emit_op(&compiler, OP_POP);
+        if (expression(&compiler, false) != EXPR_DEFINE)
+            emit_op(&compiler, OP_POP);
         has_newline = match_newlines(&compiler);
     }
 

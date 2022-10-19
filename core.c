@@ -1,10 +1,12 @@
 #include "core.h"
 
 #include "core.subtle.inc"
+#include "debug.h"
 #include "memory.h"
 #include "object.h"
 #include "table.h"
 #include "value.h"
+#include "vm.h"
 
 #include <math.h>
 #include <float.h>
@@ -329,6 +331,37 @@ DEFINE_NATIVE(Object_print) {
     fputs(str, stdout);
     fflush(stdout);
     RETURN(NIL_VAL);
+}
+
+DEFINE_NATIVE(Object_rawPerform) {
+    ARGSPEC("*m");
+    Value slot;
+    Value self = args[0];
+    ObjMsg* msg = VAL_TO_MSG(args[1]);
+    if (!vm_get_slot(vm, self, OBJ_TO_VAL(msg->sig), &slot)) {
+        vm_runtime_error(vm, "object does not respond to message '%s'", msg->sig);
+        return false;
+    }
+    // copy arguments from message...
+    if (msg->size > 0)
+        vm_ensure_stack(vm, msg->size - 1);
+    vm_pop(vm); // msg
+    for (int i = 0; i < msg->size; i++)
+        vm_push(vm, msg->args[i]);
+
+    if (IS_CLOSURE(slot)) {
+        vm_push_frame(vm, VAL_TO_CLOSURE(slot), msg->size);
+        return true;
+    }
+    if (IS_NATIVE(slot)) {
+        ObjNative* native = VAL_TO_NATIVE(slot);
+        Value* args_start = &vm->fiber->stack_top[-(int)(1 + msg->size)];
+        return native->fn(vm, args_start, msg->size);
+    }
+    if (msg->size == 0)
+        RETURN(slot);
+    vm_runtime_error(vm, "Tried to call a non-activatable slot with %d > 0 args.", msg->size);
+    return false;
 }
 
 DEFINE_NATIVE(Object_rawIterMore) {
@@ -739,6 +772,26 @@ DEFINE_NATIVE(Msg_perform) {
     RETURN(args[1]);
 }
 
+DEFINE_NATIVE(Msg_sig) {
+    ARGSPEC("m");
+    RETURN(OBJ_TO_VAL(VAL_TO_MSG(args[0])->sig));
+}
+
+DEFINE_NATIVE(Msg_argAt) {
+    ARGSPEC("mN");
+    ObjMsg* msg = VAL_TO_MSG(args[0]);
+    uint32_t idx;
+    if (value_to_index(args[1], msg->size, &idx))
+        RETURN(msg->args[idx]);
+    RETURN(NIL_VAL);
+}
+
+DEFINE_NATIVE(Msg_numArgs) {
+    ARGSPEC("m");
+    ObjMsg* msg = VAL_TO_MSG(args[0]);
+    RETURN(NUMBER_TO_VAL(msg->size));
+}
+
 void core_init_vm(VM* vm)
 {
 #define ADD_OBJECT(table, name, obj) (define_on_table(vm, table, name, OBJ_TO_VAL(obj)))
@@ -763,6 +816,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "setOwnSlot:to:", Object_setSlot);
     ADD_METHOD(ObjectProto, "hasOwnSlot:",    Object_hasOwnSlot);
     ADD_METHOD(ObjectProto, "deleteSlot:",    Object_deleteSlot);
+    ADD_METHOD(ObjectProto, "rawPerform:",    Object_rawPerform);
     ADD_METHOD(ObjectProto, "rawType:",       Object_rawType);
     ADD_METHOD(ObjectProto, "==",             Object_eq);
     ADD_METHOD(ObjectProto, "not",            Object_not);
@@ -856,7 +910,10 @@ void core_init_vm(VM* vm)
 
     vm->MsgProto = objobject_new(vm);
     vm->MsgProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    ADD_METHOD(MsgProto, "perform:", Msg_perform);
+    /* ADD_METHOD(MsgProto, "perform:", Msg_perform); */
+    ADD_METHOD(MsgProto, "sig",      Msg_sig);
+    ADD_METHOD(MsgProto, "argAt:",   Msg_argAt);
+    ADD_METHOD(MsgProto, "numArgs",  Msg_numArgs);
 
     ADD_OBJECT(&vm->globals, "Ether",  vm->Ether);
     ADD_OBJECT(&vm->globals, "Object", vm->ObjectProto);

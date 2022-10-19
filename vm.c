@@ -301,28 +301,22 @@ vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
 }
 
 static bool
-invoke_message(VM* vm, Value obj, ObjString* sig, int num_args)
+invoke(VM* vm, Value obj, ObjString* sig, int num_args)
 {
-    // try to use perform to do the work.
     Value slot;
+    if (vm_get_slot(vm, obj, OBJ_TO_VAL(sig), &slot))
+        return complete_call(vm, slot, num_args);
     if (!vm_get_slot(vm, obj, vm->perform_string, &slot)) {
-        vm_runtime_error(vm, "object does not respond to message '%s'", sig->chars);
+        vm_runtime_error(vm, "Object does not respond to message '%s'", sig->chars);
         return false;
     }
     ObjMsg* msg = objmsg_new(vm, sig, &vm->fiber->stack_top[-num_args], num_args);
     vm_drop(vm, num_args);
+    vm_push_root(vm, OBJ_TO_VAL(msg));
+    vm_ensure_stack(vm, 1);
+    vm_pop_root(vm); // msg
     vm_push(vm, OBJ_TO_VAL(msg));
     return complete_call(vm, slot, 1);
-}
-
-static bool
-invoke(VM* vm, Value obj, ObjString* sig, int num_args)
-{
-    // direct search on the protos.
-    Value slot;
-    if (vm_get_slot(vm, obj, OBJ_TO_VAL(sig), &slot))
-        return complete_call(vm, slot, num_args);
-    return invoke_message(vm, obj, sig, num_args);
 }
 
 bool
@@ -333,11 +327,14 @@ vm_invoke(VM* vm, Value obj, ObjString* sig, int num_args)
         return vm_call(vm, slot, num_args);
     // try to use perform: to do the work.
     if (!vm_get_slot(vm, obj, vm->perform_string, &slot)) {
-        vm_runtime_error(vm, "object does not respond to message '%s'", sig->chars);
+        vm_runtime_error(vm, "Object does not respond to message '%s'", sig->chars);
         return false;
     }
     ObjMsg* msg = objmsg_new(vm, sig, &vm->fiber->stack_top[-num_args], num_args);
     vm_drop(vm, num_args);
+    vm_push_root(vm, OBJ_TO_VAL(msg));
+    vm_ensure_stack(vm, 1);
+    vm_pop_root(vm); // msg
     vm_push(vm, OBJ_TO_VAL(msg));
     return vm_call(vm, slot, 1);
 }
@@ -404,7 +401,7 @@ run(VM* vm, ObjFiber* fiber, int top_level)
             case OP_ETHER:    vm_push(vm, OBJ_TO_VAL(vm->Ether)); break;
             case OP_DEF_GLOBAL: {
                 Value name = READ_CONSTANT();
-                table_set(&vm->globals, vm, name, vm_peek(vm, 0));
+                table_set(&vm->globals, vm, name, vm_pop(vm));
                 break;
             }
             case OP_GET_GLOBAL: {
@@ -579,7 +576,7 @@ handle_fibers:
                         vm_push(vm, OBJ_TO_VAL(msg));
                         num_args = 1;
                     } else {
-                        vm_runtime_error(vm, "object does not respond to message '%s'", VAL_TO_STRING(sig)->chars);
+                        vm_runtime_error(vm, "Object does not respond to message '%s'", VAL_TO_STRING(sig)->chars);
                         goto handle_fibers;
                     }
                 }
