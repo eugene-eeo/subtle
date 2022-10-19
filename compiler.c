@@ -79,6 +79,7 @@ typedef enum {
 typedef enum {
     EXPR_INVOKE,
     EXPR_DEFINE,
+    EXPR_RETURN,
     EXPR_OTHER,
 } ExprType;
 
@@ -198,7 +199,7 @@ static void emit_byte(Compiler* compiler, uint8_t b) {
 }
 
 static int stack_effects[] = {
-    [OP_RETURN] = 0,
+    [OP_RETURN] = -1,
     [OP_CONSTANT] = 1,
     [OP_POP] = -1,
     [OP_TRUE] = 1,
@@ -304,21 +305,6 @@ compiler_end(Compiler* compiler)
 
 static void begin_block(Compiler* compiler) {
     compiler->scope_depth++;
-}
-
-// Emits pop instructions to pop the current scope's locals off the stack.
-static void end_block(Compiler* compiler) {
-    compiler->scope_depth--;
-    while (compiler->local_count > 0
-           && compiler->locals[compiler->local_count - 1].depth
-                > compiler->scope_depth) {
-        if (compiler->locals[compiler->local_count - 1].is_captured) {
-            emit_op(compiler, OP_CLOSE_UPVALUE);
-        } else {
-            emit_op(compiler, OP_POP);
-        }
-        compiler->local_count--;
-    }
 }
 
 static int add_local(Compiler* compiler, Token name) {
@@ -766,7 +752,7 @@ static ExprType return_expr(Compiler* compiler, bool can_assign, bool allow_newl
         maybe_tco(compiler, t);
         emit_op(compiler, OP_RETURN);
     }
-    return EXPR_OTHER;
+    return EXPR_RETURN;
 }
 
 static ParseRule rules[] = {
@@ -838,7 +824,7 @@ static void block(Compiler* compiler) {
     bool once = false;
 
     while (!check(compiler, TOKEN_EOF) && !check(compiler, TOKEN_RBOX)) {
-        if (once && t != EXPR_DEFINE)
+        if (once && t != EXPR_DEFINE && t != EXPR_RETURN)
             emit_op(compiler, OP_POP);
         once = true;
         t = expression(compiler, false);
@@ -846,13 +832,12 @@ static void block(Compiler* compiler) {
             break;
     }
 
-    if (once) {
+    if (once && t != EXPR_RETURN) {
         maybe_tco(compiler, t);
         emit_op(compiler, OP_RETURN);
     }
 
     consume(compiler, TOKEN_RBOX, "Expect ']' after block.");
-    end_block(compiler);
 }
 
 ObjFn*
