@@ -617,8 +617,7 @@ static ExprType def_expr(Compiler* compiler, bool can_assign, bool allow_newline
 
     if (match(compiler, TOKEN_OPERATOR)) {
         // match exactly one argument.
-        const Token token = compiler->parser->previous;
-        name = identifier_constant(compiler, &token);
+        name = identifier_constant(compiler, &compiler->parser->previous);
 
         // parameter list.
         c.function->arity = 1;
@@ -626,6 +625,9 @@ static ExprType def_expr(Compiler* compiler, bool can_assign, bool allow_newline
         declare_variable(&c, &compiler->parser->previous);
         define_variable(&c, 0);
         c.slot_count++;
+    } else if (match(compiler, TOKEN_VARIABLE)) {
+        name = identifier_constant(compiler, &compiler->parser->previous);
+        c.function->arity = 0;
     } else {
         size_t siglen = 0;
         char* sig = NULL;
@@ -834,6 +836,8 @@ static void block(Compiler* compiler) {
     bool once = false;
 
     while (!check(compiler, TOKEN_EOF) && !check(compiler, TOKEN_RBOX)) {
+        if (once)
+            emit_op(compiler, OP_POP);
         once = true;
         t = expression(compiler, false);
         if (!match_newlines(compiler))
