@@ -829,14 +829,22 @@ static ParseRule* get_rule(TokenType type) {
 static void block(Compiler* compiler) {
     match_newlines(compiler);
     begin_block(compiler);
+
+    ExprType t = EXPR_OTHER;
+    bool once = false;
+
     while (!check(compiler, TOKEN_EOF) && !check(compiler, TOKEN_RBOX)) {
-        ExprType t = expression(compiler, false);
-        if (!match_newlines(compiler)) {
-            maybe_tco(compiler, t);
-            emit_op(compiler, OP_RETURN);
+        once = true;
+        t = expression(compiler, false);
+        if (!match_newlines(compiler))
             break;
-        }
     }
+
+    if (once) {
+        maybe_tco(compiler, t);
+        emit_op(compiler, OP_RETURN);
+    }
+
     consume(compiler, TOKEN_RBOX, "Expect ']' after block.");
     end_block(compiler);
 }

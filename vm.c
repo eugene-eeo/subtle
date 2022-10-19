@@ -60,7 +60,6 @@ void vm_free(VM* vm) {
     table_free(&vm->strings, vm);
     table_free(&vm->globals, vm);
     free(vm->gray_stack);
-    printf("%zu\n", vm->bytes_allocated);
     // Check that our memory accounting is correct.
     ASSERT(vm->bytes_allocated == 0, "bytes_allocated != 0");
     vm_init(vm);
@@ -157,6 +156,22 @@ runtime_error(VM* vm)
     vm->fiber = NULL;
 }
 
+static void
+fix_arguments(VM* vm, ObjFn* fn, int num_args)
+{
+    // Fix the number of arguments.
+    // Since -1 arity means a script, we ignore that here.
+    if (fn->arity == -1) return;
+    if (num_args > fn->arity) {
+        vm_drop(vm, num_args - fn->arity);
+        return;
+    }
+    while (num_args < fn->arity) {
+        vm_push(vm, NIL_VAL);
+        num_args++;
+    }
+}
+
 void
 vm_push_frame(VM* vm, ObjClosure* closure, int num_args)
 {
@@ -168,11 +183,12 @@ vm_push_frame(VM* vm, ObjClosure* closure, int num_args)
     }
     Value* stack_start = vm->fiber->stack_top - num_args - 1;
 
-    ObjFn* function = closure->function;
+    ObjFn* fn = closure->function;
     vm_push_root(vm, OBJ_TO_VAL(closure));
     objfiber_push_frame(vm->fiber, vm, closure, stack_start);
     vm_pop_root(vm);
-    vm_ensure_stack(vm, function->max_slots);
+    vm_ensure_stack(vm, fn->max_slots);
+    fix_arguments(vm, fn, num_args);
 }
 
 static bool
@@ -557,9 +573,15 @@ handle_fibers:
                 Value obj = vm_peek(vm, num_args);
                 Value slot;
                 if (!vm_get_slot(vm, obj, sig, &slot)) {
-                    // do it normally..
-                    invoke_message(vm, obj, VAL_TO_STRING(sig), num_args);
-                    goto handle_fibers;
+                    if (vm_get_slot(vm, obj, vm->perform_string, &slot)) {
+                        ObjMsg* msg = objmsg_new(vm, VAL_TO_STRING(sig), &vm->fiber->stack_top[-num_args], num_args);
+                        vm_drop(vm, num_args);
+                        vm_push(vm, OBJ_TO_VAL(msg));
+                        num_args = 1;
+                    } else {
+                        vm_runtime_error(vm, "object does not respond to message '%s'", VAL_TO_STRING(sig)->chars);
+                        goto handle_fibers;
+                    }
                 }
                 // we can perform a TCO iff:
                 // 1. the slot is a closure, OR
@@ -587,6 +609,7 @@ handle_fibers:
                 frame->ip = fn->chunk.code;
                 frame->did_tco = true;
                 vm_ensure_stack(vm, fn->max_slots - (fiber->stack_top - frame->slots));
+                fix_arguments(vm, fn, num_args);
                 break;
             }
             default: UNREACHABLE();
