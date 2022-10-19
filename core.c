@@ -202,11 +202,6 @@ DEFINE_NATIVE(Object_deleteSlot) {
     RETURN(args[0]);
 }
 
-DEFINE_NATIVE(Object_same) {
-    ARGSPEC("***");
-    RETURN(BOOL_TO_VAL(value_equal(args[1], args[2])));
-}
-
 DEFINE_NATIVE(Object_eq) {
     ARGSPEC("**");
     RETURN(BOOL_TO_VAL(value_equal(args[0], args[1])));
@@ -359,25 +354,6 @@ DEFINE_NATIVE(Object_rawIterValueNext) {
     if (generic_tableIterEntry(&obj->slots, args[1], &entry))
         RETURN(entry.value);
     RETURN(NIL_VAL);
-}
-
-DEFINE_NATIVE(Object_new) {
-    ObjObject* obj = objobject_new(vm);
-    obj->proto = args[0];
-    Value rv = OBJ_TO_VAL(obj);
-    // setup a call for obj.init(...).
-    // rather than copy the receiver and arguments we "replace"
-    // the current call.
-    // we have: | proto | arg1 | ... | argn |
-    // we need: |  rv   | arg1 | ... | argn |
-    args[0] = rv;
-    if (!vm_invoke(vm, rv, vm->init_string, num_args))
-        return false;
-    // at this point, rv is guaranteed to not be GCed as it was
-    // called as the receiver for the init slot.
-    vm_pop(vm);
-    vm_push(vm, rv);
-    return true;
 }
 
 // ============================= Fn =============================
@@ -832,26 +808,24 @@ void core_init_vm(VM* vm)
 
     vm->ObjectProto = objobject_new(vm);
     vm->ObjectProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    ADD_METHOD(ObjectProto, "proto",       Object_proto);
-    ADD_METHOD(ObjectProto, "setProto",    Object_setProto);
-    ADD_METHOD(ObjectProto, "hash",        Object_hash);
-    ADD_METHOD(ObjectProto, "rawGetSlot",  Object_rawGetSlot);
-    ADD_METHOD(ObjectProto, "rawSetSlot",  Object_setSlot);
-    ADD_METHOD(ObjectProto, "hasSlot",     Object_hasSlot);
-    ADD_METHOD(ObjectProto, "getOwnSlot",  Object_getOwnSlot);
-    ADD_METHOD(ObjectProto, "setOwnSlot",  Object_setSlot);
-    ADD_METHOD(ObjectProto, "hasOwnSlot",  Object_hasOwnSlot);
-    ADD_METHOD(ObjectProto, "deleteSlot",  Object_deleteSlot);
-    ADD_METHOD(ObjectProto, "same",        Object_same);
-    ADD_METHOD(ObjectProto, "rawType",     Object_rawType);
-    ADD_METHOD(ObjectProto, "==",          Object_eq);
-    ADD_METHOD(ObjectProto, "!",           Object_not);
-    ADD_METHOD(ObjectProto, "clone",       Object_clone);
-    ADD_METHOD(ObjectProto, "hasAncestor", Object_hasAncestor);
-    ADD_METHOD(ObjectProto, "toString",    Object_toString);
-    ADD_METHOD(ObjectProto, "print",       Object_print);
-    ADD_METHOD(ObjectProto, "new",         Object_new);
-    ADD_METHOD(ObjectProto, "rawIterMore", Object_rawIterMore);
+    ADD_METHOD(ObjectProto, "proto",          Object_proto);
+    ADD_METHOD(ObjectProto, "setProto:",      Object_setProto);
+    ADD_METHOD(ObjectProto, "hash",           Object_hash);
+    ADD_METHOD(ObjectProto, "rawGetSlot:",    Object_rawGetSlot);
+    ADD_METHOD(ObjectProto, "rawSetSlot:to:", Object_setSlot);
+    ADD_METHOD(ObjectProto, "hasSlot:",       Object_hasSlot);
+    ADD_METHOD(ObjectProto, "getOwnSlot:",    Object_getOwnSlot);
+    ADD_METHOD(ObjectProto, "setOwnSlot:to:", Object_setSlot);
+    ADD_METHOD(ObjectProto, "hasOwnSlot:",    Object_hasOwnSlot);
+    ADD_METHOD(ObjectProto, "deleteSlot:",    Object_deleteSlot);
+    ADD_METHOD(ObjectProto, "rawType",        Object_rawType);
+    ADD_METHOD(ObjectProto, "==",             Object_eq);
+    ADD_METHOD(ObjectProto, "!",              Object_not);
+    ADD_METHOD(ObjectProto, "clone",          Object_clone);
+    ADD_METHOD(ObjectProto, "hasAncestor",    Object_hasAncestor);
+    ADD_METHOD(ObjectProto, "toString",       Object_toString);
+    ADD_METHOD(ObjectProto, "print",          Object_print);
+    ADD_METHOD(ObjectProto, "rawIterMore",    Object_rawIterMore);
     ADD_METHOD(ObjectProto, "rawIterSlotsNext", Object_rawIterSlotsNext);
     ADD_METHOD(ObjectProto, "rawIterValueNext", Object_rawIterValueNext);
 
@@ -952,10 +926,10 @@ void core_init_vm(VM* vm)
     ADD_OBJECT(&vm->globals, "List",   vm->ListProto);
     ADD_OBJECT(&vm->globals, "Map",    vm->MapProto);
 
-    if (vm_interpret(vm, CORE_SOURCE) != INTERPRET_OK) {
-        fprintf(stderr, "vm_interpret(CORE_SOURCE) not ok.\n");
-        exit(788);
-    }
+    /* if (vm_interpret(vm, CORE_SOURCE) != INTERPRET_OK) { */
+    /*     fprintf(stderr, "vm_interpret(CORE_SOURCE) not ok.\n"); */
+    /*     exit(788); */
+    /* } */
 
 #undef ADD_OBJECT
 #undef ADD_NATIVE

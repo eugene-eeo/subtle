@@ -400,7 +400,6 @@ run(VM* vm, ObjFiber* fiber, int top_level)
             case OP_DEF_GLOBAL: {
                 Value name = READ_CONSTANT();
                 table_set(&vm->globals, vm, name, vm_peek(vm, 0));
-                vm_pop(vm);
                 break;
             }
             case OP_GET_GLOBAL: {

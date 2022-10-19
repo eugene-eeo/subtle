@@ -15,7 +15,7 @@
 
 #define MAX_LOCALS   UINT8_MAX
 #define MAX_UPVALUES UINT8_MAX
-#define MAX_ARGS     INT8_MAX
+#define MAX_ARGS     16
 
 typedef enum {
     FUNCTION_TYPE_SCRIPT,
@@ -30,18 +30,6 @@ typedef struct {
     bool had_error;
     bool panic_mode;
 } Parser;
-
-typedef struct Loop {
-    // Design:
-    // 1. Inject a 'well-known' OP_JUMP where we can break from the loop.
-    // 2. Skip over the OP_JUMP from (1).
-    // 3. Do the actual looping.
-    struct Loop* outer;
-    int depth; // Initial depth of the loop.
-    int break_jump; // Loop break OP_JUMP.
-    int cond_jump;  // Loop condition OP_JUMP_IF_FALSE.
-    int start; // Where should the loop jump back to?
-} Loop;
 
 typedef struct {
     Token name;
@@ -74,7 +62,6 @@ typedef struct Compiler {
     int local_count;
     Upvalue upvalues[MAX_UPVALUES];
     int scope_depth; // Current scope depth.
-    Loop* loop;
 
     VM* vm;
 } Compiler;
@@ -82,16 +69,6 @@ typedef struct Compiler {
 typedef enum {
     PREC_NONE,
     PREC_ASSIGNMENT, // =
-    PREC_OR,         // ||
-    PREC_AND,        // &&
-    PREC_BITWISE_OR, // |
-    PREC_BITWISE_AND,// &
-    PREC_EQ,         // ==, !=
-    PREC_CMP,        // <, >, <=, >=
-    PREC_RANGE,      // .., ...
-    PREC_TERM,       // + -
-    PREC_FACTOR,     // * /
-    PREC_PREFIX,     // ! -
     PREC_CALL,       // (), .
     PREC_LITERAL,    // literals
 } Precedence;
@@ -134,7 +111,6 @@ compiler_init(Compiler* compiler, Compiler* enclosing,
     compiler->local_count = 0;
     compiler->scope_depth = 0;
     compiler->vm = vm;
-    compiler->loop = NULL;
 
     Local* local = &compiler->locals[compiler->local_count++];
     local->depth = 0;
@@ -192,16 +168,7 @@ static void consume(Compiler* compiler, TokenType type, const char* message) {
 
 static bool match_slot(Compiler* compiler) {
     if (check(compiler, TOKEN_VARIABLE)
-            || check(compiler, TOKEN_TRUE)  || check(compiler, TOKEN_FALSE) || check(compiler, TOKEN_NIL)
-            || check(compiler, TOKEN_THIS)
-            || check(compiler, TOKEN_PLUS)  || check(compiler, TOKEN_MINUS)
-            || check(compiler, TOKEN_TIMES) || check(compiler, TOKEN_SLASH)
-            || check(compiler, TOKEN_PIPE)
-            || check(compiler, TOKEN_AMP)
-            || check(compiler, TOKEN_BANG)
-            || check(compiler, TOKEN_EQ_EQ) || check(compiler, TOKEN_BANG_EQ)
-            || check(compiler, TOKEN_LT)    || check(compiler, TOKEN_LEQ)
-            || check(compiler, TOKEN_GT)    || check(compiler, TOKEN_GEQ)) {
+            || check(compiler, TOKEN_TRUE)  || check(compiler, TOKEN_FALSE) || check(compiler, TOKEN_NIL)) {
         advance(compiler);
         return true;
     }
@@ -213,15 +180,8 @@ static void consume_slot(Compiler* compiler, const char* message) {
         error_at_current(compiler, message);
 }
 
-static bool match_separators(Compiler* compiler) {
-    bool a = match(compiler, TOKEN_NEWLINE);
-    bool b = match(compiler, TOKEN_SEMICOLON);
-    match(compiler, TOKEN_NEWLINE);
-    return a || b;
-}
-
-static void match_newlines(Compiler* compiler) {
-    match(compiler, TOKEN_NEWLINE);
+static bool match_newlines(Compiler* compiler) {
+    return match(compiler, TOKEN_NEWLINE);
 }
 
 // Bytecode utilities
@@ -242,7 +202,7 @@ static int stack_effects[] = {
     [OP_TRUE] = 1,
     [OP_FALSE] = 1,
     [OP_NIL] = 1,
-    [OP_DEF_GLOBAL] = -1,
+    [OP_DEF_GLOBAL] = 0,
     [OP_GET_GLOBAL] = 1,
     [OP_SET_GLOBAL] = 0,
     [OP_ASSERT] = -1,
@@ -357,23 +317,6 @@ static void end_block(Compiler* compiler) {
     }
 }
 
-// Similar to end_block, but without actually modifying the compiler.
-static void pop_to_scope(Compiler* compiler, int scope_depth) {
-    int local_count = compiler->local_count;
-    ASSERT(compiler->scope_depth >= scope_depth, "compiler->scope_depth < scope_depth");
-    while (local_count > 0
-           && compiler->locals[local_count - 1].depth > scope_depth) {
-        // use emit_byte instead of emit_op here since
-        // we don't want to change slot_count
-        if (compiler->locals[local_count - 1].is_captured) {
-            emit_byte(compiler, OP_CLOSE_UPVALUE);
-        } else {
-            emit_byte(compiler, OP_POP);
-        }
-        local_count--;
-    }
-}
-
 static int add_local(Compiler* compiler, Token name) {
     Local* local = &compiler->locals[compiler->local_count];
     local->name = name;
@@ -452,50 +395,6 @@ resolve_upvalue(Compiler* compiler, Token* token)
     return -1;
 }
 
-// Jumping helpers
-// ===============
-
-static int
-emit_jump(Compiler* compiler, uint8_t op)
-{
-    emit_op(compiler, op);
-    emit_offset(compiler, 0xFFFF);
-    // Return the index to the start of the offset.
-    return current_chunk(compiler)->length - 2;
-}
-
-static void
-patch_jump(Compiler* compiler, int offset)
-{
-    // Compute how many bytes we need to jump over -- accounting
-    // for the 2-byte offset after the jump instruction.
-    //
-    // | OP_JUMP | 0 | 0 | .... | OP_POP |  |
-    //             ^-- offset              ^-- chunk->length
-    int jump = current_chunk(compiler)->length - offset - 2;
-    if (jump > UINT16_MAX)
-        error(compiler, "Too much code to jump over.");
-
-    current_chunk(compiler)->code[offset    ] = (jump >> 8) & 0xFF;
-    current_chunk(compiler)->code[offset + 1] = (jump)      & 0xFF;
-}
-
-static void
-emit_loop(Compiler* compiler, int start)
-{
-    // It's important that this line is here, otherwise we would jump
-    // over the wrong number of bytes: the bottom line assumes that
-    // we would skip over only the 2 byte argument.
-    emit_op(compiler, OP_LOOP);
-
-    // Have to +2 here to account for the VM reading the 2 byte argument.
-    int jump = current_chunk(compiler)->length - start + 2;
-    if (jump > UINT16_MAX)
-        error(compiler, "Too much code to jump over.");
-
-    emit_offset(compiler, (uint16_t)jump);
-}
-
 // Invoke helpers
 // ==============
 
@@ -519,16 +418,29 @@ invoke_string_method(Compiler* compiler, const char* method, int num_args)
     invoke_token_method(compiler, &tok, num_args);
 }
 
+// TCO
+// ===
+
+static void maybe_tco(Compiler* compiler, ExprType t)
+{
+    if (t == EXPR_INVOKE) {
+        // Patch the previous OP_INVOKE to be an OP_TAIL_INVOKE instead,
+        // and adjust the stack requirements accordingly.
+        Chunk* chunk = &compiler->function->chunk;
+        chunk->code[chunk->length - 4] = OP_TAIL_INVOKE;
+        // We still keep the OP_RETURN around if it's a TCO-ed call, so
+        // that the vm can bail-out if necessary.
+    }
+}
+
 // Expression parsing
 // ==================
 
 static void block(Compiler*);
-static uint16_t parse_variable(Compiler*, const char* msg);
 static void define_variable(Compiler*, uint16_t);
 static ExprType expression(Compiler*, bool);
 static ExprType parse_precedence(Compiler*, Precedence, bool);
 static ParseRule* get_rule(TokenType);
-
 
 static ExprType string(Compiler* compiler, bool can_assign, bool allow_newlines) {
     ObjString* str = objstring_copy(
@@ -556,25 +468,62 @@ static ExprType literal(Compiler* compiler, bool can_assign, bool allow_newlines
     return EXPR_OTHER;
 }
 
-static ExprType and_(Compiler* compiler, bool can_assign, bool allow_newlines) {
-    match_newlines(compiler);
-    int else_jump = emit_jump(compiler, OP_AND);
-    parse_precedence(compiler, PREC_AND, allow_newlines);
-    patch_jump(compiler, else_jump);
-    return EXPR_OTHER;
+//
+// Variable declaration is split into two stages: _declaring_, which
+// marks its place in the stack (if it's a local variable), and _defining_,
+// which emits bytecode that gives it a value.
+//
+
+static void declare_variable(Compiler* compiler, Token* name) {
+    int scope_depth = compiler->scope_depth;
+    if (scope_depth == 0) return; // Nothing to do in global scope.
+
+    // Disallow declaring another variable with the same name,
+    // within a local block.
+    //    let a = 1;
+    //    let a = 2;
+    for (int i = compiler->local_count - 1; i >= 0; i--) {
+        Local* local = &compiler->locals[i];
+        if (local->depth != -1 && local->depth < scope_depth) break;
+        if (identifiers_equal(&local->name, name)) {
+            error_at(compiler, name, "Already a variable with this name in this scope.");
+            break;
+        }
+    }
+
+    if (compiler->local_count == MAX_LOCALS) {
+        error_at(compiler, name, "Too many locals in one chunk.");
+        return;
+    }
+    add_local(compiler, *name);
 }
 
-static ExprType or_(Compiler* compiler, bool can_assign, bool allow_newlines) {
-    match_newlines(compiler);
-    int else_jump = emit_jump(compiler, OP_OR);
-    parse_precedence(compiler, PREC_OR, allow_newlines);
-    patch_jump(compiler, else_jump);
-    return EXPR_OTHER;
+static void define_variable(Compiler* compiler, uint16_t global) {
+    // If there is no local scope at the moment, then there is
+    // nothing to do: the local will be on the stack.
+    if (compiler->scope_depth > 0) {
+        mark_local_initialized(compiler);
+        return;
+    }
+
+    emit_op(compiler, OP_DEF_GLOBAL);
+    emit_offset(compiler, global);
 }
 
 static void named_variable(Compiler* compiler, Token name, bool can_assign, bool allow_newlines) {
     if (allow_newlines)
         match_newlines(compiler);
+
+    if (can_assign && match(compiler, TOKEN_COLONEQ)) {
+        uint16_t global = 0;
+        if (compiler->scope_depth == 0)
+            global = identifier_constant(compiler, &name);
+        declare_variable(compiler, &name);
+        match_newlines(compiler);
+        expression(compiler, allow_newlines);
+        define_variable(compiler, global);
+        return;
+    }
 
     // Check if we can resolve to a local variable.
     int local = resolve_local(compiler, &name);
@@ -645,25 +594,76 @@ static ExprType object(Compiler* compiler, bool can_assign, bool allow_newlines)
     return EXPR_OTHER;
 }
 
-static void block_argument(Compiler* compiler) {
+static ExprType def_expr(Compiler* compiler, bool can_assign, bool allow_newlines) {
+    uint16_t name;
     Compiler c;
     compiler_init(&c, compiler, compiler->parser,
                   compiler->vm, FUNCTION_TYPE_FUNCTION);
     begin_block(&c);
 
-    // Parse the optional parameter list, if any.
-    if (match(&c, TOKEN_PIPE)) {
-        do {
-            match_newlines(compiler);
-            if (c.function->arity == MAX_ARGS)
-                error_at_current(&c, "Cannot have more than 127 parameters.");
+    if (match(compiler, TOKEN_OPERATOR)) {
+        // match exactly one argument.
+        const Token token = compiler->parser->previous;
+        name = identifier_constant(compiler, &token);
+
+        // parameter list.
+        c.function->arity = 1;
+        consume(&c, TOKEN_VARIABLE, "Expect parameter name after operator.");
+        declare_variable(&c, &compiler->parser->previous);
+        define_variable(&c, 0);
+        c.slot_count++;
+    } else {
+        size_t siglen = 0;
+        char* sig = NULL;
+
+        while (true) {
+            consume(compiler, TOKEN_SIG, "Expect keyword after '::'.");
+            // build the signature...
+            Token arg = compiler->parser->previous;
+            if (!c.parser->had_error) {
+                sig = realloc(sig, siglen + arg.length + 1);
+                memcpy(&sig[siglen], arg.start, arg.length);
+                siglen += arg.length;
+                sig[siglen] = '\0';
+            }
+            consume(&c, TOKEN_VARIABLE, "Expect parameter name after keyword.");
             c.function->arity++;
-            uint8_t constant = parse_variable(&c, "Expect parameter name.");
-            define_variable(&c, constant);
-            c.slot_count++;
-        } while (match(&c, TOKEN_COMMA));
-        consume(&c, TOKEN_PIPE, "Expect '|' after parameters.");
+            if (c.function->arity > MAX_ARGS)
+                error_at_current(compiler, "Too many parameters");
+            declare_variable(&c, &compiler->parser->previous);
+            define_variable(&c, 0);
+            // see if there's any more arguments.
+            if (!check(compiler, TOKEN_SIG))
+                break;
+        }
+
+        const Token tok = {.start=sig, .length=strlen(sig)};
+        name = identifier_constant(compiler, &tok);
+        free(sig);
     }
+
+    consume(compiler, TOKEN_LBOX, "Expect '[' after signature.");
+    block(&c);
+    ObjFn* fn = compiler_end(&c);
+    uint16_t idx = make_constant(compiler, OBJ_TO_VAL(fn));
+    emit_op(compiler, OP_CLOSURE);
+    emit_offset(compiler, idx);
+
+    for (int i = 0; i < fn->upvalue_count; i++) {
+        emit_byte(compiler, c.upvalues[i].is_local ? 1 : 0);
+        emit_byte(compiler, c.upvalues[i].index);
+    }
+
+    emit_op(compiler, OP_OBJECT_SET);
+    emit_offset(compiler, name);
+    return EXPR_OTHER;
+}
+
+static ExprType closure(Compiler* compiler, bool can_assign, bool allow_newlines) {
+    Compiler c;
+    compiler_init(&c, compiler, compiler->parser,
+                  compiler->vm, FUNCTION_TYPE_FUNCTION);
+    begin_block(&c);
     block(&c);
     end_block(&c);
 
@@ -676,55 +676,42 @@ static void block_argument(Compiler* compiler) {
         emit_byte(compiler, c.upvalues[i].is_local ? 1 : 0);
         emit_byte(compiler, c.upvalues[i].index);
     }
+    return EXPR_OTHER;
 }
 
 static ExprType invoke(Compiler* compiler, bool can_assign, bool allow_newlines) {
-    const Token op_token = compiler->parser->previous;
+    Token arg = compiler->parser->previous;
     if (allow_newlines)
         match_newlines(compiler);
 
-    if (can_assign && match(compiler, TOKEN_EQ)) {
-        match_newlines(compiler);
-        expression(compiler, allow_newlines);
-        emit_op(compiler, OP_OBJECT_SET);
-        emit_offset(compiler, identifier_constant(compiler, &op_token));
-        return EXPR_OTHER;
-    }
-
+    // create the signature.
     int num_args = 0;
-    // Match the optional arguments.
-    if (match(compiler, TOKEN_LPAREN)) {
-        if (!check(compiler, TOKEN_RPAREN)) {
-            do {
-                match_newlines(compiler);
-                expression(compiler, true);
-                if (num_args == MAX_ARGS)
-                    error(compiler, "Cannot have more than 127 arguments.");
-                num_args++;
-            } while (match(compiler, TOKEN_COMMA));
-        }
-        match_newlines(compiler);
-        consume(compiler, TOKEN_RPAREN, "Expect ')' after arguments.");
-    }
-    // Match a function block at the end.
-    if (match(compiler, TOKEN_LBRACE)) {
+    size_t siglen = 0;
+    char* sig = NULL;
+
+    while (true) {
         num_args++;
-        block_argument(compiler);
+        if (num_args > MAX_ARGS)
+            error_at_current(compiler, "too many arguments");
+        sig = realloc(sig, siglen + arg.length + 1);
+        memcpy(&sig[siglen], arg.start, arg.length);
+        siglen += arg.length;
+        sig[siglen] = '\0';
+        parse_precedence(compiler, PREC_LITERAL, allow_newlines);
+        // see if there's any more arguments.
+        if (!match(compiler, TOKEN_SIG))
+            break;
+        arg = compiler->parser->previous;
     }
 
-    invoke_token_method(compiler, &op_token, num_args);
+    invoke_string_method(compiler, sig, num_args);
+    free(sig);
     return EXPR_INVOKE;
 }
 
-static ExprType dot(Compiler* compiler, bool can_assign, bool allow_newlines) {
-    match_newlines(compiler);
-    consume_slot(compiler, "Expect slot name after '.'.");
-    return invoke(compiler, can_assign, allow_newlines);
-}
-
-static ExprType this(Compiler* compiler, bool can_assign, bool allow_newlines) {
+static ExprType self(Compiler* compiler, bool can_assign, bool allow_newlines) {
     if (compiler->type == FUNCTION_TYPE_SCRIPT) {
-        error(compiler, "Cannot use 'this' in top-level code.");
+        error(compiler, "Cannot use 'self' in top-level code.");
     }
     // The 0-th stack slot contains the target of the call.
     // Remember that we put this slot aside in compiler_init.
@@ -740,23 +727,6 @@ static ExprType grouping(Compiler* compiler, bool can_assign, bool allow_newline
     return t;
 }
 
-static ExprType unary(Compiler* compiler, bool can_assign, bool allow_newlines) {
-    Token op_token = compiler->parser->previous;
-    TokenType operator = op_token.type;
-    // Compile the operand.
-    parse_precedence(compiler, PREC_PREFIX, allow_newlines);
-    switch (operator) {
-        case TOKEN_MINUS:
-            invoke_string_method(compiler, "neg", 0);
-            break;
-        case TOKEN_BANG:
-            invoke_token_method(compiler, &op_token, 0);
-            break;
-        default: UNREACHABLE();
-    }
-    return EXPR_OTHER;
-}
-
 static ExprType binary(Compiler* compiler, bool can_assign, bool allow_newlines) {
     Token op_token = compiler->parser->previous;
     TokenType operator = op_token.type;
@@ -766,73 +736,54 @@ static ExprType binary(Compiler* compiler, bool can_assign, bool allow_newlines)
     match_newlines(compiler);
     parse_precedence(compiler, (Precedence)(rule->precedence + 1), allow_newlines);
 
-    switch (operator) {
-        case TOKEN_DOTDOT:
-        case TOKEN_DOTDOTDOT:
-        case TOKEN_EQ_EQ:
-        case TOKEN_BANG_EQ:
-        case TOKEN_PLUS:
-        case TOKEN_MINUS:
-        case TOKEN_TIMES:
-        case TOKEN_SLASH:
-        case TOKEN_LT:
-        case TOKEN_LEQ:
-        case TOKEN_GT:
-        case TOKEN_GEQ:
-        case TOKEN_AMP:
-        case TOKEN_PIPE:
-            invoke_token_method(compiler, &op_token, 1);
-            break;
-        default: UNREACHABLE();
+    invoke_token_method(compiler, &op_token, 1);
+    return EXPR_OTHER;
+}
+
+static ExprType unary(Compiler* compiler, bool can_assign, bool allow_newlines) {
+    Token token = compiler->parser->previous;
+    invoke_token_method(compiler, &token, 0);
+    return EXPR_INVOKE;
+}
+
+static ExprType return_expr(Compiler* compiler, bool can_assign, bool allow_newlines) {
+    if (compiler->type == FUNCTION_TYPE_SCRIPT)
+        error(compiler, "Cannot return from top-level code.");
+
+    if (check(compiler, TOKEN_NEWLINE)) {
+        emit_return(compiler);
+    } else {
+        ExprType t = expression(compiler, false);
+        maybe_tco(compiler, t);
+        emit_op(compiler, OP_RETURN);
     }
     return EXPR_OTHER;
 }
 
 static ParseRule rules[] = {
-    [TOKEN_PLUS]      = {NULL,     binary, PREC_TERM},
-    [TOKEN_MINUS]     = {unary,    binary, PREC_TERM},
-    [TOKEN_TIMES]     = {NULL,     binary, PREC_FACTOR},
-    [TOKEN_SLASH]     = {NULL,     binary, PREC_FACTOR},
-    [TOKEN_COMMA]     = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_LPAREN]    = {grouping, NULL,   PREC_NONE},
-    [TOKEN_RPAREN]    = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_LBRACE]    = {object,   NULL,   PREC_NONE},
-    [TOKEN_RBRACE]    = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_EQ]        = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_EQ_EQ]     = {NULL,     binary, PREC_EQ},
-    [TOKEN_BANG]      = {unary,    NULL,   PREC_NONE},
-    [TOKEN_BANG_EQ]   = {NULL,     binary, PREC_EQ},
-    [TOKEN_LT]        = {NULL,     binary, PREC_CMP},
-    [TOKEN_LEQ]       = {NULL,     binary, PREC_CMP},
-    [TOKEN_GT]        = {NULL,     binary, PREC_CMP},
-    [TOKEN_GEQ]       = {NULL,     binary, PREC_CMP},
-    [TOKEN_AMP]       = {NULL,     binary, PREC_BITWISE_AND},
-    [TOKEN_AMP_AMP]   = {NULL,     and_,   PREC_AND},
-    [TOKEN_PIPE]      = {NULL,     binary, PREC_BITWISE_OR},
-    [TOKEN_PIPE_PIPE] = {NULL,     or_,    PREC_OR},
-    [TOKEN_DOT]       = {NULL,     dot,    PREC_CALL},
-    [TOKEN_DOTDOT]    = {NULL,     binary, PREC_RANGE},
-    [TOKEN_DOTDOTDOT] = {NULL,     binary, PREC_RANGE},
-    [TOKEN_NUMBER]    = {number,   NULL,   PREC_NONE},
-    [TOKEN_STRING]    = {string,   NULL,   PREC_NONE},
-    [TOKEN_VARIABLE]  = {variable, invoke, PREC_CALL},
-    [TOKEN_NIL]       = {literal,  invoke, PREC_CALL},
-    [TOKEN_TRUE]      = {literal,  invoke, PREC_CALL},
-    [TOKEN_FALSE]     = {literal,  invoke, PREC_CALL},
-    [TOKEN_WHILE]     = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_THIS]      = {this,     invoke, PREC_CALL},
-    [TOKEN_IF]        = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_ELSE]      = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_LET]       = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_RETURN]    = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_ASSERT]    = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_BREAK]     = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_CONTINUE]  = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_FOR]       = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_SEMICOLON] = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_NEWLINE]   = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_ERROR]     = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_EOF]       = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_COMMA]      = {NULL,        NULL,     PREC_NONE},
+    [TOKEN_LPAREN]     = {grouping,    NULL,     PREC_NONE},
+    [TOKEN_RPAREN]     = {NULL,        NULL,     PREC_NONE},
+    [TOKEN_LBOX]       = {closure,     NULL,     PREC_NONE},
+    [TOKEN_RBOX]       = {NULL,        NULL,     PREC_NONE},
+    [TOKEN_LBRACE]     = {object,      NULL,     PREC_NONE},
+    [TOKEN_RBRACE]     = {NULL,        NULL,     PREC_NONE},
+    [TOKEN_EQ]         = {NULL,        NULL,     PREC_NONE},
+    [TOKEN_COLONCOLON] = {NULL,        def_expr, PREC_CALL},
+    [TOKEN_COLONEQ]    = {NULL,        NULL,     PREC_NONE},
+    [TOKEN_OPERATOR]   = {NULL,        binary,   PREC_CALL},
+    [TOKEN_NUMBER]     = {number,      NULL,     PREC_NONE},
+    [TOKEN_STRING]     = {string,      NULL,     PREC_NONE},
+    [TOKEN_VARIABLE]   = {variable,    unary,    PREC_CALL},
+    [TOKEN_SIG]        = {literal,     invoke,   PREC_CALL},
+    [TOKEN_NIL]        = {literal,     unary,    PREC_CALL},
+    [TOKEN_TRUE]       = {literal,     unary,    PREC_CALL},
+    [TOKEN_FALSE]      = {literal,     unary,    PREC_CALL},
+    [TOKEN_SELF]       = {self,        unary,    PREC_NONE},
+    [TOKEN_RETURN]     = {return_expr, unary,    PREC_NONE},
+    [TOKEN_NEWLINE]    = {NULL,        NULL,     PREC_NONE},
+    [TOKEN_ERROR]      = {NULL,        NULL,     PREC_NONE},
+    [TOKEN_EOF]        = {NULL,        NULL,     PREC_NONE},
 };
 
 static ExprType expression(Compiler* compiler, bool allow_newlines) {
@@ -867,338 +818,22 @@ static ParseRule* get_rule(TokenType type) {
     return &rules[type];
 }
 
-static void block_or_stmt(Compiler*);
-
-// Loop helpers
-// ============
-
-static void
-enter_loop(Compiler* compiler, Loop* loop)
-{
-    int skip_jump = emit_jump(compiler, OP_JUMP); // (2)
-    int break_jump = emit_jump(compiler, OP_JUMP); // (1)
-    patch_jump(compiler, skip_jump); // (2)
-
-    loop->outer = compiler->loop;
-    loop->depth = compiler->scope_depth;
-    loop->break_jump = break_jump - 1;
-    loop->start = current_chunk(compiler)->length;
-    compiler->loop = loop;
-}
-
-static void
-test_exit_loop(Compiler* compiler)
-{
-    compiler->loop->cond_jump = emit_jump(compiler, OP_JUMP_IF_FALSE);
-}
-
-static void
-exit_loop(Compiler* compiler)
-{
-    emit_loop(compiler, compiler->loop->start);
-    patch_jump(compiler, compiler->loop->cond_jump);
-    patch_jump(compiler, compiler->loop->break_jump + 1);
-    compiler->loop = compiler->loop->outer;
-}
-
 // Statement parsing
 // =================
-// There are two kinds of statements: declarations and `statements'.
-// Declarations include the let statement; this allows us to make
-// things like the following a syntactic error:
-//
-//     if (x) let u = 1; <--- why?
-
-static void block(Compiler*);
-static void declaration(Compiler*);
-static void statement(Compiler*);
-
-//
-// Variable declaration is split into two stages: _declaring_, which
-// marks its place in the stack (if it's a local variable), and _defining_,
-// which emits bytecode that gives it a value.
-//
-
-static void declare_variable(Compiler* compiler) {
-    int scope_depth = compiler->scope_depth;
-    if (scope_depth == 0) return; // Nothing to do in global scope.
-
-    Token* name = &compiler->parser->previous;
-    // Disallow declaring another variable with the same name,
-    // within a local block.
-    //    let a = 1;
-    //    let a = 2;
-    for (int i = compiler->local_count - 1; i >= 0; i--) {
-        Local* local = &compiler->locals[i];
-        if (local->depth != -1 && local->depth < scope_depth) break;
-        if (identifiers_equal(&local->name, name)) {
-            error_at(compiler, name, "Already a variable with this name in this scope.");
-            break;
-        }
-    }
-
-    if (compiler->local_count == MAX_LOCALS) {
-        error_at(compiler, name, "Too many locals in one chunk.");
-        return;
-    }
-    add_local(compiler, *name);
-}
-
-static void define_variable(Compiler* compiler, uint16_t global) {
-    // If there is no local scope at the moment, then there is
-    // nothing to do: the local will be on the stack.
-    if (compiler->scope_depth > 0) {
-        mark_local_initialized(compiler);
-        return;
-    }
-
-    emit_op(compiler, OP_DEF_GLOBAL);
-    emit_offset(compiler, global);
-}
-
-static uint16_t parse_variable(Compiler* compiler, const char* msg) {
-    consume(compiler, TOKEN_VARIABLE, msg);
-
-    declare_variable(compiler);
-    if (compiler->scope_depth > 0)
-        return 0;
-
-    return identifier_constant(compiler, &compiler->parser->previous);
-}
-
-static void let_decl(Compiler* compiler) {
-    uint16_t global = parse_variable(compiler, "Expect variable name.");
-
-    if (match(compiler, TOKEN_EQ)) {
-        expression(compiler, false);
-    } else {
-        emit_op(compiler, OP_NIL);
-    }
-
-    define_variable(compiler, global);
-}
-
-static void assert_stmt(Compiler* compiler) {
-    expression(compiler, false);
-    emit_op(compiler, OP_ASSERT);
-}
 
 static void block(Compiler* compiler) {
     match_newlines(compiler);
     begin_block(compiler);
-    bool has_newlines = true;
-    while (!check(compiler, TOKEN_EOF) && !check(compiler, TOKEN_RBRACE) && has_newlines) {
-        declaration(compiler);
-        has_newlines = match_separators(compiler);
-    }
-    consume(compiler, TOKEN_RBRACE, "Expect '}' after block.");
-    end_block(compiler);
-}
-
-static void block_or_stmt(Compiler* compiler) {
-    match(compiler, TOKEN_NEWLINE);
-    if (match(compiler, TOKEN_LBRACE)) {
-        block(compiler);
-    } else {
-        statement(compiler);
-    }
-}
-
-static void if_stmt(Compiler* compiler) {
-    consume(compiler, TOKEN_LPAREN, "Expect '(' after if.");
-    expression(compiler, true);
-    consume(compiler, TOKEN_RPAREN, "Expect ')' after condition.");
-
-    int else_jump = emit_jump(compiler, OP_JUMP_IF_FALSE);
-    block_or_stmt(compiler);
-
-    int exit_jump = emit_jump(compiler, OP_JUMP);
-
-    patch_jump(compiler, else_jump);
-
-    if (match(compiler, TOKEN_ELSE))
-        block_or_stmt(compiler);
-    patch_jump(compiler, exit_jump);
-}
-
-static void while_stmt(Compiler* compiler) {
-    Loop loop;
-    enter_loop(compiler, &loop);
-
-    consume(compiler, TOKEN_LPAREN, "Expect '(' after while.");
-    expression(compiler, true);
-    consume(compiler, TOKEN_RPAREN, "Expect ')' after condition.");
-
-    test_exit_loop(compiler);
-
-    // Compile the body of the while loop.
-    block_or_stmt(compiler);
-    exit_loop(compiler);
-}
-
-static void load_local(Compiler* compiler, int offset) {
-    emit_op(compiler, OP_GET_LOCAL);
-    emit_byte(compiler, offset);
-}
-
-static void for_stmt(Compiler* compiler) {
-    // Desugar the following for loop:
-    // for (x = items) {  | let _s = items;
-    //    bar;            | let _i = nil;
-    // }                  | while (_i = _s.iterMore(_i)) {
-    //                    |     let x = _s.iterNext(_i);
-    //                    |     bar;
-    //                    | }
-    Token seq_token  = {.start="seq ", .length=4};
-    Token iter_token = {.start="iter ", .length=5};
-
-    begin_block(compiler);
-    consume(compiler, TOKEN_LPAREN, "Expect '(' after 'for'.");
-    match(compiler, TOKEN_NEWLINE);
-    consume(compiler, TOKEN_VARIABLE, "Expect loop variable.");
-
-    // Remember the loop variable.
-    Token loop_var = compiler->parser->previous;
-
-    match(compiler, TOKEN_NEWLINE);
-    consume(compiler, TOKEN_EQ, "Expect '=' after loop variable.");
-    match(compiler, TOKEN_NEWLINE);
-
-    // Evaluate the sequence.
-    expression(compiler, true);
-
-    // Check that we have enough space to store the two locals.
-    if (compiler->local_count + 2 > MAX_LOCALS) {
-        error(compiler, "Not enough space for for-loop variables.");
-        return;
-    }
-
-    int seq = add_local(compiler, seq_token);
-    mark_local_initialized(compiler);
-
-    // The iterator value.
-    emit_op(compiler, OP_NIL);
-    int iter = add_local(compiler, iter_token);
-    mark_local_initialized(compiler);
-
-    consume(compiler, TOKEN_RPAREN, "Expect ')' after loop expression.");
-
-    Loop loop;
-    enter_loop(compiler, &loop);
-
-    // _i = _s.iterMore(_i)
-    load_local(compiler, seq);
-    load_local(compiler, iter);
-    invoke_string_method(compiler, "iterMore", 1);
-    emit_op(compiler, OP_SET_LOCAL); emit_byte(compiler, (uint8_t) iter);
-    test_exit_loop(compiler);
-
-    // loop_var = _s.iterNext(_i)
-    load_local(compiler, seq);
-    load_local(compiler, iter);
-    invoke_string_method(compiler, "iterNext", 1);
-
-    // push a fresh block for every iteration
-    begin_block(compiler);
-    add_local(compiler, loop_var);
-    mark_local_initialized(compiler);
-    block_or_stmt(compiler);
-    end_block(compiler);
-
-    exit_loop(compiler);
-
-    end_block(compiler);
-}
-
-static void continue_stmt(Compiler* compiler) {
-    if (compiler->loop == NULL) {
-        error(compiler, "Cannot continue from outside a loop.");
-        return;
-    }
-    pop_to_scope(compiler, compiler->loop->depth);
-    emit_loop(compiler, compiler->loop->start);
-}
-
-static void break_stmt(Compiler* compiler) {
-    if (compiler->loop == NULL) {
-        error(compiler, "Cannot break from outside a loop.");
-        return;
-    }
-    pop_to_scope(compiler, compiler->loop->depth);
-    emit_loop(compiler, compiler->loop->break_jump);
-}
-
-static void return_stmt(Compiler* compiler) {
-    if (compiler->type == FUNCTION_TYPE_SCRIPT)
-        error(compiler, "Cannot return from top-level code.");
-
-    if (check(compiler, TOKEN_NEWLINE) || check(compiler, TOKEN_SEMICOLON)) {
-        emit_return(compiler);
-    } else {
+    while (!check(compiler, TOKEN_EOF) && !check(compiler, TOKEN_RBOX)) {
         ExprType t = expression(compiler, false);
-        if (t == EXPR_INVOKE) {
-            // Patch the previous OP_INVOKE to be an OP_TAIL_INVOKE instead,
-            // and adjust the stack requirements accordingly.
-            Chunk* chunk = &compiler->function->chunk;
-            chunk->code[chunk->length - 4] = OP_TAIL_INVOKE;
-            // We still keep the OP_RETURN around if it's a TCO-ed call, so
-            // that the vm can bail-out if necessary.
-        }
-        emit_op(compiler, OP_RETURN);
-    }
-}
-
-static void synchronize(Compiler* compiler) {
-    compiler->parser->panic_mode = false;
-    while (compiler->parser->current.type != TOKEN_EOF) {
-        if (compiler->parser->previous.type == TOKEN_NEWLINE) return;
-        if (compiler->parser->previous.type == TOKEN_SEMICOLON) return;
-        switch (compiler->parser->current.type) {
-            case TOKEN_LET:
-            case TOKEN_WHILE:
-            case TOKEN_FOR:
-            case TOKEN_RETURN:
-            case TOKEN_BREAK:
-            case TOKEN_CONTINUE:
-            case TOKEN_ASSERT:
-            case TOKEN_IF:
-                return;
-            default:
-                advance(compiler);
+        if (!match_newlines(compiler)) {
+            maybe_tco(compiler, t);
+            emit_op(compiler, OP_RETURN);
+            break;
         }
     }
-}
-
-static void declaration(Compiler* compiler) {
-    if (match(compiler, TOKEN_LET)) {
-        let_decl(compiler);
-    } else {
-        statement(compiler);
-    }
-
-    if (compiler->parser->panic_mode) synchronize(compiler);
-}
-
-static void statement(Compiler* compiler) {
-    if (match(compiler, TOKEN_ASSERT)) {
-        assert_stmt(compiler);
-    } else if (match(compiler, TOKEN_IF)) {
-        if_stmt(compiler);
-    } else if (match(compiler, TOKEN_WHILE)) {
-        while_stmt(compiler);
-    } else if (match(compiler, TOKEN_FOR)) {
-        for_stmt(compiler);
-    } else if (match(compiler, TOKEN_RETURN)) {
-        return_stmt(compiler);
-    } else if (match(compiler, TOKEN_BREAK)) {
-        break_stmt(compiler);
-    } else if (match(compiler, TOKEN_CONTINUE)) {
-        continue_stmt(compiler);
-    } else {
-        // Expression statement
-        expression(compiler, false);
-        emit_op(compiler, OP_POP);
-    }
+    consume(compiler, TOKEN_RBOX, "Expect ']' after block.");
+    end_block(compiler);
 }
 
 ObjFn*
@@ -1214,8 +849,9 @@ compile(VM* vm, const char* source)
     match(&compiler, TOKEN_NEWLINE);
     bool has_newline = true;
     while (!match(&compiler, TOKEN_EOF) && has_newline) {
-        declaration(&compiler);
-        has_newline = match_separators(&compiler);
+        expression(&compiler, false);
+        emit_op(&compiler, OP_POP);
+        has_newline = match_newlines(&compiler);
     }
 
     ObjFn* function = compiler_end(&compiler);

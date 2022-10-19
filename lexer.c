@@ -61,6 +61,13 @@ static bool is_numeric(char ch) {
     return ch >= '0' && ch <= '9';
 }
 
+static bool is_op(char ch) {
+    return ch == '+' || ch == '-' || ch == '*' || ch == '/'
+        || ch == '!' || ch == '$' || ch == '%' || ch == '^'
+        || ch == '&' || ch == '?' || ch == '~' || ch == '@'
+        || ch == '=';
+}
+
 static bool is_alphanumeric(char ch) {
     return is_alpha(ch) || is_numeric(ch);
 }
@@ -136,31 +143,11 @@ match_rest(Lexer* lexer, TokenType type,
 
 static TokenType variable_type(Lexer* lexer) {
     switch (lexer->start[0]) {
-        case 'a': return match_rest(lexer, TOKEN_ASSERT, 1, "ssert", 5);
-        case 'b': return match_rest(lexer, TOKEN_BREAK, 1, "reak", 4);
-        case 'c': return match_rest(lexer, TOKEN_CONTINUE, 1, "ontinue", 7);
-        case 'e': return match_rest(lexer, TOKEN_ELSE, 1, "lse", 3);
-        case 'f':
-            if (lexer->current - lexer->start >= 2) {
-                switch (lexer->start[1]) {
-                    case 'a': return match_rest(lexer, TOKEN_FALSE, 2, "lse", 3);
-                    case 'o': return match_rest(lexer, TOKEN_FOR, 2, "r", 1);
-                }
-            }
-            break;
-        case 'i': return match_rest(lexer, TOKEN_IF, 1, "f", 1);
-        case 'l': return match_rest(lexer, TOKEN_LET, 1, "et", 2);
+        case 'f': return match_rest(lexer, TOKEN_FALSE, 1, "alse", 4);
         case 'n': return match_rest(lexer, TOKEN_NIL, 1, "il", 2);
         case 'r': return match_rest(lexer, TOKEN_RETURN, 1, "eturn", 5);
-        case 't':
-            if (lexer->current - lexer->start >= 2) {
-                switch (lexer->start[1]) {
-                    case 'r': return match_rest(lexer, TOKEN_TRUE, 2, "ue", 2);
-                    case 'h': return match_rest(lexer, TOKEN_THIS, 2, "is", 2);
-                }
-            }
-            break;
-        case 'w': return match_rest(lexer, TOKEN_WHILE, 1, "hile", 4);
+        case 't': return match_rest(lexer, TOKEN_TRUE, 1, "rue", 3);
+        case 's': return match_rest(lexer, TOKEN_SELF, 1, "elf", 3);
     }
     return TOKEN_VARIABLE;
 }
@@ -168,8 +155,20 @@ static TokenType variable_type(Lexer* lexer) {
 static Token variable(Lexer* lexer) {
     while (is_alphanumeric(peek(lexer)))
         advance(lexer);
+    if (peek(lexer) == ':') {
+        advance(lexer);
+        return make_token(lexer, TOKEN_SIG);
+    }
     TokenType type = variable_type(lexer);
     return make_token(lexer, type);
+}
+
+static Token operator(Lexer *lexer) {
+    while (is_op(peek(lexer)))
+        advance(lexer);
+    if (lexer->current - lexer->start == 1 && lexer->start[0] == '=')
+        return make_token(lexer, TOKEN_EQ);
+    return make_token(lexer, TOKEN_OPERATOR);
 }
 
 Token lexer_next(Lexer* lexer) {
@@ -181,29 +180,20 @@ Token lexer_next(Lexer* lexer) {
 
     if (is_numeric(ch)) return number(lexer);
     if (is_alpha(ch)) return variable(lexer);
+    if (is_op(ch)) return operator(lexer);
 
     switch (ch) {
-        case '+': return make_token(lexer, TOKEN_PLUS);
-        case '-': return make_token(lexer, TOKEN_MINUS);
-        case '*': return make_token(lexer, TOKEN_TIMES);
-        case '/': return make_token(lexer, TOKEN_SLASH);
         case ',': return make_token(lexer, TOKEN_COMMA);
-        case '.':
-            if (match(lexer, '.'))
-                return make_token(lexer, match(lexer, '.') ? TOKEN_DOTDOTDOT : TOKEN_DOTDOT);
-            return make_token(lexer, TOKEN_DOT);
         case '(': return make_token(lexer, TOKEN_LPAREN);
         case ')': return make_token(lexer, TOKEN_RPAREN);
+        case '[': return make_token(lexer, TOKEN_LBOX);
+        case ']': return make_token(lexer, TOKEN_RBOX);
         case '{': return make_token(lexer, TOKEN_LBRACE);
         case '}': return make_token(lexer, TOKEN_RBRACE);
-        case '=': return make_token(lexer, match(lexer, '=') ? TOKEN_EQ_EQ : TOKEN_EQ);
-        case '!': return make_token(lexer, match(lexer, '=') ? TOKEN_BANG_EQ : TOKEN_BANG);
-        case '<': return make_token(lexer, match(lexer, '=') ? TOKEN_LEQ : TOKEN_LT);
-        case '>': return make_token(lexer, match(lexer, '=') ? TOKEN_GEQ : TOKEN_GT);
-        case '&': return make_token(lexer, match(lexer, '&') ? TOKEN_AMP_AMP : TOKEN_AMP);
-        case '|': return make_token(lexer, match(lexer, '|') ? TOKEN_PIPE_PIPE : TOKEN_PIPE);
         case '"': return string(lexer);
-        case ';': return make_token(lexer, TOKEN_SEMICOLON);
+        case ':':
+            if (match(lexer, ':')) return make_token(lexer, TOKEN_COLONCOLON);
+            if (match(lexer, '=')) return make_token(lexer, TOKEN_COLONEQ);
     }
 
     return error_token(lexer, "Unexpected character.");
