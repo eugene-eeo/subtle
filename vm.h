@@ -29,21 +29,21 @@ typedef struct VM {
 
     // ---- init'ed by core ----
     // Constants needed by the VM or core
-    Value getSlot_string;
+    Value perform_string;
     Value setSlot_string;
-    Value init_string;
     NativeFn fn_call;
 
     // Core Protos
+    ObjObject* Ether;
     ObjObject* ObjectProto;
     ObjObject* FnProto;
     ObjObject* NativeProto;
     ObjObject* NumberProto;
     ObjObject* StringProto;
     ObjObject* FiberProto;
-    ObjObject* RangeProto;
     ObjObject* ListProto;
     ObjObject* MapProto;
+    ObjObject* MsgProto;
     // -------------------------
 
     // ---- GC ----
@@ -121,6 +121,5 @@ void vm_push_frame(VM* vm, ObjClosure* closure, int num_args);
 bool vm_call(VM* vm, Value callable, int num_args);
 
 // Runs the usual invoke path. This uses vm_call internally.
-bool vm_invoke(VM* vm,
-               Value obj, Value slot_name, int num_args);
+bool vm_invoke(VM* vm, Value obj, ObjString* sig, int num_args);
 #endif

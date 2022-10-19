@@ -83,20 +83,20 @@ static void mark_roots(VM* vm) {
         mark_value(vm, vm->roots[i]);
 
     // Mark the constants
-    mark_value(vm, vm->getSlot_string);
+    mark_value(vm, vm->perform_string);
     mark_value(vm, vm->setSlot_string);
-    mark_value(vm, vm->init_string);
 
     // Mark the *Protos
+    mark_object(vm, (Obj*)vm->Ether);
     mark_object(vm, (Obj*)vm->ObjectProto);
     mark_object(vm, (Obj*)vm->FnProto);
     mark_object(vm, (Obj*)vm->NativeProto);
     mark_object(vm, (Obj*)vm->NumberProto);
     mark_object(vm, (Obj*)vm->StringProto);
     mark_object(vm, (Obj*)vm->FiberProto);
-    mark_object(vm, (Obj*)vm->RangeProto);
     mark_object(vm, (Obj*)vm->ListProto);
     mark_object(vm, (Obj*)vm->MapProto);
+    mark_object(vm, (Obj*)vm->MsgProto);
 
     table_mark(&vm->globals, vm);
     compiler_mark(vm->compiler, vm);
@@ -138,7 +138,6 @@ static void blacken_object(VM* vm, Obj* obj) {
         case OBJ_FIBER:
             blacken_fiber(vm, (ObjFiber*)obj);
             break;
-        case OBJ_RANGE: break; // Nothing to do here.
         case OBJ_LIST: {
             ObjList* list = (ObjList*)obj;
             for (uint32_t i = 0; i < list->size; i++)
@@ -148,6 +147,13 @@ static void blacken_object(VM* vm, Obj* obj) {
         case OBJ_MAP: {
             ObjMap* map = (ObjMap*)obj;
             table_mark(&map->tbl, vm);
+            break;
+        }
+        case OBJ_MSG: {
+            ObjMsg* msg = (ObjMsg*)obj;
+            mark_object(vm, (Obj*)msg->sig);
+            for (uint32_t i = 0; i < msg->size; i++)
+                mark_value(vm, msg->args[i]);
             break;
         }
     }

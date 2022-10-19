@@ -37,9 +37,9 @@ static void objclosure_free(VM*, Obj*);
 static void objobject_free(VM*, Obj*);
 static void objnative_free(VM*, Obj*);
 static void objfiber_free(VM*, Obj*);
-static void objrange_free(VM*, Obj*);
 static void objlist_free(VM*, Obj*);
 static void objmap_free(VM*, Obj*);
+static void objmsg_free(VM*, Obj*);
 
 void
 object_free(Obj* obj, VM* vm)
@@ -55,9 +55,9 @@ object_free(Obj* obj, VM* vm)
     case OBJ_OBJECT: objobject_free(vm, obj); break;
     case OBJ_NATIVE: objnative_free(vm, obj); break;
     case OBJ_FIBER: objfiber_free(vm, obj); break;
-    case OBJ_RANGE: objrange_free(vm, obj); break;
     case OBJ_LIST: objlist_free(vm, obj); break;
     case OBJ_MAP: objmap_free(vm, obj); break;
+    case OBJ_MSG: objmsg_free(vm, obj); break;
     }
 }
 
@@ -380,25 +380,6 @@ objfiber_free(VM* vm, Obj* obj)
     FREE(vm, ObjFiber, obj);
 }
 
-// ObjRange
-// ========
-
-ObjRange*
-objrange_new(VM* vm, double start, double end, bool inclusive)
-{
-    ObjRange* range = ALLOCATE_OBJECT(vm, OBJ_RANGE, ObjRange);
-    range->start = start;
-    range->end = end;
-    range->inclusive = inclusive;
-    return range;
-}
-
-static void
-objrange_free(VM* vm, Obj* obj)
-{
-    FREE(vm, ObjRange, obj);
-}
-
 // ObjList
 // =======
 
@@ -510,4 +491,34 @@ objmap_free(VM* vm, Obj* obj)
     ObjMap* map = (ObjMap*)obj;
     table_free(&map->tbl, vm);
     FREE(vm, ObjMap, map);
+}
+
+// ObjMsg
+// ======
+
+ObjMsg*
+objmsg_new(VM* vm, ObjString* sig, Value* args, int num_args)
+{
+    vm_push_root(vm, OBJ_TO_VAL(sig));
+
+    // Copy arguments over because we need to own it.
+    Value* args_copy = ALLOCATE_ARRAY(vm, Value, num_args);
+    for (int i = 0; i < num_args; i++)
+        args_copy[i] = args[i];
+
+    ObjMsg* msg = ALLOCATE_OBJECT(vm, OBJ_MSG, ObjMsg);
+    msg->sig = sig;
+    msg->args = args_copy;
+    msg->size = num_args;
+
+    vm_pop_root(vm); // sig
+    return msg;
+}
+
+void
+objmsg_free(VM* vm, Obj* obj)
+{
+    ObjMsg* msg = (ObjMsg*)obj;
+    FREE_ARRAY(vm, msg->args, Value, msg->size);
+    FREE(vm, ObjMsg, msg);
 }

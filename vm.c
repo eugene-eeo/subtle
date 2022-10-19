@@ -20,20 +20,20 @@ void vm_init(VM* vm) {
     vm->fiber = NULL;
     vm->can_yield = true;
 
-    vm->getSlot_string = NIL_VAL;
+    vm->perform_string = NIL_VAL;
     vm->setSlot_string = NIL_VAL;
-    vm->init_string = NIL_VAL;
     vm->fn_call = NULL;
 
+    vm->Ether = NULL;
     vm->ObjectProto = NULL;
     vm->FnProto = NULL;
     vm->NativeProto = NULL;
     vm->NumberProto = NULL;
     vm->StringProto = NULL;
     vm->FiberProto = NULL;
-    vm->RangeProto = NULL;
     vm->ListProto = NULL;
     vm->MapProto = NULL;
+    vm->MsgProto = NULL;
 
     vm->objects = NULL;
     vm->bytes_allocated = 0;
@@ -60,6 +60,7 @@ void vm_free(VM* vm) {
     table_free(&vm->strings, vm);
     table_free(&vm->globals, vm);
     free(vm->gray_stack);
+    printf("%zu\n", vm->bytes_allocated);
     // Check that our memory accounting is correct.
     ASSERT(vm->bytes_allocated == 0, "bytes_allocated != 0");
     vm_init(vm);
@@ -156,22 +157,6 @@ runtime_error(VM* vm)
     vm->fiber = NULL;
 }
 
-static void
-fix_arguments(VM* vm, ObjFn* fn, int num_args)
-{
-    // Fix the number of arguments.
-    // Since -1 arity means a script, we ignore that here.
-    if (fn->arity == -1) return;
-    if (num_args > fn->arity) {
-        vm_drop(vm, num_args - fn->arity);
-        return;
-    }
-    while (num_args < fn->arity) {
-        vm_push(vm, NIL_VAL);
-        num_args++;
-    }
-}
-
 void
 vm_push_frame(VM* vm, ObjClosure* closure, int num_args)
 {
@@ -188,7 +173,6 @@ vm_push_frame(VM* vm, ObjClosure* closure, int num_args)
     objfiber_push_frame(vm->fiber, vm, closure, stack_start);
     vm_pop_root(vm);
     vm_ensure_stack(vm, function->max_slots);
-    fix_arguments(vm, function, num_args);
 }
 
 static bool
@@ -268,9 +252,9 @@ vm_get_prototype(VM* vm, Value value)
                 case OBJ_OBJECT:  return ((ObjObject*)object)->proto;
                 case OBJ_NATIVE:  return OBJ_TO_VAL(vm->NativeProto);
                 case OBJ_FIBER:   return OBJ_TO_VAL(vm->FiberProto);
-                case OBJ_RANGE:   return OBJ_TO_VAL(vm->RangeProto);
                 case OBJ_LIST:    return OBJ_TO_VAL(vm->ListProto);
                 case OBJ_MAP:     return OBJ_TO_VAL(vm->MapProto);
+                case OBJ_MSG:     return OBJ_TO_VAL(vm->MsgProto);
                 default: UNREACHABLE();
             }
         }
@@ -300,42 +284,46 @@ vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
     return rv;
 }
 
-// An Invoke is split into two sections:
-//  1) a pre-invoke, which fetches the slot (using getSlot if necessary).
-//  2) activating the slot's value, if necessary.
-// For performance, we assume that both obj and key are on the stack
-// (or, somewhere we can trace the roots).
 static bool
-pre_invoke(VM* vm, Value obj, Value key, Value* slot)
+invoke_message(VM* vm, Value obj, ObjString* sig, int num_args)
 {
-    if (!vm_get_slot(vm, obj, key, slot)) {
-        // If there is no such slot following a recursive proto search,
-        // we consult the getSlot method.
-        Value getSlot;
-        if (vm_get_slot(vm, obj, vm->getSlot_string, &getSlot)) {
-            vm_ensure_stack(vm, 2);
-            vm_push(vm, obj);
-            vm_push(vm, key);
-            if (!vm_call(vm, getSlot, 1))
-                return false;
-            *slot = vm_pop(vm);
-            return true;
-        } else {
-            *slot = NIL_VAL;
-            return true;
-        }
+    // try to use perform to do the work.
+    Value slot;
+    if (!vm_get_slot(vm, obj, vm->perform_string, &slot)) {
+        vm_runtime_error(vm, "object does not respond to message '%s'", sig->chars);
+        return false;
     }
-    // otherwise, we've found it directly on the protos.
-    return true;
+    ObjMsg* msg = objmsg_new(vm, sig, &vm->fiber->stack_top[-num_args], num_args);
+    vm_drop(vm, num_args);
+    vm_push(vm, OBJ_TO_VAL(msg));
+    return complete_call(vm, slot, 1);
+}
+
+static bool
+invoke(VM* vm, Value obj, ObjString* sig, int num_args)
+{
+    // direct search on the protos.
+    Value slot;
+    if (vm_get_slot(vm, obj, OBJ_TO_VAL(sig), &slot))
+        return complete_call(vm, slot, num_args);
+    return invoke_message(vm, obj, sig, num_args);
 }
 
 bool
-vm_invoke(VM* vm, Value obj, Value key, int num_args)
+vm_invoke(VM* vm, Value obj, ObjString* sig, int num_args)
 {
-    Value slot_value;
-    if (!pre_invoke(vm, obj, key, &slot_value))
+    Value slot;
+    if (vm_get_slot(vm, obj, OBJ_TO_VAL(sig), &slot))
+        return vm_call(vm, slot, num_args);
+    // try to use perform: to do the work.
+    if (!vm_get_slot(vm, obj, vm->perform_string, &slot)) {
+        vm_runtime_error(vm, "object does not respond to message '%s'", sig->chars);
         return false;
-    return vm_call(vm, slot_value, num_args);
+    }
+    ObjMsg* msg = objmsg_new(vm, sig, &vm->fiber->stack_top[-num_args], num_args);
+    vm_drop(vm, num_args);
+    vm_push(vm, OBJ_TO_VAL(msg));
+    return vm_call(vm, slot, 1);
 }
 
 // Run the given fiber until fiber->frames_count == top_level.
@@ -397,6 +385,7 @@ run(VM* vm, ObjFiber* fiber, int top_level)
             case OP_TRUE:     vm_push(vm, BOOL_TO_VAL(true)); break;
             case OP_FALSE:    vm_push(vm, BOOL_TO_VAL(false)); break;
             case OP_NIL:      vm_push(vm, NIL_VAL); break;
+            case OP_ETHER:    vm_push(vm, OBJ_TO_VAL(vm->Ether)); break;
             case OP_DEF_GLOBAL: {
                 Value name = READ_CONSTANT();
                 table_set(&vm->globals, vm, name, vm_peek(vm, 0));
@@ -544,14 +533,10 @@ run(VM* vm, ObjFiber* fiber, int top_level)
                 }
             }
             case OP_INVOKE: {
-                Value key = READ_CONSTANT();
+                Value sig = READ_CONSTANT();
                 uint8_t num_args = READ_BYTE();
                 Value obj = vm_peek(vm, num_args);
-                Value slot;
-                if (pre_invoke(vm, obj, key, &slot))
-                    // The stack is already in the correct form for a method call.
-                    // We have `obj` followed by `num_args`.
-                    complete_call(vm, slot, num_args);
+                invoke(vm, obj, VAL_TO_STRING(sig), num_args);
 handle_fibers:
                 fiber = vm->fiber;
                 if (fiber == NULL) return INTERPRET_OK;
@@ -567,12 +552,15 @@ handle_fibers:
                 break;
             }
             case OP_TAIL_INVOKE: {
-                Value key = READ_CONSTANT();
+                Value sig = READ_CONSTANT();
                 uint8_t num_args = READ_BYTE();
                 Value obj = vm_peek(vm, num_args);
                 Value slot;
-                if (!pre_invoke(vm, obj, key, &slot))
+                if (!vm_get_slot(vm, obj, sig, &slot)) {
+                    // do it normally..
+                    invoke_message(vm, obj, VAL_TO_STRING(sig), num_args);
                     goto handle_fibers;
+                }
                 // we can perform a TCO iff:
                 // 1. the slot is a closure, OR
                 // 2. `this` is a closure AND the slot is the Fn_call native
@@ -598,7 +586,6 @@ handle_fibers:
                 frame->closure = closure;
                 frame->ip = fn->chunk.code;
                 frame->did_tco = true;
-                fix_arguments(vm, fn, num_args);
                 vm_ensure_stack(vm, fn->max_slots - (fiber->stack_top - frame->slots));
                 break;
             }

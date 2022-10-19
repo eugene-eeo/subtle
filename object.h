@@ -12,27 +12,27 @@ typedef struct VM VM;
 
 // Macros
 // ------
-#define IS_STRING(value)       (is_object_type(value, OBJ_STRING))
-#define IS_FN(value)           (is_object_type(value, OBJ_FN))
-#define IS_UPVALUE(value)      (is_object_type(value, OBJ_UPVALUE))
-#define IS_CLOSURE(value)      (is_object_type(value, OBJ_CLOSURE))
-#define IS_OBJECT(value)       (is_object_type(value, OBJ_OBJECT))
-#define IS_NATIVE(value)       (is_object_type(value, OBJ_NATIVE))
-#define IS_FIBER(value)        (is_object_type(value, OBJ_FIBER))
-#define IS_RANGE(value)        (is_object_type(value, OBJ_RANGE))
-#define IS_LIST(value)         (is_object_type(value, OBJ_LIST))
-#define IS_MAP(value)          (is_object_type(value, OBJ_MAP))
+#define IS_STRING(value)      (is_object_type(value, OBJ_STRING))
+#define IS_FN(value)          (is_object_type(value, OBJ_FN))
+#define IS_UPVALUE(value)     (is_object_type(value, OBJ_UPVALUE))
+#define IS_CLOSURE(value)     (is_object_type(value, OBJ_CLOSURE))
+#define IS_OBJECT(value)      (is_object_type(value, OBJ_OBJECT))
+#define IS_NATIVE(value)      (is_object_type(value, OBJ_NATIVE))
+#define IS_FIBER(value)       (is_object_type(value, OBJ_FIBER))
+#define IS_LIST(value)        (is_object_type(value, OBJ_LIST))
+#define IS_MAP(value)         (is_object_type(value, OBJ_MAP))
+#define IS_MSG(value)         (is_object_type(value, OBJ_MSG))
 
-#define VAL_TO_STRING(value)   ((ObjString*)VAL_TO_OBJ(value))
-#define VAL_TO_FN(value)       ((ObjFn*)VAL_TO_OBJ(value))
-#define VAL_TO_UPVALUE(value)  ((ObjUpvalue*)VAL_TO_OBJ(value))
-#define VAL_TO_CLOSURE(value)  ((ObjClosure*)VAL_TO_OBJ(value))
-#define VAL_TO_OBJECT(value)   ((ObjObject*)VAL_TO_OBJ(value))
-#define VAL_TO_NATIVE(value)   ((ObjNative*)VAL_TO_OBJ(value))
-#define VAL_TO_FIBER(value)    ((ObjFiber*)VAL_TO_OBJ(value))
-#define VAL_TO_RANGE(value)    ((ObjRange*)VAL_TO_OBJ(value))
-#define VAL_TO_LIST(value)     ((ObjList*)VAL_TO_OBJ(value))
-#define VAL_TO_MAP(value)      ((ObjMap*)VAL_TO_OBJ(value))
+#define VAL_TO_STRING(value)  ((ObjString*)VAL_TO_OBJ(value))
+#define VAL_TO_FN(value)      ((ObjFn*)VAL_TO_OBJ(value))
+#define VAL_TO_UPVALUE(value) ((ObjUpvalue*)VAL_TO_OBJ(value))
+#define VAL_TO_CLOSURE(value) ((ObjClosure*)VAL_TO_OBJ(value))
+#define VAL_TO_OBJECT(value)  ((ObjObject*)VAL_TO_OBJ(value))
+#define VAL_TO_NATIVE(value)  ((ObjNative*)VAL_TO_OBJ(value))
+#define VAL_TO_FIBER(value)   ((ObjFiber*)VAL_TO_OBJ(value))
+#define VAL_TO_LIST(value)    ((ObjList*)VAL_TO_OBJ(value))
+#define VAL_TO_MAP(value)     ((ObjMap*)VAL_TO_OBJ(value))
+#define VAL_TO_MSG(value)     ((ObjMsg*)VAL_TO_OBJ(value))
 
 typedef enum {
     OBJ_STRING,
@@ -42,9 +42,9 @@ typedef enum {
     OBJ_OBJECT,
     OBJ_NATIVE,
     OBJ_FIBER,
-    OBJ_RANGE,
     OBJ_LIST,
     OBJ_MAP,
+    OBJ_MSG,
 } ObjType;
 
 typedef struct Obj {
@@ -143,13 +143,6 @@ typedef struct ObjFiber {
     ObjString* error;
 } ObjFiber;
 
-typedef struct ObjRange {
-    Obj obj;
-    double start;
-    double end;
-    bool inclusive;
-} ObjRange;
-
 typedef struct ObjList {
     Obj obj;
     Value* values;
@@ -161,6 +154,13 @@ typedef struct ObjMap {
     Obj obj;
     Table tbl;
 } ObjMap;
+
+typedef struct ObjMsg {
+    Obj obj;
+    ObjString* sig;
+    Value* args;
+    uint32_t size;
+} ObjMsg;
 
 // Object memory management
 // ========================
@@ -215,11 +215,6 @@ CallFrame* objfiber_push_frame(ObjFiber* fiber, VM* vm,
                                ObjClosure* closure, Value* stack_start);
 bool objfiber_is_done(ObjFiber* fiber);
 
-// ObjRange
-// ========
-
-ObjRange* objrange_new(VM* vm, double start, double end, bool inclusive);
-
 // ObjList
 // =======
 
@@ -237,5 +232,10 @@ bool objmap_has(ObjMap* map, Value key);
 bool objmap_get(ObjMap* map, Value key, Value* value);
 bool objmap_set(ObjMap* map, VM* vm, Value key, Value value);
 bool objmap_delete(ObjMap* map, VM* vm, Value key);
+
+// ObjMsg
+// ======
+
+ObjMsg* objmsg_new(VM* vm, ObjString* sig, Value* args, int num_args);
 
 #endif

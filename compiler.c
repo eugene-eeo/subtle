@@ -69,6 +69,7 @@ typedef struct Compiler {
 typedef enum {
     PREC_NONE,
     PREC_ASSIGNMENT, // =
+    PREC_OPERATOR,   // operators
     PREC_CALL,       // (), .
     PREC_LITERAL,    // literals
 } Precedence;
@@ -202,6 +203,7 @@ static int stack_effects[] = {
     [OP_TRUE] = 1,
     [OP_FALSE] = 1,
     [OP_NIL] = 1,
+    [OP_ETHER] = 1,
     [OP_DEF_GLOBAL] = 0,
     [OP_GET_GLOBAL] = 1,
     [OP_SET_GLOBAL] = 0,
@@ -594,6 +596,18 @@ static ExprType object(Compiler* compiler, bool can_assign, bool allow_newlines)
     return EXPR_OTHER;
 }
 
+static void finalise_closure(Compiler* compiler, Compiler* closure_compiler) {
+    ObjFn* fn = compiler_end(closure_compiler);
+    uint16_t idx = make_constant(compiler, OBJ_TO_VAL(fn));
+    emit_op(compiler, OP_CLOSURE);
+    emit_offset(compiler, idx);
+
+    for (int i = 0; i < fn->upvalue_count; i++) {
+        emit_byte(compiler, closure_compiler->upvalues[i].is_local ? 1 : 0);
+        emit_byte(compiler, closure_compiler->upvalues[i].index);
+    }
+}
+
 static ExprType def_expr(Compiler* compiler, bool can_assign, bool allow_newlines) {
     uint16_t name;
     Compiler c;
@@ -621,10 +635,9 @@ static ExprType def_expr(Compiler* compiler, bool can_assign, bool allow_newline
             // build the signature...
             Token arg = compiler->parser->previous;
             if (!c.parser->had_error) {
-                sig = realloc(sig, siglen + arg.length + 1);
+                sig = GROW_ARRAY(compiler->vm, sig, char, siglen, siglen + arg.length);
                 memcpy(&sig[siglen], arg.start, arg.length);
                 siglen += arg.length;
-                sig[siglen] = '\0';
             }
             consume(&c, TOKEN_VARIABLE, "Expect parameter name after keyword.");
             c.function->arity++;
@@ -637,22 +650,15 @@ static ExprType def_expr(Compiler* compiler, bool can_assign, bool allow_newline
                 break;
         }
 
-        const Token tok = {.start=sig, .length=strlen(sig)};
+        sig = GROW_ARRAY(compiler->vm, sig, char, siglen, siglen + 1);
+        const Token tok = {.start=sig, .length=siglen};
         name = identifier_constant(compiler, &tok);
-        free(sig);
+        FREE_ARRAY(compiler->vm, sig, char, siglen + 1);
     }
 
     consume(compiler, TOKEN_LBOX, "Expect '[' after signature.");
     block(&c);
-    ObjFn* fn = compiler_end(&c);
-    uint16_t idx = make_constant(compiler, OBJ_TO_VAL(fn));
-    emit_op(compiler, OP_CLOSURE);
-    emit_offset(compiler, idx);
-
-    for (int i = 0; i < fn->upvalue_count; i++) {
-        emit_byte(compiler, c.upvalues[i].is_local ? 1 : 0);
-        emit_byte(compiler, c.upvalues[i].index);
-    }
+    finalise_closure(compiler, &c);
 
     emit_op(compiler, OP_OBJECT_SET);
     emit_offset(compiler, name);
@@ -666,16 +672,7 @@ static ExprType closure(Compiler* compiler, bool can_assign, bool allow_newlines
     begin_block(&c);
     block(&c);
     end_block(&c);
-
-    ObjFn* fn = compiler_end(&c);
-    uint16_t idx = make_constant(compiler, OBJ_TO_VAL(fn));
-    emit_op(compiler, OP_CLOSURE);
-    emit_offset(compiler, idx);
-
-    for (int i = 0; i < fn->upvalue_count; i++) {
-        emit_byte(compiler, c.upvalues[i].is_local ? 1 : 0);
-        emit_byte(compiler, c.upvalues[i].index);
-    }
+    finalise_closure(compiler, &c);
     return EXPR_OTHER;
 }
 
@@ -693,10 +690,11 @@ static ExprType invoke(Compiler* compiler, bool can_assign, bool allow_newlines)
         num_args++;
         if (num_args > MAX_ARGS)
             error_at_current(compiler, "too many arguments");
-        sig = realloc(sig, siglen + arg.length + 1);
-        memcpy(&sig[siglen], arg.start, arg.length);
-        siglen += arg.length;
-        sig[siglen] = '\0';
+        if (!compiler->parser->had_error) {
+            sig = GROW_ARRAY(compiler->vm, sig, char, siglen, siglen + arg.length);
+            memcpy(&sig[siglen], arg.start, arg.length);
+            siglen += arg.length;
+        }
         parse_precedence(compiler, PREC_LITERAL, allow_newlines);
         // see if there's any more arguments.
         if (!match(compiler, TOKEN_SIG))
@@ -704,9 +702,16 @@ static ExprType invoke(Compiler* compiler, bool can_assign, bool allow_newlines)
         arg = compiler->parser->previous;
     }
 
+    sig = GROW_ARRAY(compiler->vm, sig, char, siglen, siglen + 1);
+    sig[siglen] = '\0';
     invoke_string_method(compiler, sig, num_args);
-    free(sig);
+    FREE_ARRAY(compiler->vm, sig, char, siglen + 1);
     return EXPR_INVOKE;
+}
+
+static ExprType invoke_ether(Compiler* compiler, bool can_assign, bool allow_newlines) {
+    emit_op(compiler, OP_ETHER);
+    return invoke(compiler, can_assign, allow_newlines);
 }
 
 static ExprType self(Compiler* compiler, bool can_assign, bool allow_newlines) {
@@ -761,29 +766,29 @@ static ExprType return_expr(Compiler* compiler, bool can_assign, bool allow_newl
 }
 
 static ParseRule rules[] = {
-    [TOKEN_COMMA]      = {NULL,        NULL,     PREC_NONE},
-    [TOKEN_LPAREN]     = {grouping,    NULL,     PREC_NONE},
-    [TOKEN_RPAREN]     = {NULL,        NULL,     PREC_NONE},
-    [TOKEN_LBOX]       = {closure,     NULL,     PREC_NONE},
-    [TOKEN_RBOX]       = {NULL,        NULL,     PREC_NONE},
-    [TOKEN_LBRACE]     = {object,      NULL,     PREC_NONE},
-    [TOKEN_RBRACE]     = {NULL,        NULL,     PREC_NONE},
-    [TOKEN_EQ]         = {NULL,        NULL,     PREC_NONE},
-    [TOKEN_COLONCOLON] = {NULL,        def_expr, PREC_CALL},
-    [TOKEN_COLONEQ]    = {NULL,        NULL,     PREC_NONE},
-    [TOKEN_OPERATOR]   = {NULL,        binary,   PREC_CALL},
-    [TOKEN_NUMBER]     = {number,      NULL,     PREC_NONE},
-    [TOKEN_STRING]     = {string,      NULL,     PREC_NONE},
-    [TOKEN_VARIABLE]   = {variable,    unary,    PREC_CALL},
-    [TOKEN_SIG]        = {literal,     invoke,   PREC_CALL},
-    [TOKEN_NIL]        = {literal,     unary,    PREC_CALL},
-    [TOKEN_TRUE]       = {literal,     unary,    PREC_CALL},
-    [TOKEN_FALSE]      = {literal,     unary,    PREC_CALL},
-    [TOKEN_SELF]       = {self,        unary,    PREC_NONE},
-    [TOKEN_RETURN]     = {return_expr, unary,    PREC_NONE},
-    [TOKEN_NEWLINE]    = {NULL,        NULL,     PREC_NONE},
-    [TOKEN_ERROR]      = {NULL,        NULL,     PREC_NONE},
-    [TOKEN_EOF]        = {NULL,        NULL,     PREC_NONE},
+    [TOKEN_COMMA]      = {NULL,         NULL,     PREC_NONE},
+    [TOKEN_LPAREN]     = {grouping,     NULL,     PREC_NONE},
+    [TOKEN_RPAREN]     = {NULL,         NULL,     PREC_NONE},
+    [TOKEN_LBOX]       = {closure,      NULL,     PREC_NONE},
+    [TOKEN_RBOX]       = {NULL,         NULL,     PREC_NONE},
+    [TOKEN_LBRACE]     = {object,       NULL,     PREC_NONE},
+    [TOKEN_RBRACE]     = {NULL,         NULL,     PREC_NONE},
+    [TOKEN_EQ]         = {NULL,         NULL,     PREC_NONE},
+    [TOKEN_COLONCOLON] = {NULL,         def_expr, PREC_OPERATOR},
+    [TOKEN_COLONEQ]    = {NULL,         NULL,     PREC_NONE},
+    [TOKEN_OPERATOR]   = {NULL,         binary,   PREC_OPERATOR},
+    [TOKEN_NUMBER]     = {number,       NULL,     PREC_NONE},
+    [TOKEN_STRING]     = {string,       NULL,     PREC_NONE},
+    [TOKEN_VARIABLE]   = {variable,     unary,    PREC_CALL},
+    [TOKEN_SIG]        = {invoke_ether, invoke,   PREC_CALL},
+    [TOKEN_NIL]        = {literal,      unary,    PREC_CALL},
+    [TOKEN_TRUE]       = {literal,      unary,    PREC_CALL},
+    [TOKEN_FALSE]      = {literal,      unary,    PREC_CALL},
+    [TOKEN_SELF]       = {self,         unary,    PREC_NONE},
+    [TOKEN_RETURN]     = {return_expr,  unary,    PREC_NONE},
+    [TOKEN_NEWLINE]    = {NULL,         NULL,     PREC_NONE},
+    [TOKEN_ERROR]      = {NULL,         NULL,     PREC_NONE},
+    [TOKEN_EOF]        = {NULL,         NULL,     PREC_NONE},
 };
 
 static ExprType expression(Compiler* compiler, bool allow_newlines) {

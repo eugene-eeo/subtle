@@ -27,7 +27,7 @@ typedef enum {
     // Literals
     TOKEN_NUMBER,
     TOKEN_STRING,
-    TOKEN_VARIABLE, // [a-zA-Z_][a-zA-Z_0-9]+
+    TOKEN_VARIABLE, // [a-zA-Z_][a-zA-Z_0-9?!]+
     // Keywords
     TOKEN_SIG, // variable + ":"
     TOKEN_NIL,

@@ -22,13 +22,9 @@ void debug_print_object(Obj* obj) {
         case OBJ_UPVALUE: printf("upvalue"); break;
         case OBJ_OBJECT: printf("object_%p", (void*)obj); break;
         case OBJ_FIBER: printf("fiber_%p", (void*)obj); break;
-        case OBJ_RANGE: {
-            ObjRange* range = (ObjRange*)obj;
-            printf("%g%s%g", range->start, range->inclusive ? ".." : "...", range->end);
-            break;
-        }
         case OBJ_LIST: printf("list_%p", (void*)obj); break;
         case OBJ_MAP: printf("map_%p", (void*)obj); break;
+        case OBJ_MSG: printf("msg_%p", (void*)obj); break;
     }
 }
 
@@ -93,6 +89,7 @@ int debug_print_instruction(Chunk* chunk, int index) {
         case OP_TRUE:     return simple_instruction(index, "OP_TRUE");
         case OP_FALSE:    return simple_instruction(index, "OP_FALSE");
         case OP_NIL:      return simple_instruction(index, "OP_NIL");
+        case OP_ETHER:    return simple_instruction(index, "OP_ETHER");
         case OP_DEF_GLOBAL: return constant_instruction(chunk, index, "OP_DEF_GLOBAL");
         case OP_GET_GLOBAL: return constant_instruction(chunk, index, "OP_GET_GLOBAL");
         case OP_SET_GLOBAL: return constant_instruction(chunk, index, "OP_SET_GLOBAL");

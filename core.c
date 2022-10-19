@@ -50,9 +50,9 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
         case 'n': if (!IS_NATIVE(arg))  ARG_ERROR(idx, "a Native"); break; \
         case 'F': if (!IS_CLOSURE(arg)) ARG_ERROR(idx, "an Fn"); break; \
         case 'f': if (!IS_FIBER(arg))   ARG_ERROR(idx, "a Fiber"); break; \
-        case 'r': if (!IS_RANGE(arg))   ARG_ERROR(idx, "a Range"); break; \
         case 'L': if (!IS_LIST(arg))    ARG_ERROR(idx, "a List"); break; \
         case 'M': if (!IS_MAP(arg))     ARG_ERROR(idx, "a Map"); break; \
+        case 'm': if (!IS_MSG(arg))     ARG_ERROR(idx, "a Msg"); break; \
         case '*': break; \
         default: UNREACHABLE(); \
     } \
@@ -160,7 +160,7 @@ DEFINE_NATIVE(Object_hash) {
     RETURN(NUMBER_TO_VAL(value_hash(args[0])));
 }
 
-DEFINE_NATIVE(Object_rawGetSlot) {
+DEFINE_NATIVE(Object_getSlot) {
     ARGSPEC("**");
     Value slot;
     if (!vm_get_slot(vm, args[0], args[1], &slot))
@@ -255,9 +255,9 @@ DEFINE_NATIVE(Object_rawType) {
         case OBJ_OBJECT:  RETURN(OBJ_TO_VAL(CONST_STRING(vm, "Object")));
         case OBJ_NATIVE:  RETURN(OBJ_TO_VAL(CONST_STRING(vm, "Native")));
         case OBJ_FIBER:   RETURN(OBJ_TO_VAL(CONST_STRING(vm, "Fiber")));
-        case OBJ_RANGE:   RETURN(OBJ_TO_VAL(CONST_STRING(vm, "Range")));
         case OBJ_LIST:    RETURN(OBJ_TO_VAL(CONST_STRING(vm, "List")));
         case OBJ_MAP:     RETURN(OBJ_TO_VAL(CONST_STRING(vm, "Map")));
+        case OBJ_MSG:     RETURN(OBJ_TO_VAL(CONST_STRING(vm, "Msg")));
         default: UNREACHABLE();
         }
     default: UNREACHABLE();
@@ -303,9 +303,9 @@ DEFINE_NATIVE(Object_toString) {
         case OBJ_OBJECT:  prefix = "Object"; break;
         case OBJ_NATIVE:  prefix = "Native"; break;
         case OBJ_FIBER:   prefix = "Fiber"; break;
-        case OBJ_RANGE:   prefix = "Range"; break;
         case OBJ_LIST:    prefix = "List"; break;
         case OBJ_MAP:     prefix = "Map"; break;
+        case OBJ_MSG:     prefix = "Msg"; break;
         default:          UNREACHABLE();
         }
         length = sprintf(buffer, "%s_%p", prefix, (void*) obj);
@@ -319,7 +319,7 @@ DEFINE_NATIVE(Object_print) {
     Value this = args[0];
     vm_ensure_stack(vm, 1);
     vm_push(vm, this);
-    if (!vm_invoke(vm, this, OBJ_TO_VAL(CONST_STRING(vm, "toString")), 0))
+    if (!vm_invoke(vm, this, CONST_STRING(vm, "toString"), 0))
         return false;
 
     Value slot = vm_pop(vm);
@@ -426,20 +426,6 @@ DEFINE_NUMBER_METHOD(Number_land, int32_t, &, NUMBER_TO_VAL)
 DEFINE_NATIVE(Number_negate) {
     ARGSPEC("N");
     RETURN(NUMBER_TO_VAL(-VAL_TO_NUMBER(args[0])));
-}
-
-DEFINE_NATIVE(Number_inclusiveRange) {
-    ARGSPEC("NN");
-    double start = VAL_TO_NUMBER(args[0]);
-    double end = VAL_TO_NUMBER(args[1]);
-    RETURN(OBJ_TO_VAL(objrange_new(vm, start, end, true)));
-}
-
-DEFINE_NATIVE(Number_exclusiveRange) {
-    ARGSPEC("NN");
-    double start = VAL_TO_NUMBER(args[0]);
-    double end = VAL_TO_NUMBER(args[1]);
-    RETURN(OBJ_TO_VAL(objrange_new(vm, start, end, false)));
 }
 
 // ============================= String =============================
@@ -611,55 +597,6 @@ DEFINE_NATIVE(Fiber_isDone) {
     RETURN(BOOL_TO_VAL(objfiber_is_done(fiber)));
 }
 
-// ============================= Range =============================
-
-DEFINE_NATIVE(Range_start) {
-    ARGSPEC("r");
-    RETURN(NUMBER_TO_VAL(VAL_TO_RANGE(args[0])->start));
-}
-
-DEFINE_NATIVE(Range_end) {
-    ARGSPEC("r");
-    RETURN(NUMBER_TO_VAL(VAL_TO_RANGE(args[0])->end));
-}
-
-DEFINE_NATIVE(Range_iterMore) {
-    ARGSPEC("r*");
-    ObjRange* range = VAL_TO_RANGE(args[0]);
-    // nothing to iterate?
-    if (range->start == range->end && !range->inclusive)
-        RETURN(FALSE_VAL);
-
-    double v;
-    if (IS_NIL(args[1])) {
-        // start of the iteration.
-        v = range->start;
-    } else if (IS_NUMBER(args[1])) {
-        v = VAL_TO_NUMBER(args[1]);
-        if (range->start <= range->end) {
-            // 0..5 or 0...5
-            v = v + 1;
-            if (v < range->start) RETURN(FALSE_VAL);
-            if (range->inclusive && v > range->end) RETURN(FALSE_VAL);
-            if (!range->inclusive && v >= range->end) RETURN(FALSE_VAL);
-        } else {
-            // 5..0 or 5...0
-            v = v - 1;
-            if (v > range->start) RETURN(FALSE_VAL);
-            if (range->inclusive && v < range->end) RETURN(FALSE_VAL);
-            if (!range->inclusive && v <= range->end) RETURN(FALSE_VAL);
-        }
-    } else {
-        RETURN(FALSE_VAL);
-    }
-    RETURN(NUMBER_TO_VAL(v));
-}
-
-DEFINE_NATIVE(Range_iterNext) {
-    ARGSPEC("rN");
-    RETURN(args[1]);
-}
-
 // ============================= List =============================
 
 DEFINE_NATIVE(List_new) {
@@ -795,6 +732,13 @@ DEFINE_NATIVE(Map_length) {
     RETURN(NUMBER_TO_VAL((double) map->tbl.count));
 }
 
+// ============================= Msg =============================
+
+DEFINE_NATIVE(Msg_perform) {
+    ARGSPEC("*m");
+    RETURN(args[1]);
+}
+
 void core_init_vm(VM* vm)
 {
 #define ADD_OBJECT(table, name, obj) (define_on_table(vm, table, name, OBJ_TO_VAL(obj)))
@@ -802,25 +746,26 @@ void core_init_vm(VM* vm)
 #define ADD_METHOD(PROTO, name, fn)  (ADD_NATIVE(&vm->PROTO->slots, name, fn))
 #define ADD_VALUE(PROTO, name, v)    (define_on_table(vm, &vm->PROTO->slots, name, v))
 
-    vm->getSlot_string = OBJ_TO_VAL(CONST_STRING(vm, "getSlot"));
-    vm->setSlot_string = OBJ_TO_VAL(CONST_STRING(vm, "setSlot"));
-    vm->init_string = OBJ_TO_VAL(CONST_STRING(vm, "init"));
+    vm->perform_string = OBJ_TO_VAL(CONST_STRING(vm, "perform:"));
+    vm->setSlot_string = OBJ_TO_VAL(CONST_STRING(vm, "setSlot:to:"));
+
+    vm->Ether = objobject_new(vm);
+    vm->Ether->proto = OBJ_TO_VAL(vm->Ether);
 
     vm->ObjectProto = objobject_new(vm);
     vm->ObjectProto->proto = OBJ_TO_VAL(vm->ObjectProto);
     ADD_METHOD(ObjectProto, "proto",          Object_proto);
     ADD_METHOD(ObjectProto, "setProto:",      Object_setProto);
     ADD_METHOD(ObjectProto, "hash",           Object_hash);
-    ADD_METHOD(ObjectProto, "rawGetSlot:",    Object_rawGetSlot);
-    ADD_METHOD(ObjectProto, "rawSetSlot:to:", Object_setSlot);
+    ADD_METHOD(ObjectProto, "getSlot:",       Object_getSlot);
     ADD_METHOD(ObjectProto, "hasSlot:",       Object_hasSlot);
     ADD_METHOD(ObjectProto, "getOwnSlot:",    Object_getOwnSlot);
     ADD_METHOD(ObjectProto, "setOwnSlot:to:", Object_setSlot);
     ADD_METHOD(ObjectProto, "hasOwnSlot:",    Object_hasOwnSlot);
     ADD_METHOD(ObjectProto, "deleteSlot:",    Object_deleteSlot);
-    ADD_METHOD(ObjectProto, "rawType",        Object_rawType);
+    ADD_METHOD(ObjectProto, "rawType:",       Object_rawType);
     ADD_METHOD(ObjectProto, "==",             Object_eq);
-    ADD_METHOD(ObjectProto, "!",              Object_not);
+    ADD_METHOD(ObjectProto, "not",            Object_not);
     ADD_METHOD(ObjectProto, "clone",          Object_clone);
     ADD_METHOD(ObjectProto, "hasAncestor",    Object_hasAncestor);
     ADD_METHOD(ObjectProto, "toString",       Object_toString);
@@ -854,8 +799,6 @@ void core_init_vm(VM* vm)
     ADD_METHOD(NumberProto, "neg", Number_negate);
     ADD_METHOD(NumberProto, "|",   Number_lor);
     ADD_METHOD(NumberProto, "&",   Number_land);
-    ADD_METHOD(NumberProto, "..",  Number_inclusiveRange);
-    ADD_METHOD(NumberProto, "...", Number_exclusiveRange);
     ADD_VALUE(NumberProto, "inf",  NUMBER_TO_VAL(INFINITY));
     ADD_VALUE(NumberProto, "nan",  NUMBER_TO_VAL(NAN));
     ADD_VALUE(NumberProto, "largest",  NUMBER_TO_VAL(DBL_MAX));
@@ -877,20 +820,15 @@ void core_init_vm(VM* vm)
     vm->FiberProto->proto = OBJ_TO_VAL(vm->ObjectProto);
     ADD_METHOD(FiberProto, "current", Fiber_current);
     ADD_METHOD(FiberProto, "yield",   Fiber_yield);
-    ADD_METHOD(FiberProto, "abort",   Fiber_abort);
+    ADD_METHOD(FiberProto, "abort:",  Fiber_abort);
     ADD_METHOD(FiberProto, "new",     Fiber_new);
     ADD_METHOD(FiberProto, "parent",  Fiber_parent);
     ADD_METHOD(FiberProto, "call",    Fiber_call);
+    ADD_METHOD(FiberProto, "call:",   Fiber_call);
     ADD_METHOD(FiberProto, "try",     Fiber_try);
+    ADD_METHOD(FiberProto, "try:",    Fiber_try);
     ADD_METHOD(FiberProto, "isDone",  Fiber_isDone);
     ADD_METHOD(FiberProto, "error",   Fiber_error);
-
-    vm->RangeProto = objobject_new(vm);
-    vm->RangeProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    ADD_METHOD(RangeProto, "start",    Range_start);
-    ADD_METHOD(RangeProto, "end",      Range_end);
-    ADD_METHOD(RangeProto, "iterNext", Range_iterNext);
-    ADD_METHOD(RangeProto, "iterMore", Range_iterMore);
 
     vm->ListProto = objobject_new(vm);
     vm->ListProto->proto = OBJ_TO_VAL(vm->ObjectProto);
@@ -916,15 +854,20 @@ void core_init_vm(VM* vm)
     ADD_METHOD(MapProto, "rawIterKeyNext", Map_rawIterKeyNext);
     ADD_METHOD(MapProto, "rawIterValueNext", Map_rawIterValueNext);
 
+    vm->MsgProto = objobject_new(vm);
+    vm->MsgProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    ADD_METHOD(MsgProto, "perform:", Msg_perform);
+
+    ADD_OBJECT(&vm->globals, "Ether",  vm->Ether);
     ADD_OBJECT(&vm->globals, "Object", vm->ObjectProto);
     ADD_OBJECT(&vm->globals, "Fn",     vm->FnProto);
     ADD_OBJECT(&vm->globals, "Native", vm->NativeProto);
     ADD_OBJECT(&vm->globals, "Number", vm->NumberProto);
     ADD_OBJECT(&vm->globals, "String", vm->StringProto);
     ADD_OBJECT(&vm->globals, "Fiber",  vm->FiberProto);
-    ADD_OBJECT(&vm->globals, "Range",  vm->RangeProto);
     ADD_OBJECT(&vm->globals, "List",   vm->ListProto);
     ADD_OBJECT(&vm->globals, "Map",    vm->MapProto);
+    ADD_OBJECT(&vm->globals, "Msg",    vm->MsgProto);
 
     /* if (vm_interpret(vm, CORE_SOURCE) != INTERPRET_OK) { */
     /*     fprintf(stderr, "vm_interpret(CORE_SOURCE) not ok.\n"); */
