@@ -653,6 +653,7 @@ static ExprType def_expr(Compiler* compiler, bool can_assign, bool allow_newline
         }
 
         sig = GROW_ARRAY(compiler->vm, sig, char, siglen, siglen + 1);
+        sig[siglen] = '\0';
         const Token tok = {.start=sig, .length=siglen};
         name = identifier_constant(compiler, &tok);
         FREE_ARRAY(compiler->vm, sig, char, siglen + 1);
