@@ -15,6 +15,13 @@ Ether :: while:x do:f [
         while: x do: f
     ]
 ]
+Ether :: do:f while:x [
+    f call
+    if: (x call) then: [
+        do: f while: x
+    ]
+]
+Ether :: assert:f msg:y [ if: (f not) then: [ Fiber abort: y ] ]
 
 MsgRaw := {}
 MsgRaw :: perform:msg [ msg ]

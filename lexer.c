@@ -65,7 +65,7 @@ static bool is_op(char ch) {
     return ch == '+' || ch == '-' || ch == '*' || ch == '/'
         || ch == '!' || ch == '$' || ch == '%' || ch == '^'
         || ch == '&' || ch == '?' || ch == '~' || ch == '@'
-        || ch == '=';
+        || ch == '=' || ch == '<' || ch == '>';
 }
 
 static bool is_variable_char(char ch) {
