@@ -101,7 +101,7 @@ bool table_delete_key(Table* table, VM* vm, Value key) {
 
     // Leave a tombstone.
     entry->key = UNDEFINED_VAL;
-    entry->value = NIL_VAL;
+    entry->value = UNDEFINED_VAL;
     table->count--;
     return true;
 }
