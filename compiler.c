@@ -650,7 +650,6 @@ static void block_argument(Compiler* compiler) {
         consume(&c, TOKEN_PIPE, "Expect '|' after parameters.");
     }
     block(&c);
-    end_block(&c);
 
     ObjFn* fn = compiler_end(&c);
     uint16_t idx = make_constant(compiler, OBJ_TO_VAL(fn));
