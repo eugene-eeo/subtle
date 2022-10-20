@@ -82,7 +82,7 @@ bool table_set(Table* table, VM* vm, Value key, Value value) {
 
     Entry* entry = table_find_entry(table->entries, table->capacity, key);
     bool is_new_key = IS_UNDEFINED(entry->key);
-    if (is_new_key && IS_NIL(entry->value))
+    if (is_new_key)
         table->count++;
 
     entry->key = key;
@@ -166,7 +166,11 @@ table_remove_white(Table* table, VM* vm)
 {
     for (uint32_t i = 0; i < table->capacity; i++) {
         Entry* entry = &table->entries[i];
-        if (IS_OBJ(entry->key) && !VAL_TO_OBJ(entry->key)->marked)
-            table_delete_key(table, vm, entry->key);
+        if (IS_OBJ(entry->key) && !VAL_TO_OBJ(entry->key)->marked) {
+            // Leave a tombstone.
+            entry->key = UNDEFINED_VAL;
+            entry->value = UNDEFINED_VAL;
+            table->count--;
+        }
     }
 }

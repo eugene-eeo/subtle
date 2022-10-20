@@ -13,3 +13,11 @@ x.getSlot = Fn.new{|k|
 };
 Object.rawGetSlot("print").
     callWithThis(x);
+
+# stress test table delete
+let k = 0
+# earlier test fails around ~130
+while (k < 500) {
+    k = k + 1
+    k toString
+}
