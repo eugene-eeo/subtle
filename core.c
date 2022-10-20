@@ -880,7 +880,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(FiberProto, "current", Fiber_current);
     ADD_METHOD(FiberProto, "yield",   Fiber_yield);
     ADD_METHOD(FiberProto, "abort:",  Fiber_abort);
-    ADD_METHOD(FiberProto, "new",     Fiber_new);
+    ADD_METHOD(FiberProto, "new:",    Fiber_new);
     ADD_METHOD(FiberProto, "parent",  Fiber_parent);
     ADD_METHOD(FiberProto, "call",    Fiber_call);
     ADD_METHOD(FiberProto, "call:",   Fiber_call);
