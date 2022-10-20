@@ -425,13 +425,6 @@ run(VM* vm, ObjFiber* fiber, int top_level)
                 }
                 break;
             }
-            case OP_ASSERT: {
-                if (!value_truthy(vm_pop(vm))) {
-                    vm_runtime_error(vm, "Assertion failed.");
-                    goto handle_fibers;
-                }
-                break;
-            }
             case OP_GET_LOCAL: {
                 uint8_t slot = READ_BYTE();
                 vm_push(vm, frame->slots[slot]);
@@ -440,38 +433,6 @@ run(VM* vm, ObjFiber* fiber, int top_level)
             case OP_SET_LOCAL: {
                 uint8_t slot = READ_BYTE();
                 frame->slots[slot] = vm_peek(vm, 0);
-                break;
-            }
-            case OP_LOOP: {
-                uint16_t offset = READ_SHORT();
-                frame->ip -= offset;
-                break;
-            }
-            case OP_JUMP: {
-                uint16_t offset = READ_SHORT();
-                frame->ip += offset;
-                break;
-            }
-            case OP_JUMP_IF_FALSE: {
-                uint16_t offset = READ_SHORT();
-                if (!value_truthy(vm_pop(vm)))
-                    frame->ip += offset;
-                break;
-            }
-            case OP_OR: {
-                uint16_t offset = READ_SHORT();
-                if (value_truthy(vm_peek(vm, 0)))
-                    frame->ip += offset;
-                else
-                    vm_pop(vm);
-                break;
-            }
-            case OP_AND: {
-                uint16_t offset = READ_SHORT();
-                if (!value_truthy(vm_peek(vm, 0)))
-                    frame->ip += offset;
-                else
-                    vm_pop(vm);
                 break;
             }
             case OP_CLOSURE: {

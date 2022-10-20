@@ -65,16 +65,6 @@ static int byte_instruction(Chunk* chunk, int index, const char* name) {
     return index + 2;
 }
 
-static int
-jump_instruction(Chunk* chunk, int index, int direction, const char* name)
-{
-    uint16_t jump = (uint16_t)(chunk->code[index + 1] << 8);
-    jump |= chunk->code[index + 2];
-    printf("%-16s %4d -> %d\n", name, index,
-           index + 3 + direction * jump);
-    return index + 3;
-}
-
 int debug_print_instruction(Chunk* chunk, int index) {
     printf("%04d ", index);
     if (index > 0 && chunk_get_line(chunk, index-1) == chunk_get_line(chunk, index)) {
@@ -93,14 +83,8 @@ int debug_print_instruction(Chunk* chunk, int index) {
         case OP_DEF_GLOBAL: return constant_instruction(chunk, index, "OP_DEF_GLOBAL");
         case OP_GET_GLOBAL: return constant_instruction(chunk, index, "OP_GET_GLOBAL");
         case OP_SET_GLOBAL: return constant_instruction(chunk, index, "OP_SET_GLOBAL");
-        case OP_ASSERT: return simple_instruction(index, "OP_ASSERT");
         case OP_GET_LOCAL:  return byte_instruction(chunk, index, "OP_GET_LOCAL");
         case OP_SET_LOCAL:  return byte_instruction(chunk, index, "OP_SET_LOCAL");
-        case OP_LOOP:          return jump_instruction(chunk, index, -1, "OP_LOOP");
-        case OP_JUMP:          return jump_instruction(chunk, index, +1, "OP_JUMP");
-        case OP_JUMP_IF_FALSE: return jump_instruction(chunk, index, +1, "OP_JUMP_IF_FALSE");
-        case OP_OR:            return jump_instruction(chunk, index, +1, "OP_OR");
-        case OP_AND:           return jump_instruction(chunk, index, +1, "OP_AND");
         case OP_CLOSURE: {
             index++;
             uint16_t offset = (uint16_t)(chunk->code[index++] << 8);
