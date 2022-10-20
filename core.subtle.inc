@@ -34,9 +34,7 @@ const char* CORE_SOURCE =
 "\n"
 "MsgRaw := {}\n"
 "MsgRaw :: perform:msg [ msg ]\n"
-"Msg :: raw [\n"
-"    return MsgRaw\n"
-"]\n"
+"Msg :: raw [ MsgRaw ]\n"
 "] call\n"
 ;
 #endif

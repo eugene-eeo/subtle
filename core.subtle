@@ -30,7 +30,5 @@ Ether :: assert:f msg:y [ if: (f not) then: [ Fiber abort: y ] ]
 
 MsgRaw := {}
 MsgRaw :: perform:msg [ msg ]
-Msg :: raw [
-    return MsgRaw
-]
+Msg :: raw [ MsgRaw ]
 ] call
