@@ -1,60 +1,24 @@
-Fn.new{
-Object.!= = Fn.new{|o| return ! (this == o) }
-Object.println = Fn.new{
-    this.print
-    "\n".print
-}
+[
+Object :: call   [ self ]
+Object :: call:_ [ self ]
+Object :: ifTrue:f ifFalse:_ [ f call ]
+Object :: != arg [ (self == arg) not ]
 
-let Entry = {
-    init = Fn new{|k, v|
-        this key = k
-        this value = v
-    }
-}
+false proto :: ifTrue:_ ifFalse:f [ f call ]
+nil proto   :: ifTrue:_ ifFalse:f [ f call ]
 
-let MethodIterator = {
-    init = Fn.new{|obj, slot|
-        this._obj = obj
-        this._slot = slot
-        return this
-    },
-    iterMore = Fn.new{|v| return this._obj.rawIterMore(v) },
-    iterNext = Fn.new{|v|
-        return this._obj.
-            rawGetSlot(this._slot).
-            callWithThis(this._obj, v)
-    }
-}
+Ether :: if:x then:t        [ x ifTrue:t ifFalse:nil ]
+Ether :: if:x then:t else:f [ x ifTrue:t ifFalse:f ]
+Ether :: while:x do:f [
+    if: (x call) then: [
+        f call
+        while: x do: f
+    ]
+]
 
-let fromSlot = Fn.new{|slot|
-    return Fn.new{ return MethodIterator.new(this, slot) }
-}
-
-Object.rawEntryFromIndex = Fn.new{|i|
-    return Entry new(
-        this rawIterSlotsNext(i),
-        this rawIterValueNext(i)
-    )
-}
-
-Map.rawEntryFromIndex = Fn.new{|i|
-    return Entry new(
-        this rawIterKeyNext(i),
-        this rawIterValueNext(i)
-    )
-}
-
-Object.keys    = fromSlot.call("rawIterSlotsNext")
-Object.values  = fromSlot.call("rawIterValueNext")
-Object.entries = fromSlot.call("rawEntryFromIndex")
-Map.keys       = fromSlot.call("rawIterKeyNext")
-Map.values     = fromSlot.call("rawIterValueNext")
-Map.entries    = fromSlot.call("rawEntryFromIndex")
-
-List.fromIterator = Fn.new{|it|
-    let list = List.new()
-    for (item = it)
-        list.add(item)
-    return list
-}
-}.call
+MsgRaw := {}
+MsgRaw :: perform:msg [ msg ]
+Msg :: raw [
+    return MsgRaw
+]
+] call

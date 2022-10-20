@@ -22,6 +22,7 @@ void vm_init(VM* vm) {
 
     vm->perform_string = NIL_VAL;
     vm->setSlot_string = NIL_VAL;
+    vm->toString_string = NIL_VAL;
     vm->fn_call = NULL;
 
     vm->Ether = NULL;
@@ -34,6 +35,9 @@ void vm_init(VM* vm) {
     vm->ListProto = NULL;
     vm->MapProto = NULL;
     vm->MsgProto = NULL;
+    vm->NilProto = NULL;
+    vm->TrueProto = NULL;
+    vm->FalseProto = NULL;
 
     vm->objects = NULL;
     vm->bytes_allocated = 0;
@@ -254,27 +258,25 @@ Value
 vm_get_prototype(VM* vm, Value value)
 {
     switch (value.type) {
-        case VALUE_NIL:
-        case VALUE_TRUE:
-        case VALUE_FALSE:
-            return OBJ_TO_VAL(vm->ObjectProto);
-        case VALUE_NUMBER:
-            return OBJ_TO_VAL(vm->NumberProto);
-        case VALUE_OBJ: {
-            Obj* object = VAL_TO_OBJ(value);
-            switch (object->type) {
-                case OBJ_STRING:  return OBJ_TO_VAL(vm->StringProto);
-                case OBJ_CLOSURE: return OBJ_TO_VAL(vm->FnProto);
-                case OBJ_OBJECT:  return ((ObjObject*)object)->proto;
-                case OBJ_NATIVE:  return OBJ_TO_VAL(vm->NativeProto);
-                case OBJ_FIBER:   return OBJ_TO_VAL(vm->FiberProto);
-                case OBJ_LIST:    return OBJ_TO_VAL(vm->ListProto);
-                case OBJ_MAP:     return OBJ_TO_VAL(vm->MapProto);
-                case OBJ_MSG:     return OBJ_TO_VAL(vm->MsgProto);
-                default: UNREACHABLE();
-            }
-        }
+    case VALUE_NIL:    return OBJ_TO_VAL(vm->NilProto);
+    case VALUE_TRUE:   return OBJ_TO_VAL(vm->TrueProto);
+    case VALUE_FALSE:  return OBJ_TO_VAL(vm->FalseProto);
+    case VALUE_NUMBER: return OBJ_TO_VAL(vm->NumberProto);
+    case VALUE_OBJ: {
+        Obj* object = VAL_TO_OBJ(value);
+        switch (object->type) {
+        case OBJ_STRING:  return OBJ_TO_VAL(vm->StringProto);
+        case OBJ_CLOSURE: return OBJ_TO_VAL(vm->FnProto);
+        case OBJ_OBJECT:  return ((ObjObject*)object)->proto;
+        case OBJ_NATIVE:  return OBJ_TO_VAL(vm->NativeProto);
+        case OBJ_FIBER:   return OBJ_TO_VAL(vm->FiberProto);
+        case OBJ_LIST:    return OBJ_TO_VAL(vm->ListProto);
+        case OBJ_MAP:     return OBJ_TO_VAL(vm->MapProto);
+        case OBJ_MSG:     return OBJ_TO_VAL(vm->MsgProto);
         default: UNREACHABLE();
+        }
+    }
+    default: UNREACHABLE();
     }
 }
 

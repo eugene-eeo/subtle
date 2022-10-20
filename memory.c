@@ -85,6 +85,7 @@ static void mark_roots(VM* vm) {
     // Mark the constants
     mark_value(vm, vm->perform_string);
     mark_value(vm, vm->setSlot_string);
+    mark_value(vm, vm->toString_string);
 
     // Mark the *Protos
     mark_object(vm, (Obj*)vm->Ether);
@@ -97,6 +98,9 @@ static void mark_roots(VM* vm) {
     mark_object(vm, (Obj*)vm->ListProto);
     mark_object(vm, (Obj*)vm->MapProto);
     mark_object(vm, (Obj*)vm->MsgProto);
+    mark_object(vm, (Obj*)vm->NilProto);
+    mark_object(vm, (Obj*)vm->TrueProto);
+    mark_object(vm, (Obj*)vm->FalseProto);
 
     table_mark(&vm->globals, vm);
     compiler_mark(vm->compiler, vm);

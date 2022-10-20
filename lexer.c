@@ -68,8 +68,8 @@ static bool is_op(char ch) {
         || ch == '=';
 }
 
-static bool is_alphanumeric(char ch) {
-    return is_alpha(ch) || is_numeric(ch);
+static bool is_variable_char(char ch) {
+    return is_alpha(ch) || is_numeric(ch) || ch == '?' || ch == '!';
 }
 
 static bool skip_whitespace(Lexer* lexer) {
@@ -153,7 +153,7 @@ static TokenType variable_type(Lexer* lexer) {
 }
 
 static Token variable(Lexer* lexer) {
-    while (is_alphanumeric(peek(lexer)))
+    while (is_variable_char(peek(lexer)))
         advance(lexer);
     if (peek(lexer) == ':') {
         advance(lexer);

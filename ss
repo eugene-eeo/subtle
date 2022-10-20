@@ -1,6 +1,5 @@
-Msg :: raw [
-    MsgRaw := {}
-    MsgRaw :: perform: msg [ msg ]
-    return MsgRaw
+x := 1
+while: true do: [
+    x print
+    x = x + 1
 ]
-(Msg raw)

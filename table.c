@@ -101,7 +101,7 @@ bool table_delete_key(Table* table, VM* vm, Value key) {
 
     // Leave a tombstone.
     entry->key = UNDEFINED_VAL;
-    entry->value = UNDEFINED_VAL;
+    entry->value = NIL_VAL;
     table->count--;
     return true;
 }
@@ -166,7 +166,8 @@ table_remove_white(Table* table, VM* vm)
 {
     for (uint32_t i = 0; i < table->capacity; i++) {
         Entry* entry = &table->entries[i];
-        if (IS_OBJ(entry->key) && !VAL_TO_OBJ(entry->key)->marked)
+        if (IS_OBJ(entry->key) && !VAL_TO_OBJ(entry->key)->marked) {
             table_delete_key(table, vm, entry->key);
+        }
     }
 }

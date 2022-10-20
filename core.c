@@ -321,7 +321,7 @@ DEFINE_NATIVE(Object_print) {
     Value this = args[0];
     vm_ensure_stack(vm, 1);
     vm_push(vm, this);
-    if (!vm_invoke(vm, this, CONST_STRING(vm, "toString"), 0))
+    if (!vm_invoke(vm, this, VAL_TO_STRING(vm->toString_string), 0))
         return false;
 
     Value slot = vm_pop(vm);
@@ -767,11 +767,6 @@ DEFINE_NATIVE(Map_length) {
 
 // ============================= Msg =============================
 
-DEFINE_NATIVE(Msg_perform) {
-    ARGSPEC("*m");
-    RETURN(args[1]);
-}
-
 DEFINE_NATIVE(Msg_sig) {
     ARGSPEC("m");
     RETURN(OBJ_TO_VAL(VAL_TO_MSG(args[0])->sig));
@@ -801,6 +796,7 @@ void core_init_vm(VM* vm)
 
     vm->perform_string = OBJ_TO_VAL(CONST_STRING(vm, "perform:"));
     vm->setSlot_string = OBJ_TO_VAL(CONST_STRING(vm, "setSlot:to:"));
+    vm->toString_string = OBJ_TO_VAL(CONST_STRING(vm, "toString"));
 
     vm->Ether = objobject_new(vm);
     vm->Ether->proto = OBJ_TO_VAL(vm->Ether);
@@ -827,6 +823,15 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "rawIterMore",    Object_rawIterMore);
     ADD_METHOD(ObjectProto, "rawIterSlotsNext", Object_rawIterSlotsNext);
     ADD_METHOD(ObjectProto, "rawIterValueNext", Object_rawIterValueNext);
+
+    vm->NilProto = objobject_new(vm);
+    vm->NilProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+
+    vm->TrueProto = objobject_new(vm);
+    vm->TrueProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+
+    vm->FalseProto = objobject_new(vm);
+    vm->FalseProto->proto = OBJ_TO_VAL(vm->ObjectProto);
 
     vm->FnProto = objobject_new(vm);
     vm->FnProto->proto = OBJ_TO_VAL(vm->ObjectProto);
@@ -910,7 +915,6 @@ void core_init_vm(VM* vm)
 
     vm->MsgProto = objobject_new(vm);
     vm->MsgProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    /* ADD_METHOD(MsgProto, "perform:", Msg_perform); */
     ADD_METHOD(MsgProto, "sig",      Msg_sig);
     ADD_METHOD(MsgProto, "argAt:",   Msg_argAt);
     ADD_METHOD(MsgProto, "numArgs",  Msg_numArgs);
@@ -926,10 +930,10 @@ void core_init_vm(VM* vm)
     ADD_OBJECT(&vm->globals, "Map",    vm->MapProto);
     ADD_OBJECT(&vm->globals, "Msg",    vm->MsgProto);
 
-    /* if (vm_interpret(vm, CORE_SOURCE) != INTERPRET_OK) { */
-    /*     fprintf(stderr, "vm_interpret(CORE_SOURCE) not ok.\n"); */
-    /*     exit(788); */
-    /* } */
+    if (vm_interpret(vm, CORE_SOURCE) != INTERPRET_OK) {
+        fprintf(stderr, "vm_interpret(CORE_SOURCE) not ok.\n");
+        exit(788);
+    }
 
 #undef ADD_OBJECT
 #undef ADD_NATIVE

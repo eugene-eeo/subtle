@@ -31,6 +31,7 @@ typedef struct VM {
     // Constants needed by the VM or core
     Value perform_string;
     Value setSlot_string;
+    Value toString_string;
     NativeFn fn_call;
 
     // Core Protos
@@ -44,6 +45,9 @@ typedef struct VM {
     ObjObject* ListProto;
     ObjObject* MapProto;
     ObjObject* MsgProto;
+    ObjObject* NilProto;
+    ObjObject* TrueProto;
+    ObjObject* FalseProto;
     // -------------------------
 
     // ---- GC ----
