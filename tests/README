@@ -1,15 +1,15 @@
-# Comments start with '#'
-let Point = {}; # semicolons are optional
-Point.init = Fn.new{|x, y|
-    this.x = x
-    this.y = y
-}
-# (some) dots are optional
-Point.+ = Fn new {|other|  # yes, this is allowed
-    return Point new(this x + other x, this y + other y)
-}
-let p1 = Point new(1, 2)
-let p2 = Point new(3, 4)
-let result = p1 + p2
-assert result x == 4
-assert result y == 6
+Point := {}
+Point :: new-x: x y: y [
+    p := Point clone
+    p x = x
+    p y = y
+    p
+]
+Point :: + other [
+    Point new-x: (self x + other x) y: (self y + other y)
+]
+p1 := Point new-x: 1 y: 2
+p2 := Point new-x: 3 y: 4
+result := p1 + p2
+assert: (result x == 4) msg: "!"
+assert: (result y == 6) msg: "!"

@@ -1,26 +1,27 @@
 # subtle
 
 Tiny OO, prototype-based language inspired by
-[Wren](https://github.com/wren-lang/wren) and
-[IO](https://iolanguage.org/).
+[Wren](https://github.com/wren-lang/wren),
+[IO](https://iolanguage.org/), and
+[Finch](http://finch.stuffwithstuff.com/).
 Features prototypal inheritance, fibers, operator overloading,
 and recursive inheritance (cycles in the prototype chain are allowed).
 
     # Comments start with '#'
-    let Point = {}; # semicolons are optional
-    Point.init = Fn.new{|x, y|
-        this.x = x
-        this.y = y
-    }
-    # (some) dots are optional
-    Point.+ = Fn new {|other|  # yes, this is allowed
-        return Point new(this x + other x, this y + other y)
-    }
-    let p1 = Point new(1, 2)
-    let p2 = Point new(3, 4)
-    let result = p1 + p2
-    assert result x == 4
-    assert result y == 6
+    Point := {}
+    Point :: newWithX: x y: y = [
+        p := point clone
+        p x = x
+        p y = y
+    ]
+    Point :: + other [
+        Point newWithX: (self x + other x) y: (self y + other y)
+    ]
+    p1 := Point newWithX: 1 y: 2
+    p2 := Point newWithX: 3 y: 4
+    result := p1 + p2
+    assert: (result x == 4) msg: "woah!"
+    assert: (result y == 6) msg: "woah!"
 
 ## running
 

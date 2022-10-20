@@ -69,7 +69,7 @@ static bool is_op(char ch) {
 }
 
 static bool is_variable_char(char ch) {
-    return is_alpha(ch) || is_numeric(ch) || ch == '?' || ch == '!';
+    return is_alpha(ch) || is_numeric(ch) || ch == '?' || ch == '!' || ch == '-';
 }
 
 static bool skip_whitespace(Lexer* lexer) {

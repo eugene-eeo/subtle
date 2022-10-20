@@ -731,6 +731,13 @@ static ExprType binary(Compiler* compiler, bool can_assign, bool allow_newlines)
 
 static ExprType unary(Compiler* compiler, bool can_assign, bool allow_newlines) {
     Token token = compiler->parser->previous;
+    if (can_assign && match(compiler, TOKEN_EQ)) {
+        match_newlines(compiler);
+        expression(compiler, allow_newlines);
+        emit_op(compiler, OP_OBJECT_SET);
+        emit_offset(compiler, identifier_constant(compiler, &token));
+        return EXPR_DEFINE;
+    }
     invoke_token_method(compiler, &token, 0);
     return EXPR_INVOKE;
 }
