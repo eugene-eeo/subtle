@@ -3,6 +3,11 @@ Object :: call   [ self ]
 Object :: call:_ [ self ]
 Object :: ifTrue:f ifFalse:_ [ f call ]
 Object :: != arg [ (self == arg) not ]
+Object :: println [
+    self print
+    "
+" print
+]
 
 false proto :: ifTrue:_ ifFalse:f [ f call ]
 nil proto   :: ifTrue:_ ifFalse:f [ f call ]
