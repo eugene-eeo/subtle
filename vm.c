@@ -290,16 +290,19 @@ vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
     return rv;
 }
 
+typedef bool (*CompleteCallFn)(VM* vm, Value slot, int num_args);
+
 static
 bool
-invoke(VM* vm, Value obj, ObjString* slot_name, int num_args)
+generic_invoke(VM* vm, Value obj, ObjString* slot_name, int num_args,
+               CompleteCallFn complete_call)
 {
     // Try to search on the protos.
     Value callee;
     if (vm_get_slot(vm, obj, OBJ_TO_VAL(slot_name), &callee))
-        return vm_complete_call(vm, callee, num_args);
+        return complete_call(vm, callee, num_args);
     if (!vm_get_slot(vm, obj, OBJ_TO_VAL(vm->perform_string), &callee))
-        return vm_complete_call(vm, NIL_VAL, num_args);
+        return complete_call(vm, NIL_VAL, num_args);
     // More expensive message alloc.
     Value* args = &vm->fiber->stack_top[-num_args];
     ObjMessage* msg = objmessage_new(vm, slot_name, args, num_args);
@@ -308,28 +311,13 @@ invoke(VM* vm, Value obj, ObjString* slot_name, int num_args)
     vm_ensure_stack(vm, 1);
     vm_push(vm, OBJ_TO_VAL(msg));
     vm_pop_root(vm); // msg
-    return vm_complete_call(vm, callee, 1);
+    return complete_call(vm, callee, 1);
 }
 
 bool
 vm_invoke(VM* vm, Value obj, ObjString* slot_name, int num_args)
 {
-    // Try to search on the protos.
-    Value callee;
-    if (vm_get_slot(vm, obj, OBJ_TO_VAL(slot_name), &callee))
-        return vm_call(vm, callee, num_args);
-    // Perform?
-    if (!vm_get_slot(vm, obj, OBJ_TO_VAL(vm->perform_string), &callee))
-        return vm_call(vm, NIL_VAL, num_args);
-    // Message alloc
-    Value* args = &vm->fiber->stack_top[-num_args];
-    ObjMessage* msg = objmessage_new(vm, slot_name, args, num_args);
-    vm_drop(vm, num_args);
-    vm_push_root(vm, OBJ_TO_VAL(msg));
-    vm_ensure_stack(vm, 1);
-    vm_push(vm, OBJ_TO_VAL(msg));
-    vm_pop_root(vm); // msg
-    return vm_call(vm, callee, 1);
+    return generic_invoke(vm, obj, slot_name, num_args, vm_call);
 }
 
 // Run the given fiber until fiber->frames_count == top_level.
@@ -544,7 +532,9 @@ run(VM* vm, ObjFiber* fiber, int top_level)
                 Value obj = vm_peek(vm, num_args);
                 // The stack is already in the correct form for a method call.
                 // We have `obj` followed by `num_args`.
-                invoke(vm, obj, VAL_TO_STRING(key), num_args);
+                generic_invoke(vm, obj,
+                               VAL_TO_STRING(key), num_args,
+                               vm_complete_call);
 handle_fibers:
                 fiber = vm->fiber;
                 if (fiber == NULL) return INTERPRET_OK;
