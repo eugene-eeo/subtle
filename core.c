@@ -847,6 +847,12 @@ DEFINE_NATIVE(Map_length) {
 
 // ============================= Message =============================
 
+DEFINE_NATIVE(Message_new) {
+    ARGSPEC("*S");
+    ObjMessage* msg = objmessage_new(vm, VAL_TO_STRING(args[1]), &args[2], num_args - 1);
+    RETURN(OBJ_TO_VAL(msg));
+}
+
 DEFINE_NATIVE(Message_slotName) {
     ARGSPEC("m");
     ObjMessage* msg = VAL_TO_MESSAGE(args[0]);
@@ -984,6 +990,7 @@ void core_init_vm(VM* vm)
 
     vm->MessageProto = objobject_new(vm);
     vm->MessageProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    ADD_METHOD(MessageProto, "new",      Message_new);
     ADD_METHOD(MessageProto, "slotName", Message_slotName);
     ADD_METHOD(MessageProto, "args",     Message_args);
 
