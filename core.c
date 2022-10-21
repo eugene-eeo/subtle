@@ -853,6 +853,12 @@ DEFINE_NATIVE(Message_new) {
     RETURN(OBJ_TO_VAL(msg));
 }
 
+DEFINE_NATIVE(Message_newFromList) {
+    ARGSPEC("*SL");
+    ObjMessage* msg = objmessage_from_list(vm, VAL_TO_STRING(args[1]), VAL_TO_LIST(args[2]));
+    RETURN(OBJ_TO_VAL(msg));
+}
+
 DEFINE_NATIVE(Message_slotName) {
     ARGSPEC("m");
     ObjMessage* msg = VAL_TO_MESSAGE(args[0]);
@@ -990,9 +996,10 @@ void core_init_vm(VM* vm)
 
     vm->MessageProto = objobject_new(vm);
     vm->MessageProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    ADD_METHOD(MessageProto, "new",      Message_new);
-    ADD_METHOD(MessageProto, "slotName", Message_slotName);
-    ADD_METHOD(MessageProto, "args",     Message_args);
+    ADD_METHOD(MessageProto, "new",         Message_new);
+    ADD_METHOD(MessageProto, "newFromList", Message_newFromList);
+    ADD_METHOD(MessageProto, "slotName",    Message_slotName);
+    ADD_METHOD(MessageProto, "args",        Message_args);
 
     ADD_OBJECT(&vm->globals, "Object",  vm->ObjectProto);
     ADD_OBJECT(&vm->globals, "Fn",      vm->FnProto);
