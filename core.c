@@ -5,6 +5,7 @@
 #include "object.h"
 #include "table.h"
 #include "value.h"
+#include "vm.h"
 
 #include <math.h>
 #include <float.h>
@@ -53,6 +54,7 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
         case 'r': if (!IS_RANGE(arg))   ARG_ERROR(idx, "a Range"); break; \
         case 'L': if (!IS_LIST(arg))    ARG_ERROR(idx, "a List"); break; \
         case 'M': if (!IS_MAP(arg))     ARG_ERROR(idx, "a Map"); break; \
+        case 'm': if (!IS_MESSAGE(arg)) ARG_ERROR(idx, "a Message"); break; \
         case '*': break; \
         default: UNREACHABLE(); \
     } \
@@ -160,7 +162,7 @@ DEFINE_NATIVE(Object_hash) {
     RETURN(NUMBER_TO_VAL(value_hash(args[0])));
 }
 
-DEFINE_NATIVE(Object_rawGetSlot) {
+DEFINE_NATIVE(Object_getSlot) {
     ARGSPEC("**");
     Value slot;
     if (!vm_get_slot(vm, args[0], args[1], &slot))
@@ -179,6 +181,30 @@ DEFINE_NATIVE(Object_hasSlot) {
     Value slot;
     bool has_slot = vm_get_slot(vm, args[0], args[1], &slot);
     RETURN(BOOL_TO_VAL(has_slot));
+}
+
+DEFINE_NATIVE(Object_perform) {
+    ARGSPEC("*m");
+    Value slot;
+    Value self = args[0];
+    ObjMessage* msg = VAL_TO_MESSAGE(args[1]);
+
+    // search on protos.
+    if (vm_get_slot(vm, self, OBJ_TO_VAL(msg->slot_name), &slot)) {
+        // found it -- copy args onto stack.
+        vm_push_root(vm, args[1]);
+        vm_drop(vm, num_args); // pop all args, incl. msg
+        vm_ensure_stack(vm, msg->args->size);
+        vm_pop_root(vm); // msg
+        for (uint32_t i = 0; i < msg->args->size; i++)
+            vm_push(vm, msg->args->values[i]);
+        num_args = msg->args->size;
+    } else {
+        slot = NIL_VAL;
+        num_args = msg->args->size;
+    }
+
+    return vm_complete_call(vm, slot, num_args);
 }
 
 DEFINE_NATIVE(Object_getOwnSlot) {
@@ -263,6 +289,7 @@ DEFINE_NATIVE(Object_rawType) {
         case OBJ_RANGE:   RETURN(OBJ_TO_VAL(CONST_STRING(vm, "Range")));
         case OBJ_LIST:    RETURN(OBJ_TO_VAL(CONST_STRING(vm, "List")));
         case OBJ_MAP:     RETURN(OBJ_TO_VAL(CONST_STRING(vm, "Map")));
+        case OBJ_MESSAGE: RETURN(OBJ_TO_VAL(CONST_STRING(vm, "Message")));
         default: UNREACHABLE();
         }
     default: UNREACHABLE();
@@ -299,7 +326,7 @@ DEFINE_NATIVE(Object_toString) {
         // Calculate the length (at compile-time) to store an
         // Object prefix plus the hex representation of the pointer:
         //   prefix + "_" + "0x" + hex ptr + NUL byte
-        char buffer[6 + 1 + 2 + sizeof(void*) * 8 / 4 + 1];
+        char buffer[7 + 1 + 2 + sizeof(void*) * 8 / 4 + 1];
         const char* prefix;
 
         switch (obj->type) {
@@ -311,6 +338,7 @@ DEFINE_NATIVE(Object_toString) {
         case OBJ_RANGE:   prefix = "Range"; break;
         case OBJ_LIST:    prefix = "List"; break;
         case OBJ_MAP:     prefix = "Map"; break;
+        case OBJ_MESSAGE: prefix = "Message"; break;
         default:          UNREACHABLE();
         }
         length = sprintf(buffer, "%s_%p", prefix, (void*) obj);
@@ -324,7 +352,7 @@ DEFINE_NATIVE(Object_print) {
     Value this = args[0];
     vm_ensure_stack(vm, 1);
     vm_push(vm, this);
-    if (!vm_invoke(vm, this, OBJ_TO_VAL(CONST_STRING(vm, "toString")), 0))
+    if (!vm_invoke(vm, this, CONST_STRING(vm, "toString"), 0))
         return false;
 
     Value slot = vm_pop(vm);
@@ -687,11 +715,9 @@ DEFINE_NATIVE(Range_iterNext) {
 // ============================= List =============================
 
 DEFINE_NATIVE(List_new) {
-    ObjList* list = objlist_new(vm);
-    vm_push_root(vm, OBJ_TO_VAL(list));
+    ObjList* list = objlist_new(vm, num_args);
     for (int i = 0; i < num_args; i++)
-        objlist_insert(list, vm, i, args[i+1]);
-    vm_pop_root(vm);
+        list->values[i] = args[i+1];
     RETURN(OBJ_TO_VAL(list));
 }
 
@@ -819,6 +845,20 @@ DEFINE_NATIVE(Map_length) {
     RETURN(NUMBER_TO_VAL((double) map->tbl.count));
 }
 
+// ============================= Message =============================
+
+DEFINE_NATIVE(Message_slotName) {
+    ARGSPEC("m");
+    ObjMessage* msg = VAL_TO_MESSAGE(args[0]);
+    RETURN(OBJ_TO_VAL(msg->slot_name));
+}
+
+DEFINE_NATIVE(Message_args) {
+    ARGSPEC("m");
+    ObjMessage* msg = VAL_TO_MESSAGE(args[0]);
+    RETURN(OBJ_TO_VAL(msg->args));
+}
+
 void core_init_vm(VM* vm)
 {
 #define ADD_OBJECT(table, name, obj) (define_on_table(vm, table, name, OBJ_TO_VAL(obj)))
@@ -826,21 +866,22 @@ void core_init_vm(VM* vm)
 #define ADD_METHOD(PROTO, name, fn)  (ADD_NATIVE(&vm->PROTO->slots, name, fn))
 #define ADD_VALUE(PROTO, name, v)    (define_on_table(vm, &vm->PROTO->slots, name, v))
 
-    vm->getSlot_string = OBJ_TO_VAL(CONST_STRING(vm, "getSlot"));
-    vm->setSlot_string = OBJ_TO_VAL(CONST_STRING(vm, "setSlot"));
-    vm->init_string = OBJ_TO_VAL(CONST_STRING(vm, "init"));
+    vm->perform_string = CONST_STRING(vm, "perform");
+    vm->setSlot_string = CONST_STRING(vm, "setSlot");
+    vm->init_string = CONST_STRING(vm, "init");
 
     vm->ObjectProto = objobject_new(vm);
     vm->ObjectProto->proto = OBJ_TO_VAL(vm->ObjectProto);
     ADD_METHOD(ObjectProto, "proto",       Object_proto);
     ADD_METHOD(ObjectProto, "setProto",    Object_setProto);
     ADD_METHOD(ObjectProto, "hash",        Object_hash);
-    ADD_METHOD(ObjectProto, "rawGetSlot",  Object_rawGetSlot);
-    ADD_METHOD(ObjectProto, "rawSetSlot",  Object_setSlot);
     ADD_METHOD(ObjectProto, "hasSlot",     Object_hasSlot);
+    ADD_METHOD(ObjectProto, "getSlot",     Object_getSlot);
+    ADD_METHOD(ObjectProto, "rawSetSlot",  Object_setSlot);
+    ADD_METHOD(ObjectProto, "rawPerform",  Object_perform);
+    ADD_METHOD(ObjectProto, "hasOwnSlot",  Object_hasOwnSlot);
     ADD_METHOD(ObjectProto, "getOwnSlot",  Object_getOwnSlot);
     ADD_METHOD(ObjectProto, "setOwnSlot",  Object_setSlot);
-    ADD_METHOD(ObjectProto, "hasOwnSlot",  Object_hasOwnSlot);
     ADD_METHOD(ObjectProto, "deleteSlot",  Object_deleteSlot);
     ADD_METHOD(ObjectProto, "same",        Object_same);
     ADD_METHOD(ObjectProto, "rawType",     Object_rawType);
@@ -941,15 +982,21 @@ void core_init_vm(VM* vm)
     ADD_METHOD(MapProto, "rawIterKeyNext", Map_rawIterKeyNext);
     ADD_METHOD(MapProto, "rawIterValueNext", Map_rawIterValueNext);
 
-    ADD_OBJECT(&vm->globals, "Object", vm->ObjectProto);
-    ADD_OBJECT(&vm->globals, "Fn",     vm->FnProto);
-    ADD_OBJECT(&vm->globals, "Native", vm->NativeProto);
-    ADD_OBJECT(&vm->globals, "Number", vm->NumberProto);
-    ADD_OBJECT(&vm->globals, "String", vm->StringProto);
-    ADD_OBJECT(&vm->globals, "Fiber",  vm->FiberProto);
-    ADD_OBJECT(&vm->globals, "Range",  vm->RangeProto);
-    ADD_OBJECT(&vm->globals, "List",   vm->ListProto);
-    ADD_OBJECT(&vm->globals, "Map",    vm->MapProto);
+    vm->MessageProto = objobject_new(vm);
+    vm->MessageProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    ADD_METHOD(MessageProto, "slotName", Message_slotName);
+    ADD_METHOD(MessageProto, "args",     Message_args);
+
+    ADD_OBJECT(&vm->globals, "Object",  vm->ObjectProto);
+    ADD_OBJECT(&vm->globals, "Fn",      vm->FnProto);
+    ADD_OBJECT(&vm->globals, "Native",  vm->NativeProto);
+    ADD_OBJECT(&vm->globals, "Number",  vm->NumberProto);
+    ADD_OBJECT(&vm->globals, "String",  vm->StringProto);
+    ADD_OBJECT(&vm->globals, "Fiber",   vm->FiberProto);
+    ADD_OBJECT(&vm->globals, "Range",   vm->RangeProto);
+    ADD_OBJECT(&vm->globals, "List",    vm->ListProto);
+    ADD_OBJECT(&vm->globals, "Map",     vm->MapProto);
+    ADD_OBJECT(&vm->globals, "Message", vm->MessageProto);
 
     if (vm_interpret(vm, CORE_SOURCE) != INTERPRET_OK) {
         fprintf(stderr, "vm_interpret(CORE_SOURCE) not ok.\n");

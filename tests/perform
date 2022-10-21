@@ -1,0 +1,29 @@
+# For an object [obj] without slot [x],
+# obj.x(1,2) <-> obj.perform(Message{x, 1, 2})
+let obj = {}
+obj perform = Fn new {|msg|
+    assert msg slotName == "x"
+    assert msg args length == 2
+    assert msg args get(0) == 1
+    assert msg args get(1) == 2
+    return 3
+}
+assert obj x(1, 2) == 3
+
+# Used to be a bug where empty args would cause
+# a vm_push() without ensuring enough stack space.
+obj perform = Fn new{|msg|
+    assert msg slotName == "y"
+    assert msg args length == 0
+    return "hi"
+}
+assert obj y == "hi"
+
+# Same, for vm_call.
+# We use Object_init here.
+let vmCall = {}
+vmCall perform = Fn new {|msg|
+    assert msg slotName == "init"
+}
+assert vmCall new(1) hasAncestor(vmCall)
+assert vmCall new hasAncestor(vmCall)

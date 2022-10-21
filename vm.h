@@ -29,9 +29,9 @@ typedef struct VM {
 
     // ---- init'ed by core ----
     // Constants needed by the VM or core
-    Value getSlot_string;
-    Value setSlot_string;
-    Value init_string;
+    ObjString* perform_string;
+    ObjString* setSlot_string;
+    ObjString* init_string;
 
     // Core Protos
     ObjObject* ObjectProto;
@@ -43,6 +43,7 @@ typedef struct VM {
     ObjObject* RangeProto;
     ObjObject* ListProto;
     ObjObject* MapProto;
+    ObjObject* MessageProto;
     // -------------------------
 
     // ---- GC ----
@@ -112,14 +113,19 @@ vm_ensure_stack(VM* vm, int n)
 //                           ^-- stack_top
 void vm_push_frame(VM* vm, ObjClosure* closure, int num_args);
 
-// Runs the given slot, returning true if the call succeeded
-// and false otherwise. Unlike vm_push_frame(), this runs the
-// slot until completion.
+// Run the given callable, returning true if the call succeeded.
+// This should only be called if it's the last thing you do before
+// returning from a native function, as it uses vm_push_frame to
+// do the work.
+bool vm_complete_call(VM* vm, Value callable, int num_args);
+
+// Similar to vm_complete_call, but runs the slot until completion.
 // Upon return, if the return value is true, the top of the stack
-// will contain the callable's return value.
+// will contain the callable's return value. Use this if you need
+// to do some work with the return value.
 bool vm_call(VM* vm, Value callable, int num_args);
 
 // Runs the usual invoke path. This uses vm_call internally.
 bool vm_invoke(VM* vm,
-               Value obj, Value slot_name, int num_args);
+               Value obj, ObjString* slot_name, int num_args);
 #endif

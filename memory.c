@@ -83,9 +83,9 @@ static void mark_roots(VM* vm) {
         mark_value(vm, vm->roots[i]);
 
     // Mark the constants
-    mark_value(vm, vm->getSlot_string);
-    mark_value(vm, vm->setSlot_string);
-    mark_value(vm, vm->init_string);
+    mark_object(vm, (Obj*)vm->perform_string);
+    mark_object(vm, (Obj*)vm->setSlot_string);
+    mark_object(vm, (Obj*)vm->init_string);
 
     // Mark the *Protos
     mark_object(vm, (Obj*)vm->ObjectProto);
@@ -97,6 +97,7 @@ static void mark_roots(VM* vm) {
     mark_object(vm, (Obj*)vm->RangeProto);
     mark_object(vm, (Obj*)vm->ListProto);
     mark_object(vm, (Obj*)vm->MapProto);
+    mark_object(vm, (Obj*)vm->MessageProto);
 
     table_mark(&vm->globals, vm);
     compiler_mark(vm->compiler, vm);
@@ -148,6 +149,12 @@ static void blacken_object(VM* vm, Obj* obj) {
         case OBJ_MAP: {
             ObjMap* map = (ObjMap*)obj;
             table_mark(&map->tbl, vm);
+            break;
+        }
+        case OBJ_MESSAGE: {
+            ObjMessage* msg = (ObjMessage*)obj;
+            mark_object(vm, (Obj*)msg->slot_name);
+            mark_object(vm, (Obj*)msg->args);
             break;
         }
     }

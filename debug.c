@@ -28,6 +28,7 @@ void debug_print_object(Obj* obj) {
         }
         case OBJ_LIST: printf("list_%p", (void*)obj); break;
         case OBJ_MAP: printf("map_%p", (void*)obj); break;
+        case OBJ_MESSAGE: printf("message_%p", (void*)obj); break;
     }
 }
 

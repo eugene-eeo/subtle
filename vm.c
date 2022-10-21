@@ -20,9 +20,9 @@ void vm_init(VM* vm) {
     vm->fiber = NULL;
     vm->can_yield = true;
 
-    vm->getSlot_string = NIL_VAL;
-    vm->setSlot_string = NIL_VAL;
-    vm->init_string = NIL_VAL;
+    vm->perform_string = NULL;
+    vm->setSlot_string = NULL;
+    vm->init_string = NULL;
 
     vm->ObjectProto = NULL;
     vm->FnProto = NULL;
@@ -33,6 +33,7 @@ void vm_init(VM* vm) {
     vm->RangeProto = NULL;
     vm->ListProto = NULL;
     vm->MapProto = NULL;
+    vm->MessageProto = NULL;
 
     vm->objects = NULL;
     vm->bytes_allocated = 0;
@@ -179,8 +180,8 @@ vm_push_frame(VM* vm, ObjClosure* closure, int num_args)
     }
 }
 
-static bool
-complete_call(VM* vm, Value callee, int args)
+bool
+vm_complete_call(VM* vm, Value callee, int args)
 {
     if (IS_CLOSURE(callee)) {
         vm_push_frame(vm, VAL_TO_CLOSURE(callee), args);
@@ -259,6 +260,7 @@ vm_get_prototype(VM* vm, Value value)
                 case OBJ_RANGE:   return OBJ_TO_VAL(vm->RangeProto);
                 case OBJ_LIST:    return OBJ_TO_VAL(vm->ListProto);
                 case OBJ_MAP:     return OBJ_TO_VAL(vm->MapProto);
+                case OBJ_MESSAGE: return OBJ_TO_VAL(vm->MessageProto);
                 default: UNREACHABLE();
             }
         }
@@ -288,42 +290,46 @@ vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
     return rv;
 }
 
-// An Invoke is split into two sections:
-//  1) a pre-invoke, which fetches the slot (using getSlot if necessary).
-//  2) activating the slot's value, if necessary.
-// For performance, we assume that both obj and key are on the stack
-// (or, somewhere we can trace the roots).
-static bool
-pre_invoke(VM* vm, Value obj, Value key, Value* slot)
+static
+bool
+invoke(VM* vm, Value obj, ObjString* slot_name, int num_args)
 {
-    if (!vm_get_slot(vm, obj, key, slot)) {
-        // If there is no such slot following a recursive proto search,
-        // we consult the getSlot method.
-        Value getSlot;
-        if (vm_get_slot(vm, obj, vm->getSlot_string, &getSlot)) {
-            vm_ensure_stack(vm, 2);
-            vm_push(vm, obj);
-            vm_push(vm, key);
-            if (!vm_call(vm, getSlot, 1))
-                return false;
-            *slot = vm_pop(vm);
-            return true;
-        } else {
-            *slot = NIL_VAL;
-            return true;
-        }
-    }
-    // otherwise, we've found it directly on the protos.
-    return true;
+    // Try to search on the protos.
+    Value callee;
+    if (vm_get_slot(vm, obj, OBJ_TO_VAL(slot_name), &callee))
+        return vm_complete_call(vm, callee, num_args);
+    if (!vm_get_slot(vm, obj, OBJ_TO_VAL(vm->perform_string), &callee))
+        return vm_complete_call(vm, NIL_VAL, num_args);
+    // More expensive message alloc.
+    Value* args = &vm->fiber->stack_top[-num_args];
+    ObjMessage* msg = objmessage_new(vm, slot_name, args, num_args);
+    vm_drop(vm, num_args);
+    vm_push_root(vm, OBJ_TO_VAL(msg));
+    vm_ensure_stack(vm, 1);
+    vm_push(vm, OBJ_TO_VAL(msg));
+    vm_pop_root(vm); // msg
+    return vm_complete_call(vm, callee, 1);
 }
 
 bool
-vm_invoke(VM* vm, Value obj, Value key, int num_args)
+vm_invoke(VM* vm, Value obj, ObjString* slot_name, int num_args)
 {
-    Value slot_value;
-    if (!pre_invoke(vm, obj, key, &slot_value))
-        return false;
-    return vm_call(vm, slot_value, num_args);
+    // Try to search on the protos.
+    Value callee;
+    if (vm_get_slot(vm, obj, OBJ_TO_VAL(slot_name), &callee))
+        return vm_call(vm, callee, num_args);
+    // Perform?
+    if (!vm_get_slot(vm, obj, OBJ_TO_VAL(vm->perform_string), &callee))
+        return vm_call(vm, NIL_VAL, num_args);
+    // Message alloc
+    Value* args = &vm->fiber->stack_top[-num_args];
+    ObjMessage* msg = objmessage_new(vm, slot_name, args, num_args);
+    vm_drop(vm, num_args);
+    vm_push_root(vm, OBJ_TO_VAL(msg));
+    vm_ensure_stack(vm, 1);
+    vm_push(vm, OBJ_TO_VAL(msg));
+    vm_pop_root(vm); // msg
+    return vm_call(vm, callee, 1);
 }
 
 // Run the given fiber until fiber->frames_count == top_level.
@@ -513,11 +519,11 @@ run(VM* vm, ObjFiber* fiber, int top_level)
                 Value obj = vm_peek(vm, 1);
                 Value val = vm_peek(vm, 0);
                 Value setSlot;
-                if (vm_get_slot(vm, obj, vm->setSlot_string, &setSlot)) {
+                if (vm_get_slot(vm, obj, OBJ_TO_VAL(vm->setSlot_string), &setSlot)) {
                     vm_ensure_stack(vm, 1);     // stack: [obj] [val]
                     fiber->stack_top[-1] = key; // stack: [obj] [key]
                     vm_push(vm, val);           // stack: [obj] [key] [val]
-                    complete_call(vm, setSlot, 2);
+                    vm_complete_call(vm, setSlot, 2);
                     goto handle_fibers;
                 } else {
                     if (IS_OBJECT(obj)) {
@@ -536,11 +542,9 @@ run(VM* vm, ObjFiber* fiber, int top_level)
                 Value key = READ_CONSTANT();
                 uint8_t num_args = READ_BYTE();
                 Value obj = vm_peek(vm, num_args);
-                Value slot;
-                if (pre_invoke(vm, obj, key, &slot))
-                    // The stack is already in the correct form for a method call.
-                    // We have `obj` followed by `num_args`.
-                    complete_call(vm, slot, num_args);
+                // The stack is already in the correct form for a method call.
+                // We have `obj` followed by `num_args`.
+                invoke(vm, obj, VAL_TO_STRING(key), num_args);
 handle_fibers:
                 fiber = vm->fiber;
                 if (fiber == NULL) return INTERPRET_OK;

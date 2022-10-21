@@ -51,7 +51,6 @@ run_test:
 	$(RUNNER) ./subtle ./tests/functions
 	$(RUNNER) ./subtle ./tests/closures
 	$(RUNNER) ./subtle ./tests/this
-	$(RUNNER) ./subtle ./tests/vm_call
 	$(RUNNER) ./subtle ./tests/compact
 	$(RUNNER) ./subtle ./tests/table
 	$(RUNNER) ./subtle ./tests/x
@@ -60,6 +59,7 @@ run_test:
 	$(RUNNER) ./subtle ./tests/fiber2
 	$(RUNNER) ./subtle ./tests/list
 	$(RUNNER) ./subtle ./tests/newlines
+	$(RUNNER) ./subtle ./tests/perform
 
 test:
 	make stress

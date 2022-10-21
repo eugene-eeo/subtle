@@ -25,7 +25,7 @@ const char* CORE_SOURCE =
 "    iterMore = Fn.new{|v| return this._obj.rawIterMore(v) },\n"
 "    iterNext = Fn.new{|v|\n"
 "        return this._obj.\n"
-"            rawGetSlot(this._slot).\n"
+"            getSlot(this._slot).\n"
 "            callWithThis(this._obj, v)\n"
 "    }\n"
 "}\n"
