@@ -27,6 +27,19 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
 #define DEFINE_NATIVE(name) \
     static bool name(VM* vm, Value* args, int num_args)
 
+#define RETURN(expr) \
+    do { \
+        *(vm->fiber->stack_top - num_args - 1) = expr; \
+        vm_drop(vm, num_args); \
+        return true; \
+    } while (false)
+
+#define ERROR(...) \
+    do { \
+        vm_runtime_error(vm, __VA_ARGS__); \
+        return false; \
+    } while (false)
+
 #define ARG_ERROR(arg_idx, msg) \
     do { \
         if ((arg_idx) == 0) \
@@ -59,19 +72,6 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
         default: UNREACHABLE(); \
     } \
     } while(false)
-
-#define ERROR(...) \
-    do { \
-        vm_runtime_error(vm, __VA_ARGS__); \
-        return false; \
-    } while (false)
-
-#define RETURN(expr) \
-    do { \
-        *(vm->fiber->stack_top - num_args - 1) = expr; \
-        vm_drop(vm, num_args); \
-        return true; \
-    } while (false)
 
 #define CONST_STRING(vm, s) objstring_copy(vm, (s), strlen(s))
 
