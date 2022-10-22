@@ -607,10 +607,9 @@ DEFINE_NATIVE(Fiber_abort) {
 DEFINE_NATIVE(Fiber_new) {
     ARGSPEC("*F");
     ObjClosure* closure = VAL_TO_CLOSURE(args[1]);
-    if (closure->fn->arity != 0
-        && closure->fn->arity != 1) {
-        ERROR("Cannot create fiber from function with arity %d.", closure->fn->arity);
-    }
+    if (closure->fn->arity != 0 && closure->fn->arity != 1)
+        ERROR("Cannot create fiber from function with arity %d.",
+              closure->fn->arity);
     ObjFiber* fiber = objfiber_new(vm, closure);
     RETURN(OBJ_TO_VAL(fiber));
 }
@@ -849,13 +848,16 @@ DEFINE_NATIVE(Map_length) {
 
 DEFINE_NATIVE(Message_new) {
     ARGSPEC("*S");
-    ObjMessage* msg = objmessage_new(vm, VAL_TO_STRING(args[1]), &args[2], num_args - 1);
+    ObjString* slot_name = VAL_TO_STRING(args[1]);
+    ObjMessage* msg = objmessage_new(vm, slot_name, &args[2], num_args - 1);
     RETURN(OBJ_TO_VAL(msg));
 }
 
 DEFINE_NATIVE(Message_newFromList) {
     ARGSPEC("*SL");
-    ObjMessage* msg = objmessage_from_list(vm, VAL_TO_STRING(args[1]), VAL_TO_LIST(args[2]));
+    ObjString* slot_name = VAL_TO_STRING(args[1]);
+    ObjList* list = VAL_TO_LIST(args[2]);
+    ObjMessage* msg = objmessage_from_list(vm, slot_name, list);
     RETURN(OBJ_TO_VAL(msg));
 }
 
