@@ -43,7 +43,7 @@ x = {a=1, b=2, c=3};
 # keys
 seen = {};
 for (key = x.keys)
-    seen.rawSetSlot(key, 1);
+    seen.setSlot(key, 1);
 assert seen.a == 1;
 assert seen.b == 1;
 assert seen.c == 1;
@@ -51,7 +51,7 @@ assert seen.c == 1;
 # values
 seen = {};
 for (key = x.values)
-    seen.rawSetSlot(key, 1);
+    seen.setSlot(key, 1);
 assert seen.getOwnSlot(1) == 1;
 assert seen.getOwnSlot(2) == 1;
 assert seen.getOwnSlot(3) == 1;

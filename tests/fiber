@@ -24,7 +24,7 @@ let i = 0;
 let x = {};
 "=== pre".println;
 while (i < 5) {
-    x.rawSetSlot(i, Fiber.new{
+    x.setSlot(i, Fiber.new{
         assert Fiber.current == x.getOwnSlot(i);
         i.println;
         Fiber.yield;
