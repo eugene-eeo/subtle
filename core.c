@@ -552,8 +552,8 @@ run_fiber(VM* vm, ObjFiber* fiber,
     if (fiber->state == FIBER_ROOT) ERROR("Cannot '%s' a root fiber.", verb);
 
     if (fiber->frames_count == 1
-        && fiber->frames[0].ip == fiber->frames[0].closure->function->chunk.code) {
-        if (fiber->frames[0].closure->function->arity == 1) {
+        && fiber->frames[0].ip == fiber->frames[0].closure->fn->chunk.code) {
+        if (fiber->frames[0].closure->fn->arity == 1) {
             // The fiber has not ran yet, and is expecting some
             // data to be sent.
             *fiber->stack_top = value;
@@ -607,9 +607,9 @@ DEFINE_NATIVE(Fiber_abort) {
 DEFINE_NATIVE(Fiber_new) {
     ARGSPEC("*F");
     ObjClosure* closure = VAL_TO_CLOSURE(args[1]);
-    if (closure->function->arity != 0
-        && closure->function->arity != 1) {
-        ERROR("Cannot create fiber from function with arity %d.", closure->function->arity);
+    if (closure->fn->arity != 0
+        && closure->fn->arity != 1) {
+        ERROR("Cannot create fiber from function with arity %d.", closure->fn->arity);
     }
     ObjFiber* fiber = objfiber_new(vm, closure);
     RETURN(OBJ_TO_VAL(fiber));

@@ -116,8 +116,8 @@ static void blacken_object(VM* vm, Obj* obj) {
         case OBJ_STRING: break; // Nothing to do here.
         case OBJ_NATIVE: break; // Nothing to do here.
         case OBJ_FN: {
-            ObjFn* function = (ObjFn*)obj;
-            chunk_mark(&function->chunk, vm);
+            ObjFn* fn = (ObjFn*)obj;
+            chunk_mark(&fn->chunk, vm);
             break;
         }
         case OBJ_UPVALUE:
@@ -125,7 +125,7 @@ static void blacken_object(VM* vm, Obj* obj) {
             break;
         case OBJ_CLOSURE: {
             ObjClosure* closure = (ObjClosure*)obj;
-            mark_object(vm, (Obj*)closure->function);
+            mark_object(vm, (Obj*)closure->fn);
             for (int i = 0; i < closure->upvalue_count; i++)
                 mark_object(vm, (Obj*)closure->upvalues[i]);
             break;

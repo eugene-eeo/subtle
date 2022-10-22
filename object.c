@@ -188,7 +188,7 @@ objclosure_new(VM* vm, ObjFn* fn)
         upvalues[i] = NULL;
 
     ObjClosure* closure = ALLOCATE_OBJECT(vm, OBJ_CLOSURE, ObjClosure);
-    closure->function = fn;
+    closure->fn = fn;
     closure->upvalues = upvalues;
     closure->upvalue_count = fn->upvalue_count;
     return closure;
@@ -280,7 +280,7 @@ ObjFiber*
 objfiber_new(VM* vm, ObjClosure* closure)
 {
     // Allocate arrays first in case of GC
-    int stack_capacity = next_power_of_two(closure->function->max_slots);
+    int stack_capacity = next_power_of_two(closure->fn->max_slots);
     Value* stack = ALLOCATE_ARRAY(vm, Value, stack_capacity);
 
     int frames_capacity = 1;
@@ -359,7 +359,7 @@ objfiber_push_frame(ObjFiber* fiber, VM* vm,
     }
     CallFrame* frame = &fiber->frames[fiber->frames_count++];
     frame->closure = closure;
-    frame->ip = closure->function->chunk.code;
+    frame->ip = closure->fn->chunk.code;
     frame->slots = stack_start;
     return frame;
 }

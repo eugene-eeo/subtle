@@ -63,7 +63,7 @@ typedef struct Compiler {
     Parser* parser;
 
     // Where are we compiling to?
-    ObjFn* function;
+    ObjFn* fn;
     FunctionType type;
 
     // Keep track of the number of stack slots currently
@@ -118,9 +118,9 @@ compiler_init(Compiler* compiler, Compiler* enclosing,
 {
     compiler->enclosing = enclosing;
     compiler->parser = parser;
-    compiler->function = objfn_new(vm);
+    compiler->fn = objfn_new(vm);
     if (type == FUNCTION_TYPE_SCRIPT)
-        compiler->function->arity = -1;
+        compiler->fn->arity = -1;
 
     compiler->type = type;
     compiler->slot_count = 1; // the initial local
@@ -221,7 +221,7 @@ static void match_newlines(Compiler* compiler) {
 // ==================
 
 static Chunk* current_chunk(Compiler* compiler) {
-    return &compiler->function->chunk;
+    return &compiler->fn->chunk;
 }
 
 static void emit_byte(Compiler* compiler, uint8_t b) {
@@ -261,8 +261,8 @@ static void emit_op(Compiler* compiler, uint8_t op) {
     compiler->slot_count += stack_effects[op];
     if (!compiler->parser->had_error)
         ASSERT(compiler->slot_count >= 1, "compiler->slot_count < 1");
-    if (compiler->function->max_slots < compiler->slot_count)
-        compiler->function->max_slots = compiler->slot_count;
+    if (compiler->fn->max_slots < compiler->slot_count)
+        compiler->fn->max_slots = compiler->slot_count;
 }
 
 static void emit_offset(Compiler* compiler, uint16_t offset) {
@@ -315,16 +315,16 @@ compiler_end(Compiler* compiler)
         if (compiler->type == FUNCTION_TYPE_SCRIPT) {
             printf("script");
         } else {
-            printf("fn_%p", (void*)compiler->function);
+            printf("fn_%p", (void*)compiler->fn);
         }
         printf(" [c=%d]", compiler->slot_count);
-        printf(" [m=%d]", compiler->function->max_slots);
+        printf(" [m=%d]", compiler->fn->max_slots);
         printf(" ==\n");
         debug_print_chunk(current_chunk(compiler));
     }
 #endif
     chunk_done(current_chunk(compiler), compiler->vm);
-    return compiler->function;
+    return compiler->fn;
 }
 
 // Scoping helpers
@@ -405,7 +405,7 @@ resolve_local(Compiler* compiler, Token* token)
 static int
 add_upvalue(Compiler* compiler, uint8_t index, bool is_local)
 {
-    int count = compiler->function->upvalue_count;
+    int count = compiler->fn->upvalue_count;
 
     for (int i = 0; i < count; i++) {
         Upvalue* upvalue = &compiler->upvalues[i];
@@ -420,7 +420,7 @@ add_upvalue(Compiler* compiler, uint8_t index, bool is_local)
 
     compiler->upvalues[count].is_local = is_local;
     compiler->upvalues[count].index = index;
-    compiler->function->upvalue_count++;
+    compiler->fn->upvalue_count++;
     return count;
 }
 
@@ -640,9 +640,9 @@ static void block_argument(Compiler* compiler) {
     if (match(&c, TOKEN_PIPE)) {
         do {
             match_newlines(compiler);
-            if (c.function->arity == MAX_ARGS)
+            if (c.fn->arity == MAX_ARGS)
                 error_at_current(&c, "Cannot have more than 127 parameters.");
-            c.function->arity++;
+            c.fn->arity++;
             uint8_t constant = parse_variable(&c, "Expect parameter name.");
             define_variable(&c, constant);
             c.slot_count++;
@@ -1187,9 +1187,9 @@ compile(VM* vm, const char* source)
         has_newline = match_separators(&compiler);
     }
 
-    ObjFn* function = compiler_end(&compiler);
+    ObjFn* fn = compiler_end(&compiler);
     consume(&compiler, TOKEN_EOF, "Expect end of file.");
-    return parser.had_error ? NULL : function;
+    return parser.had_error ? NULL : fn;
 }
 
 void
@@ -1199,5 +1199,5 @@ compiler_mark(Compiler* compiler, VM* vm)
 
     // mark the enclosing compiler.
     compiler_mark(compiler->enclosing, vm);
-    mark_object(vm, (Obj*)compiler->function);
+    mark_object(vm, (Obj*)compiler->fn);
 }

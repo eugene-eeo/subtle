@@ -116,12 +116,12 @@ print_stack_trace(VM* vm)
         fprintf(stderr, "[Fiber %p]\n", (void*) fiber);
         for (int i = fiber->frames_count - 1; i >= 0; i--) {
             CallFrame* frame = &fiber->frames[i];
-            ObjFn* function = frame->closure->function;
+            ObjFn* fn = frame->closure->fn;
             // -1 as we increment frame->ip on each loop.
-            int instruction = frame->ip - function->chunk.code - 1;
+            int instruction = frame->ip - fn->chunk.code - 1;
             fprintf(stderr, "\t[line %u] in %s\n",
-                    chunk_get_line(&function->chunk, instruction),
-                    function->arity == -1 ? "script" : "fn");
+                    chunk_get_line(&fn->chunk, instruction),
+                    fn->arity == -1 ? "script" : "fn");
         }
     }
 }
@@ -165,18 +165,18 @@ vm_push_frame(VM* vm, ObjClosure* closure, int num_args)
     }
     Value* stack_start = vm->fiber->stack_top - num_args - 1;
 
-    ObjFn* function = closure->function;
+    ObjFn* fn = closure->fn;
     vm_push_root(vm, OBJ_TO_VAL(closure));
     objfiber_push_frame(vm->fiber, vm, closure, stack_start);
     vm_pop_root(vm);
-    vm_ensure_stack(vm, function->max_slots);
+    vm_ensure_stack(vm, fn->max_slots);
 
     // Fix the number of arguments.
     // Since -1 arity means a script, we ignore that here.
-    if (function->arity != -1) {
-        for (int i = 0; i < function->arity - num_args; i++) vm_push(vm, NIL_VAL);
-        if (num_args > function->arity)
-            vm_drop(vm, num_args - function->arity);
+    if (fn->arity != -1) {
+        for (int i = 0; i < fn->arity - num_args; i++) vm_push(vm, NIL_VAL);
+        if (num_args > fn->arity)
+            vm_drop(vm, num_args - fn->arity);
     }
 }
 
@@ -331,7 +331,7 @@ run(VM* vm, ObjFiber* fiber, int top_level)
 #define READ_SHORT() \
     (frame->ip += 2, \
      (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
-#define READ_CONSTANT() (frame->closure->function->chunk.constants.values[READ_SHORT()])
+#define READ_CONSTANT() (frame->closure->fn->chunk.constants.values[READ_SHORT()])
 
     // Actually start running the code here.
     REFRESH_FRAME();
@@ -346,8 +346,8 @@ run(VM* vm, ObjFiber* fiber, int top_level)
         }
         printf("\n");
         // Trace the about-to-be-executed instruction.
-        debug_print_instruction(&frame->closure->function->chunk,
-                                frame->ip - frame->closure->function->chunk.code);
+        debug_print_instruction(&frame->closure->fn->chunk,
+                                frame->ip - frame->closure->fn->chunk.code);
 #endif
         switch (READ_BYTE()) {
             case OP_RETURN: {

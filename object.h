@@ -92,7 +92,7 @@ typedef struct ObjUpvalue {
 
 typedef struct {
     Obj obj;
-    ObjFn* function;
+    ObjFn* fn;
     ObjUpvalue** upvalues;
     uint8_t upvalue_count;
 } ObjClosure;
