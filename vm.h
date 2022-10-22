@@ -103,12 +103,12 @@ vm_ensure_stack(VM* vm, int n)
 
 // Pushes the given closure onto the call stack. Note that the
 // num_args argument should be the number of _actual_ arguments,
-// excluding "this".
+// excluding "self".
 // The stack should look like this:
 //
 //                | num_args |
 //   +-----+------+----------+
-//   | ... | this |   ...    |
+//   | ... | self |   ...    |
 //   +-----+------+----------+
 //                           ^-- stack_top
 void vm_push_frame(VM* vm, ObjClosure* closure, int num_args);

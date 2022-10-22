@@ -32,7 +32,7 @@ typedef enum {
     TOKEN_NIL,
     TOKEN_TRUE, TOKEN_FALSE,
     TOKEN_WHILE,
-    TOKEN_THIS,
+    TOKEN_SELF,
     TOKEN_IF,
     TOKEN_ELSE,
     TOKEN_LET,

@@ -1,6 +1,6 @@
 let f;
 f = Fn.new {|x|
-    assert this == f;
+    assert self == f;
     assert x == 1;
     return 1;
 };
@@ -9,10 +9,10 @@ assert f.call(1) == 1;
 
 let z = {};
 f = Fn.new {|x|
-    assert this == z;
+    assert self == z;
     z.u = x;
     return x;
 };
 
-assert f.callWithThis(z, 1) == 1;
+assert f.callWith(z, 1) == 1;
 assert z.u == 1;

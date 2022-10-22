@@ -193,8 +193,7 @@ vm_complete_call(VM* vm, Value callee, int args)
         return native->fn(vm, args_start, args);
     }
     if (args == 0) {
-        vm_pop(vm);
-        vm_push(vm, callee);
+        vm->fiber->stack_top[-1] = callee;
         return true;
     }
     vm_runtime_error(vm, "Tried to call a non-activatable slot with %d > 0 args.", args);

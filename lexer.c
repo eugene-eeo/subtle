@@ -152,14 +152,8 @@ static TokenType variable_type(Lexer* lexer) {
         case 'l': return match_rest(lexer, TOKEN_LET, 1, "et", 2);
         case 'n': return match_rest(lexer, TOKEN_NIL, 1, "il", 2);
         case 'r': return match_rest(lexer, TOKEN_RETURN, 1, "eturn", 5);
-        case 't':
-            if (lexer->current - lexer->start >= 2) {
-                switch (lexer->start[1]) {
-                    case 'r': return match_rest(lexer, TOKEN_TRUE, 2, "ue", 2);
-                    case 'h': return match_rest(lexer, TOKEN_THIS, 2, "is", 2);
-                }
-            }
-            break;
+        case 's': return match_rest(lexer, TOKEN_SELF, 1, "elf", 3);
+        case 't': return match_rest(lexer, TOKEN_TRUE, 1, "rue", 3);
         case 'w': return match_rest(lexer, TOKEN_WHILE, 1, "hile", 4);
     }
     return TOKEN_VARIABLE;

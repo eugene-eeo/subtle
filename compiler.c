@@ -186,7 +186,7 @@ static void consume(Compiler* compiler, TokenType type, const char* message) {
 static bool match_slot(Compiler* compiler) {
     if (check(compiler, TOKEN_VARIABLE)
             || check(compiler, TOKEN_TRUE)  || check(compiler, TOKEN_FALSE) || check(compiler, TOKEN_NIL)
-            || check(compiler, TOKEN_THIS)
+            || check(compiler, TOKEN_SELF)
             || check(compiler, TOKEN_PLUS)  || check(compiler, TOKEN_MINUS)
             || check(compiler, TOKEN_TIMES) || check(compiler, TOKEN_SLASH)
             || check(compiler, TOKEN_PIPE)
@@ -705,12 +705,12 @@ static void dot(Compiler* compiler, bool can_assign, bool allow_newlines) {
     invoke(compiler, can_assign, allow_newlines);
 }
 
-static void this(Compiler* compiler, bool can_assign, bool allow_newlines) {
+static void self(Compiler* compiler, bool can_assign, bool allow_newlines) {
     if (compiler->type == FUNCTION_TYPE_SCRIPT) {
-        error(compiler, "Cannot use 'this' in top-level code.");
+        error(compiler, "Cannot use 'self' in top-level code.");
     }
     // The 0-th stack slot contains the target of the call.
-    // Remember that we put this slot aside in compiler_init.
+    // Remember that we put self slot aside in compiler_init.
     emit_op(compiler, OP_GET_LOCAL);
     emit_byte(compiler, 0);
 }
@@ -799,7 +799,7 @@ static ParseRule rules[] = {
     [TOKEN_TRUE]      = {literal,  invoke, PREC_CALL},
     [TOKEN_FALSE]     = {literal,  invoke, PREC_CALL},
     [TOKEN_WHILE]     = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_THIS]      = {this,     invoke, PREC_CALL},
+    [TOKEN_SELF]      = {self,     invoke, PREC_CALL},
     [TOKEN_IF]        = {NULL,     NULL,   PREC_NONE},
     [TOKEN_ELSE]      = {NULL,     NULL,   PREC_NONE},
     [TOKEN_LET]       = {NULL,     NULL,   PREC_NONE},

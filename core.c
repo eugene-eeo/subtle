@@ -30,7 +30,7 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
 #define ARG_ERROR(arg_idx, msg) \
     do { \
         if ((arg_idx) == 0) \
-            ERROR("%s expected 'this' to be %s.", __func__, msg); \
+            ERROR("%s expected 'self' to be %s.", __func__, msg); \
         else \
             ERROR("%s expected arg %d to be %s.", __func__, (arg_idx)-1, msg); \
     } while (false)
@@ -314,14 +314,14 @@ num_to_string(VM* vm, double num) {
 }
 
 DEFINE_NATIVE(Object_toString) {
-    Value this = args[0];
-    switch (this.type) {
+    Value self = args[0];
+    switch (self.type) {
     case VALUE_NIL:    RETURN(OBJ_TO_VAL(CONST_STRING(vm, "nil")));
     case VALUE_TRUE:   RETURN(OBJ_TO_VAL(CONST_STRING(vm, "true")));
     case VALUE_FALSE:  RETURN(OBJ_TO_VAL(CONST_STRING(vm, "false")));
-    case VALUE_NUMBER: RETURN(OBJ_TO_VAL(num_to_string(vm, VAL_TO_NUMBER(this))));
+    case VALUE_NUMBER: RETURN(OBJ_TO_VAL(num_to_string(vm, VAL_TO_NUMBER(self))));
     case VALUE_OBJ: {
-        Obj* obj = VAL_TO_OBJ(this);
+        Obj* obj = VAL_TO_OBJ(self);
         int length;
         // Calculate the length (at compile-time) to store an
         // Object prefix plus the hex representation of the pointer:
@@ -330,7 +330,7 @@ DEFINE_NATIVE(Object_toString) {
         const char* prefix;
 
         switch (obj->type) {
-        case OBJ_STRING:  RETURN(this);
+        case OBJ_STRING:  RETURN(self);
         case OBJ_CLOSURE: prefix = "Fn"; break;
         case OBJ_OBJECT:  prefix = "Object"; break;
         case OBJ_NATIVE:  prefix = "Native"; break;
@@ -349,10 +349,10 @@ DEFINE_NATIVE(Object_toString) {
 }
 
 DEFINE_NATIVE(Object_print) {
-    Value this = args[0];
+    Value self = args[0];
     vm_ensure_stack(vm, 1);
-    vm_push(vm, this);
-    if (!vm_invoke(vm, this, CONST_STRING(vm, "toString"), 0))
+    vm_push(vm, self);
+    if (!vm_invoke(vm, self, CONST_STRING(vm, "toString"), 0))
         return false;
 
     Value slot = vm_pop(vm);
@@ -421,12 +421,12 @@ DEFINE_NATIVE(Fn_call) {
     return true;
 }
 
-DEFINE_NATIVE(Fn_callWithThis) {
+DEFINE_NATIVE(Fn_callWith) {
     ARGSPEC("F*");
     // Shift the arguments, so that we set up the stack properly.
     //            0    1         2      3            num_args
-    // We have: | fn | newThis | arg1 | arg2 | ... | arg_{num_args} |
-    // we want:      | newThis | arg1 | arg2 | ... | arg_{num_args} |
+    // We have: | fn | newSelf | arg1 | arg2 | ... | arg_{num_args} |
+    // we want:      | newSelf | arg1 | arg2 | ... | arg_{num_args} |
     //                 0         1      2            num_args-1
     ObjClosure* closure = VAL_TO_CLOSURE(args[0]);
     for (int i = 0; i < num_args; i++)
@@ -444,7 +444,7 @@ DEFINE_NATIVE(Native_call) {
     return native->fn(vm, args, num_args);
 }
 
-DEFINE_NATIVE(Native_callWithThis) {
+DEFINE_NATIVE(Native_callWith) {
     ARGSPEC("n*");
     ObjNative* native = VAL_TO_NATIVE(args[0]);
     for (int i = 0; i < num_args; i++)
@@ -582,7 +582,7 @@ DEFINE_NATIVE(Fiber_current) {
 
 DEFINE_NATIVE(Fiber_yield) {
     if (!vm->can_yield)
-        ERROR("Tried to yield from a VM call.");
+        ERROR("Cannot yield from a VM call.");
     Value v = NIL_VAL;
     if (num_args >= 1) {
         vm_drop(vm, num_args - 1);
@@ -865,10 +865,24 @@ DEFINE_NATIVE(Message_slotName) {
     RETURN(OBJ_TO_VAL(msg->slot_name));
 }
 
+DEFINE_NATIVE(Message_setSlotName) {
+    ARGSPEC("mS");
+    ObjMessage* msg = VAL_TO_MESSAGE(args[0]);
+    msg->slot_name = VAL_TO_STRING(args[1]);
+    RETURN(OBJ_TO_VAL(msg));
+}
+
 DEFINE_NATIVE(Message_args) {
     ARGSPEC("m");
     ObjMessage* msg = VAL_TO_MESSAGE(args[0]);
     RETURN(OBJ_TO_VAL(msg->args));
+}
+
+DEFINE_NATIVE(Message_setArgs) {
+    ARGSPEC("mL");
+    ObjMessage* msg = VAL_TO_MESSAGE(args[0]);
+    msg->args = VAL_TO_LIST(args[1]);
+    RETURN(OBJ_TO_VAL(msg));
 }
 
 void core_init_vm(VM* vm)
@@ -910,14 +924,14 @@ void core_init_vm(VM* vm)
 
     vm->FnProto = objobject_new(vm);
     vm->FnProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    ADD_METHOD(FnProto, "new",          Fn_new);
-    ADD_METHOD(FnProto, "call",         Fn_call);
-    ADD_METHOD(FnProto, "callWithThis", Fn_callWithThis);
+    ADD_METHOD(FnProto, "new",      Fn_new);
+    ADD_METHOD(FnProto, "call",     Fn_call);
+    ADD_METHOD(FnProto, "callWith", Fn_callWith);
 
     vm->NativeProto = objobject_new(vm);
     vm->NativeProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    ADD_METHOD(NativeProto, "call",         Native_call);
-    ADD_METHOD(NativeProto, "callWithThis", Native_callWithThis);
+    ADD_METHOD(NativeProto, "call",     Native_call);
+    ADD_METHOD(NativeProto, "callWith", Native_callWith);
 
     vm->NumberProto = objobject_new(vm);
     vm->NumberProto->proto = OBJ_TO_VAL(vm->ObjectProto);
@@ -1000,6 +1014,8 @@ void core_init_vm(VM* vm)
     ADD_METHOD(MessageProto, "newFromList", Message_newFromList);
     ADD_METHOD(MessageProto, "slotName",    Message_slotName);
     ADD_METHOD(MessageProto, "args",        Message_args);
+    ADD_METHOD(MessageProto, "setSlotName", Message_setSlotName);
+    ADD_METHOD(MessageProto, "setArgs",     Message_setArgs);
 
     ADD_OBJECT(&vm->globals, "Object",  vm->ObjectProto);
     ADD_OBJECT(&vm->globals, "Fn",      vm->FnProto);

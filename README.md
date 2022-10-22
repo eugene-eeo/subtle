@@ -9,12 +9,12 @@ and recursive inheritance (cycles in the prototype chain are allowed).
     # Comments start with '#'
     let Point = {}; # semicolons are optional
     Point.init = Fn.new{|x, y|
-        this.x = x
-        this.y = y
+        self.x = x
+        self.y = y
     }
     # (some) dots are optional
     Point.+ = Fn new {|other|  # yes, this is allowed
-        return Point new(this x + other x, this y + other y)
+        return Point new(self x + other x, self y + other y)
     }
     let p1 = Point new(1, 2)
     let p2 = Point new(3, 4)

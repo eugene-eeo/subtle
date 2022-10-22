@@ -35,7 +35,7 @@ x.> = 12;     assert x.> == 12;
 x.true = 13;  assert x.true == 13;
 x.false = 14; assert x.false == 14;
 x.nil = 15;   assert x.nil == 15;
-x.this = 16;  assert x.this == 16;
+x.self = 16;  assert x.self == 16;
 
 let seen;
 x = {a=1, b=2, c=3};
