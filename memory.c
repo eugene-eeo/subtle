@@ -84,7 +84,6 @@ static void mark_roots(VM* vm) {
 
     // Mark the constants
     mark_object(vm, (Obj*)vm->perform_string);
-    mark_object(vm, (Obj*)vm->setSlot_string);
     mark_object(vm, (Obj*)vm->init_string);
 
     // Mark the *Protos
@@ -118,6 +117,7 @@ static void blacken_object(VM* vm, Obj* obj) {
         case OBJ_FN: {
             ObjFn* fn = (ObjFn*)obj;
             chunk_mark(&fn->chunk, vm);
+            mark_object(vm, (Obj*)fn->name);
             break;
         }
         case OBJ_UPVALUE:

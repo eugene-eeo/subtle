@@ -172,6 +172,11 @@ DEFINE_NATIVE(Object_getSlot) {
 
 DEFINE_NATIVE(Object_setSlot) {
     ARGSPEC("O**");
+    if (IS_STRING(args[1]) && IS_CLOSURE(args[2])) {
+        ObjFn* fn = VAL_TO_CLOSURE(args[2])->fn;
+        if (fn->name == NULL)
+            fn->name = VAL_TO_STRING(args[1]);
+    }
     objobject_set(VAL_TO_OBJECT(args[0]), vm, args[1], args[2]);
     RETURN(args[2]);
 }
@@ -895,7 +900,6 @@ void core_init_vm(VM* vm)
 #define ADD_VALUE(PROTO, name, v)    (define_on_table(vm, &vm->PROTO->slots, name, v))
 
     vm->perform_string = CONST_STRING(vm, "perform");
-    vm->setSlot_string = CONST_STRING(vm, "setSlot");
     vm->init_string = CONST_STRING(vm, "init");
 
     vm->ObjectProto = objobject_new(vm);
@@ -905,7 +909,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "hash",        Object_hash);
     ADD_METHOD(ObjectProto, "hasSlot",     Object_hasSlot);
     ADD_METHOD(ObjectProto, "getSlot",     Object_getSlot);
-    ADD_METHOD(ObjectProto, "rawSetSlot",  Object_setSlot);
+    ADD_METHOD(ObjectProto, "setSlot",     Object_setSlot);
     ADD_METHOD(ObjectProto, "rawPerform",  Object_perform);
     ADD_METHOD(ObjectProto, "hasOwnSlot",  Object_hasOwnSlot);
     ADD_METHOD(ObjectProto, "getOwnSlot",  Object_getOwnSlot);

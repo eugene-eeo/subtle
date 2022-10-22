@@ -76,6 +76,7 @@ typedef struct ObjFn {
     int8_t arity;  // Arguments required by the function. -1 if it's a script.
     uint8_t upvalue_count;
     Chunk chunk;
+    ObjString* name;
 } ObjFn;
 
 typedef struct ObjUpvalue {

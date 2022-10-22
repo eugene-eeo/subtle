@@ -251,7 +251,6 @@ static int stack_effects[] = {
     [OP_SET_UPVALUE] = 0,
     [OP_CLOSE_UPVALUE] = -1,
     [OP_OBJECT] = 1,
-    [OP_OBJECT_SET] = -1,
     [OP_OBJLIT_SET] = -1,
     [OP_INVOKE] = 0,
 };
@@ -669,9 +668,10 @@ static void invoke(Compiler* compiler, bool can_assign, bool allow_newlines) {
 
     if (can_assign && match(compiler, TOKEN_EQ)) {
         match_newlines(compiler);
-        expression(compiler, allow_newlines);
-        emit_op(compiler, OP_OBJECT_SET);
+        emit_op(compiler, OP_CONSTANT);
         emit_offset(compiler, identifier_constant(compiler, &op_token));
+        expression(compiler, allow_newlines);
+        invoke_string_method(compiler, "setSlot", 2);
         return;
     }
 

@@ -125,7 +125,6 @@ int debug_print_instruction(Chunk* chunk, int index) {
         case OP_SET_UPVALUE: return byte_instruction(chunk, index, "OP_SET_UPVALUE");
         case OP_CLOSE_UPVALUE: return simple_instruction(index, "OP_CLOSE_UPVALUE");
         case OP_OBJECT: return simple_instruction(index, "OP_OBJECT");
-        case OP_OBJECT_SET: return constant_instruction(chunk, index, "OP_OBJECT_SET");
         case OP_OBJLIT_SET: return constant_instruction(chunk, index, "OP_OBJLIT_SET");
         case OP_INVOKE: {
             index++;

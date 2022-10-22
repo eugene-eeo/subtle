@@ -28,7 +28,6 @@ enum OpCode {
     OP_SET_UPVALUE,
     OP_CLOSE_UPVALUE,
     OP_OBJECT,
-    OP_OBJECT_SET,
     OP_OBJLIT_SET,
     OP_INVOKE,
 };

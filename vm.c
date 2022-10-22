@@ -21,7 +21,6 @@ void vm_init(VM* vm) {
     vm->can_yield = true;
 
     vm->perform_string = NULL;
-    vm->setSlot_string = NULL;
     vm->init_string = NULL;
 
     vm->ObjectProto = NULL;
@@ -121,7 +120,8 @@ print_stack_trace(VM* vm)
             int instruction = frame->ip - fn->chunk.code - 1;
             fprintf(stderr, "\t[line %u] in %s\n",
                     chunk_get_line(&fn->chunk, instruction),
-                    fn->arity == -1 ? "script" : "fn");
+                    fn->arity == -1 ? "script" :
+                    fn->name == NULL ? "fn" : fn->name->chars);
         }
     }
 }
@@ -181,23 +181,20 @@ vm_push_frame(VM* vm, ObjClosure* closure, int num_args)
 }
 
 bool
-vm_complete_call(VM* vm, Value callee, int args)
+vm_complete_call(VM* vm, Value callee, int num_args)
 {
     if (IS_CLOSURE(callee)) {
-        vm_push_frame(vm, VAL_TO_CLOSURE(callee), args);
+        vm_push_frame(vm, VAL_TO_CLOSURE(callee), num_args);
         return true;
     }
     if (IS_NATIVE(callee)) {
         ObjNative* native = VAL_TO_NATIVE(callee);
-        Value* args_start = &vm->fiber->stack_top[-args - 1];
-        return native->fn(vm, args_start, args);
+        Value* args_start = &vm->fiber->stack_top[-num_args - 1];
+        return native->fn(vm, args_start, num_args);
     }
-    if (args == 0) {
-        vm->fiber->stack_top[-1] = callee;
-        return true;
-    }
-    vm_runtime_error(vm, "Tried to call a non-activatable slot with %d > 0 args.", args);
-    return false;
+    ASSERT(num_args == 0, "num_args != 0");
+    vm->fiber->stack_top[-1] = callee;
+    return true;
 }
 
 static ObjUpvalue*
@@ -300,8 +297,13 @@ generic_invoke(VM* vm, Value obj, ObjString* slot_name, int num_args,
     Value callee;
     if (vm_get_slot(vm, obj, OBJ_TO_VAL(slot_name), &callee))
         return complete_call(vm, callee, num_args);
-    if (!vm_get_slot(vm, obj, OBJ_TO_VAL(vm->perform_string), &callee))
-        return complete_call(vm, NIL_VAL, num_args);
+    if (!vm_get_slot(vm, obj, OBJ_TO_VAL(vm->perform_string), &callee)) {
+        if (num_args != 0) {
+            vm_runtime_error(vm, "Called a non-activatable slot '%s' with %d args.", slot_name->chars, num_args);
+            return false;
+        }
+        return complete_call(vm, NIL_VAL, 0);
+    }
     // More expensive message alloc.
     Value* args = &vm->fiber->stack_top[-num_args];
     ObjMessage* msg = objmessage_new(vm, slot_name, args, num_args);
@@ -501,30 +503,6 @@ run(VM* vm, ObjFiber* fiber, int top_level)
                 vm_pop(vm); // value
                 break;
             }
-            case OP_OBJECT_SET: {
-                Value key = READ_CONSTANT();
-                Value obj = vm_peek(vm, 1);
-                Value val = vm_peek(vm, 0);
-                Value setSlot;
-                if (vm_get_slot(vm, obj, OBJ_TO_VAL(vm->setSlot_string), &setSlot)) {
-                    vm_ensure_stack(vm, 1);     // stack: [obj] [val]
-                    fiber->stack_top[-1] = key; // stack: [obj] [key]
-                    vm_push(vm, val);           // stack: [obj] [key] [val]
-                    vm_complete_call(vm, setSlot, 2);
-                    goto handle_fibers;
-                } else {
-                    if (IS_OBJECT(obj)) {
-                        objobject_set(VAL_TO_OBJECT(obj), vm, key, val);
-                        vm_pop(vm);
-                        vm_pop(vm);
-                        vm_push(vm, val);
-                        break;
-                    } else {
-                        vm_runtime_error(vm, "Cannot set slot on a non-object.");
-                        goto handle_fibers;
-                    }
-                }
-            }
             case OP_INVOKE: {
                 Value key = READ_CONSTANT();
                 uint8_t num_args = READ_BYTE();
@@ -572,13 +550,9 @@ vm_call(VM* vm, Value slot, int num_args)
         ObjNative* native = VAL_TO_NATIVE(slot);
         rv = native->fn(vm, &vm->fiber->stack_top[-num_args - 1], num_args);
     } else {
-        if (num_args > 0) {
-            vm_runtime_error(vm, "Tried to call a non-activatable slot with %d > 0 args.", num_args);
-            rv = false;
-        } else {
-            vm->fiber->stack_top[-1] = slot;
-            rv = true;
-        }
+        ASSERT(num_args == 0, "num_args != 0");
+        vm->fiber->stack_top[-1] = slot;
+        rv = true;
     }
     vm->can_yield = can_yield;
     return rv;

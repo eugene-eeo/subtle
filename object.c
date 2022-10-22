@@ -145,6 +145,7 @@ objfn_new(VM* vm)
     fn->max_slots = 0;
     fn->arity = 0;
     fn->upvalue_count = 0;
+    fn->name = NULL;
     chunk_init(&fn->chunk);
     return fn;
 }
