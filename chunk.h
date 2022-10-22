@@ -11,6 +11,7 @@ enum OpCode {
     OP_POP,
     OP_TRUE,
     OP_FALSE,
+    OP_DONE,
     OP_NIL,
     OP_DEF_GLOBAL,
     OP_GET_GLOBAL,
@@ -21,6 +22,7 @@ enum OpCode {
     OP_LOOP,
     OP_JUMP,
     OP_JUMP_IF_FALSE, // Pop, then jump
+    OP_JUMP_IF_DONE,  // Check and jump (no pop)
     OP_OR,  // Jump if the top is true, else pop
     OP_AND, // Jump if the top is false, else pop
     OP_CLOSURE,

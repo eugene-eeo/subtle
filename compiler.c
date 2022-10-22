@@ -234,6 +234,7 @@ static int stack_effects[] = {
     [OP_POP] = -1,
     [OP_TRUE] = 1,
     [OP_FALSE] = 1,
+    [OP_DONE] = 1,
     [OP_NIL] = 1,
     [OP_DEF_GLOBAL] = -1,
     [OP_GET_GLOBAL] = 1,
@@ -244,6 +245,7 @@ static int stack_effects[] = {
     [OP_LOOP] = 0,
     [OP_JUMP] = 0,
     [OP_JUMP_IF_FALSE] = -1,
+    [OP_JUMP_IF_DONE] = 0,
     [OP_OR] = -1,
     [OP_AND] = -1,
     [OP_CLOSURE] = 1,
@@ -540,6 +542,7 @@ static void literal(Compiler* compiler, bool can_assign, bool allow_newlines) {
         case TOKEN_TRUE:  emit_op(compiler, OP_TRUE); break;
         case TOKEN_FALSE: emit_op(compiler, OP_FALSE); break;
         case TOKEN_NIL:   emit_op(compiler, OP_NIL); break;
+        case TOKEN_DONE:  emit_op(compiler, OP_DONE); break;
         default: UNREACHABLE();
     }
 }
@@ -798,6 +801,7 @@ static ParseRule rules[] = {
     [TOKEN_NIL]       = {literal,  invoke, PREC_CALL},
     [TOKEN_TRUE]      = {literal,  invoke, PREC_CALL},
     [TOKEN_FALSE]     = {literal,  invoke, PREC_CALL},
+    [TOKEN_DONE]      = {literal,  invoke, PREC_CALL},
     [TOKEN_WHILE]     = {NULL,     NULL,   PREC_NONE},
     [TOKEN_SELF]      = {self,     invoke, PREC_CALL},
     [TOKEN_IF]        = {NULL,     NULL,   PREC_NONE},
@@ -1020,14 +1024,13 @@ static void load_local(Compiler* compiler, int offset) {
 
 static void for_stmt(Compiler* compiler) {
     // Desugar the following for loop:
-    // for (x = items) {  | let _s = items;
+    // for (x = items) {  | let _s = items.iter();
     //    bar;            | let _i = nil;
-    // }                  | while (_i = _s.iterMore(_i)) {
-    //                    |     let x = _s.iterNext(_i);
+    // }                  | while (_i = _s.advance()) {
+    //                    |     let x = _i;
     //                    |     bar;
     //                    | }
-    Token seq_token  = {.start="seq ", .length=4};
-    Token iter_token = {.start="iter ", .length=5};
+    Token seq_token  = {.start="$seq", .length=4};
 
     begin_block(compiler);
     consume(compiler, TOKEN_LPAREN, "Expect '(' after 'for'.");
@@ -1041,21 +1044,17 @@ static void for_stmt(Compiler* compiler) {
     consume(compiler, TOKEN_EQ, "Expect '=' after loop variable.");
     match(compiler, TOKEN_NEWLINE);
 
-    // Evaluate the sequence.
+    // _s = items.iter()
     expression(compiler, true);
+    invoke_string_method(compiler, "iter", 0);
 
     // Check that we have enough space to store the two locals.
     if (compiler->local_count + 2 > MAX_LOCALS) {
-        error(compiler, "Not enough space for for-loop variables.");
+        error(compiler, "Not enough space for loop variables.");
         return;
     }
 
     int seq = add_local(compiler, seq_token);
-    mark_local_initialized(compiler);
-
-    // The iterator value.
-    emit_op(compiler, OP_NIL);
-    int iter = add_local(compiler, iter_token);
     mark_local_initialized(compiler);
 
     consume(compiler, TOKEN_RPAREN, "Expect ')' after loop expression.");
@@ -1063,27 +1062,18 @@ static void for_stmt(Compiler* compiler) {
     Loop loop;
     enter_loop(compiler, &loop);
 
-    // _i = _s.iterMore(_i)
-    load_local(compiler, seq);
-    load_local(compiler, iter);
-    invoke_string_method(compiler, "iterMore", 1);
-    emit_op(compiler, OP_SET_LOCAL); emit_byte(compiler, (uint8_t) iter);
-    test_exit_loop(compiler);
-
-    // loop_var = _s.iterNext(_i)
-    load_local(compiler, seq);
-    load_local(compiler, iter);
-    invoke_string_method(compiler, "iterNext", 1);
-
     // push a fresh block for every iteration
     begin_block(compiler);
+    // loop_var = _s.advance()
+    load_local(compiler, seq);
+    invoke_string_method(compiler, "advance", 0);
+    compiler->loop->cond_jump = emit_jump(compiler, OP_JUMP_IF_DONE);
     add_local(compiler, loop_var);
     mark_local_initialized(compiler);
     block_or_stmt(compiler);
     end_block(compiler);
 
     exit_loop(compiler);
-
     end_block(compiler);
 }
 

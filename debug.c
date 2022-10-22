@@ -38,6 +38,7 @@ void debug_print_value(Value value) {
         case VALUE_NIL: printf("nil"); break;
         case VALUE_TRUE: printf("true"); break;
         case VALUE_FALSE: printf("false"); break;
+        case VALUE_DONE: printf("done"); break;
         case VALUE_NUMBER: printf("%g", VAL_TO_NUMBER(value)); break;
         case VALUE_OBJ: debug_print_object(VAL_TO_OBJ(value)); break;
     }
@@ -92,6 +93,7 @@ int debug_print_instruction(Chunk* chunk, int index) {
         case OP_POP:      return simple_instruction(index, "OP_POP");
         case OP_TRUE:     return simple_instruction(index, "OP_TRUE");
         case OP_FALSE:    return simple_instruction(index, "OP_FALSE");
+        case OP_DONE:     return simple_instruction(index, "OP_DONE");
         case OP_NIL:      return simple_instruction(index, "OP_NIL");
         case OP_DEF_GLOBAL: return constant_instruction(chunk, index, "OP_DEF_GLOBAL");
         case OP_GET_GLOBAL: return constant_instruction(chunk, index, "OP_GET_GLOBAL");
@@ -102,6 +104,7 @@ int debug_print_instruction(Chunk* chunk, int index) {
         case OP_LOOP:          return jump_instruction(chunk, index, -1, "OP_LOOP");
         case OP_JUMP:          return jump_instruction(chunk, index, +1, "OP_JUMP");
         case OP_JUMP_IF_FALSE: return jump_instruction(chunk, index, +1, "OP_JUMP_IF_FALSE");
+        case OP_JUMP_IF_DONE:  return jump_instruction(chunk, index, +1, "OP_JUMP_IF_DONE");
         case OP_OR:            return jump_instruction(chunk, index, +1, "OP_OR");
         case OP_AND:           return jump_instruction(chunk, index, +1, "OP_AND");
         case OP_CLOSURE: {

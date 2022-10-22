@@ -679,6 +679,14 @@ DEFINE_NATIVE(Range_end) {
     RETURN(NUMBER_TO_VAL(VAL_TO_RANGE(args[0])->end));
 }
 
+DEFINE_NATIVE(Range_iter) {
+    ARGSPEC("r");
+    RETURN(args[0]);
+}
+
+DEFINE_NATIVE(Range_advance) {
+}
+
 DEFINE_NATIVE(Range_iterMore) {
     ARGSPEC("r*");
     ObjRange* range = VAL_TO_RANGE(args[0]);
@@ -709,11 +717,6 @@ DEFINE_NATIVE(Range_iterMore) {
         RETURN(FALSE_VAL);
     }
     RETURN(NUMBER_TO_VAL(v));
-}
-
-DEFINE_NATIVE(Range_iterNext) {
-    ARGSPEC("rN");
-    RETURN(args[1]);
 }
 
 // ============================= List =============================
@@ -987,8 +990,8 @@ void core_init_vm(VM* vm)
     vm->RangeProto->proto = OBJ_TO_VAL(vm->ObjectProto);
     ADD_METHOD(RangeProto, "start",    Range_start);
     ADD_METHOD(RangeProto, "end",      Range_end);
-    ADD_METHOD(RangeProto, "iterNext", Range_iterNext);
-    ADD_METHOD(RangeProto, "iterMore", Range_iterMore);
+    ADD_METHOD(RangeProto, "iter",     Range_iter);
+    ADD_METHOD(RangeProto, "advance",  Range_advance);
 
     vm->ListProto = objobject_new(vm);
     vm->ListProto->proto = OBJ_TO_VAL(vm->ObjectProto);
@@ -1034,10 +1037,10 @@ void core_init_vm(VM* vm)
     ADD_OBJECT(&vm->globals, "Map",     vm->MapProto);
     ADD_OBJECT(&vm->globals, "Message", vm->MessageProto);
 
-    if (vm_interpret(vm, CORE_SOURCE) != INTERPRET_OK) {
-        fprintf(stderr, "vm_interpret(CORE_SOURCE) not ok.\n");
-        exit(788);
-    }
+    /* if (vm_interpret(vm, CORE_SOURCE) != INTERPRET_OK) { */
+    /*     fprintf(stderr, "vm_interpret(CORE_SOURCE) not ok.\n"); */
+    /*     exit(788); */
+    /* } */
 
 #undef ADD_OBJECT
 #undef ADD_NATIVE

@@ -65,6 +65,7 @@ uint32_t value_hash(Value v) {
         case VALUE_NIL:    return 0xa3b1799d;
         case VALUE_TRUE:   return 0x46685257;
         case VALUE_FALSE:  return 0x392456de;
+        case VALUE_DONE:   return 0x8f614c72;
         case VALUE_NUMBER: return hash_bits(double_to_bits(VAL_TO_NUMBER(v)));
         case VALUE_OBJ:    return object_hash(VAL_TO_OBJ(v));
         default: UNREACHABLE();

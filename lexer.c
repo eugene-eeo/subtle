@@ -139,6 +139,7 @@ static TokenType variable_type(Lexer* lexer) {
         case 'a': return match_rest(lexer, TOKEN_ASSERT, 1, "ssert", 5);
         case 'b': return match_rest(lexer, TOKEN_BREAK, 1, "reak", 4);
         case 'c': return match_rest(lexer, TOKEN_CONTINUE, 1, "ontinue", 7);
+        case 'd': return match_rest(lexer, TOKEN_DONE, 1, "one", 3);
         case 'e': return match_rest(lexer, TOKEN_ELSE, 1, "lse", 3);
         case 'f':
             if (lexer->current - lexer->start >= 2) {

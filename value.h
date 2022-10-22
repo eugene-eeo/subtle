@@ -14,6 +14,7 @@ typedef struct Obj Obj;
 #define IS_NIL(value)        ((value).type == VALUE_NIL)
 #define IS_TRUE(value)       ((value).type == VALUE_TRUE)
 #define IS_FALSE(value)      ((value).type == VALUE_FALSE)
+#define IS_DONE(value)       ((value).type == VALUE_DONE)
 #define IS_NUMBER(value)     ((value).type == VALUE_NUMBER)
 #define IS_OBJ(value)        ((value).type == VALUE_OBJ)
 
@@ -25,6 +26,7 @@ typedef struct Obj Obj;
 #define NIL_VAL          ((Value){VALUE_NIL,       {.number = 0}})
 #define TRUE_VAL         ((Value){VALUE_TRUE,      {.number = 0}})
 #define FALSE_VAL        ((Value){VALUE_FALSE,     {.number = 0}})
+#define DONE_VAL         ((Value){VALUE_DONE,      {.number = 0}})
 #define BOOL_TO_VAL(b)   ((b) ? TRUE_VAL : FALSE_VAL)
 #define NUMBER_TO_VAL(n) ((Value){VALUE_NUMBER,    {.number = n}})
 #define OBJ_TO_VAL(p)    ((Value){VALUE_OBJ,       {.obj = (Obj*)p}})
@@ -38,6 +40,7 @@ typedef enum {
     VALUE_NIL,
     VALUE_TRUE,
     VALUE_FALSE,
+    VALUE_DONE,
     VALUE_NUMBER,
     VALUE_OBJ,
 } ValueType;
