@@ -685,14 +685,11 @@ DEFINE_NATIVE(Range_iter) {
 }
 
 DEFINE_NATIVE(Range_advance) {
-}
-
-DEFINE_NATIVE(Range_iterMore) {
     ARGSPEC("r*");
     ObjRange* range = VAL_TO_RANGE(args[0]);
     // nothing to iterate?
     if (range->start == range->end && !range->inclusive)
-        RETURN(FALSE_VAL);
+        RETURN(DONE_VAL);
 
     double v;
     if (IS_NIL(args[1])) {
@@ -703,18 +700,18 @@ DEFINE_NATIVE(Range_iterMore) {
         if (range->start <= range->end) {
             // 0..5 or 0...5
             v = v + 1;
-            if (v < range->start) RETURN(FALSE_VAL);
-            if (range->inclusive && v > range->end) RETURN(FALSE_VAL);
-            if (!range->inclusive && v >= range->end) RETURN(FALSE_VAL);
+            if (v < range->start) RETURN(DONE_VAL);
+            if (range->inclusive && v > range->end) RETURN(DONE_VAL);
+            if (!range->inclusive && v >= range->end) RETURN(DONE_VAL);
         } else {
             // 5..0 or 5...0
             v = v - 1;
-            if (v > range->start) RETURN(FALSE_VAL);
-            if (range->inclusive && v < range->end) RETURN(FALSE_VAL);
-            if (!range->inclusive && v <= range->end) RETURN(FALSE_VAL);
+            if (v > range->start) RETURN(DONE_VAL);
+            if (range->inclusive && v < range->end) RETURN(DONE_VAL);
+            if (!range->inclusive && v <= range->end) RETURN(DONE_VAL);
         }
     } else {
-        RETURN(FALSE_VAL);
+        RETURN(DONE_VAL);
     }
     RETURN(NUMBER_TO_VAL(v));
 }

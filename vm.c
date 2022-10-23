@@ -441,7 +441,7 @@ run(VM* vm, ObjFiber* fiber, int top_level)
             }
             case OP_JUMP_IF_DONE: {
                 uint16_t offset = READ_SHORT();
-                if (IS_DONE(vm_peek(vm, 0)))
+                if (IS_DONE(vm_pop(vm)))
                     frame->ip += offset;
                 break;
             }

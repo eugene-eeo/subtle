@@ -245,7 +245,7 @@ static int stack_effects[] = {
     [OP_LOOP] = 0,
     [OP_JUMP] = 0,
     [OP_JUMP_IF_FALSE] = -1,
-    [OP_JUMP_IF_DONE] = 0,
+    [OP_JUMP_IF_DONE] = -1,
     [OP_OR] = -1,
     [OP_AND] = -1,
     [OP_CLOSURE] = 1,
@@ -1026,11 +1026,12 @@ static void for_stmt(Compiler* compiler) {
     // Desugar the following for loop:
     // for (x = items) {  | let _s = items.iter();
     //    bar;            | let _i = nil;
-    // }                  | while (_i = _s.advance()) {
+    // }                  | while (_i = _s.advance(_i)) {
     //                    |     let x = _i;
     //                    |     bar;
     //                    | }
-    Token seq_token  = {.start="$seq", .length=4};
+    Token seq_token  = {.start="$s", .length=2};
+    Token iter_token = {.start="$i", .length=2};
 
     begin_block(compiler);
     consume(compiler, TOKEN_LPAREN, "Expect '(' after 'for'.");
@@ -1057,17 +1058,28 @@ static void for_stmt(Compiler* compiler) {
     int seq = add_local(compiler, seq_token);
     mark_local_initialized(compiler);
 
+    // _i = nil
+    emit_op(compiler, OP_NIL);
+    int iter = add_local(compiler, iter_token);
+    mark_local_initialized(compiler);
+
     consume(compiler, TOKEN_RPAREN, "Expect ')' after loop expression.");
 
     Loop loop;
     enter_loop(compiler, &loop);
 
+    // _i = _s.advance(_i)
+    load_local(compiler, seq);
+    load_local(compiler, iter);
+    invoke_string_method(compiler, "advance", 1);
+    emit_op(compiler, OP_SET_LOCAL); emit_byte(compiler, (uint8_t) iter);
+    compiler->loop->cond_jump = emit_jump(compiler, OP_JUMP_IF_DONE);
+
+    // loop_var = _i
+    load_local(compiler, iter);
+
     // push a fresh block for every iteration
     begin_block(compiler);
-    // loop_var = _s.advance()
-    load_local(compiler, seq);
-    invoke_string_method(compiler, "advance", 0);
-    compiler->loop->cond_jump = emit_jump(compiler, OP_JUMP_IF_DONE);
     add_local(compiler, loop_var);
     mark_local_initialized(compiler);
     block_or_stmt(compiler);
