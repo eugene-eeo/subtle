@@ -39,3 +39,11 @@ u toString = Fn.new{
     return recursive.call(1, 3) toString;
 }
 u println
+
+# fixed a bug in Object.rawPerform that did not check if the
+# values were callable.
+assert (Fiber new {
+    let obj = {}
+    # this used to crash the vm.
+    obj rawPerform("x", 1)
+}) try != nil

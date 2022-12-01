@@ -181,6 +181,18 @@ vm_push_frame(VM* vm, ObjClosure* closure, int num_args)
 }
 
 bool
+vm_ensure_callable(VM* vm, Value v, int num_args, const char* slot)
+{
+    ASSERT(slot != NULL, "slot may not be NULL");
+
+    if (IS_CLOSURE(v) || IS_NATIVE(v)) return true;
+    if (num_args == 0) return true;
+
+    vm_runtime_error(vm, "Called a non-activatable slot '%s' with %d args.", slot, num_args);
+    return false;
+}
+
+bool
 vm_complete_call(VM* vm, Value callee, int num_args)
 {
     if (IS_CLOSURE(callee)) {
@@ -298,10 +310,8 @@ generic_invoke(VM* vm, Value obj, ObjString* slot_name, int num_args,
     if (vm_get_slot(vm, obj, OBJ_TO_VAL(slot_name), &callee))
         return complete_call(vm, callee, num_args);
     if (!vm_get_slot(vm, obj, OBJ_TO_VAL(vm->perform_string), &callee)) {
-        if (num_args != 0) {
-            vm_runtime_error(vm, "Called a non-activatable slot '%s' with %d args.", slot_name->chars, num_args);
+        if (!vm_ensure_callable(vm, NIL_VAL, num_args, slot_name->chars))
             return false;
-        }
         return complete_call(vm, NIL_VAL, 0);
     }
     // More expensive message alloc.

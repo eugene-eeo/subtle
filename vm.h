@@ -127,4 +127,7 @@ bool vm_call(VM* vm, Value callable, int num_args);
 // Runs the usual invoke path. This uses vm_call internally.
 bool vm_invoke(VM* vm,
                Value obj, ObjString* slot_name, int num_args);
+
+// Return true if the object `v` is callable.
+bool vm_ensure_callable(VM* vm, Value v, int num_args, const char* slot);
 #endif
