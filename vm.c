@@ -307,8 +307,11 @@ generic_invoke(VM* vm, Value obj, ObjString* slot_name, int num_args,
 {
     // Try to search on the protos.
     Value callee;
-    if (vm_get_slot(vm, obj, OBJ_TO_VAL(slot_name), &callee))
+    if (vm_get_slot(vm, obj, OBJ_TO_VAL(slot_name), &callee)) {
+        if (!vm_ensure_callable(vm, callee, num_args, slot_name->chars))
+            return false;
         return complete_call(vm, callee, num_args);
+    }
     if (!vm_get_slot(vm, obj, OBJ_TO_VAL(vm->perform_string), &callee)) {
         if (!vm_ensure_callable(vm, NIL_VAL, num_args, slot_name->chars))
             return false;

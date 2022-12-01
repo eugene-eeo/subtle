@@ -54,3 +54,10 @@ assert (Fiber new {
     obj perform = nil
     obj x(1) # used to crash here
 }) try != nil
+
+# similar bug...
+assert (Fiber new {
+    let obj = {}
+    obj x = nil
+    obj x(1) # used to crash here
+}) try != nil
