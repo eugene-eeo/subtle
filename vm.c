@@ -180,15 +180,19 @@ vm_push_frame(VM* vm, ObjClosure* closure, int num_args)
     }
 }
 
+static inline bool
+is_callable(Value v)
+{
+    return IS_CLOSURE(v) || IS_NATIVE(v);
+}
+
 bool
 vm_check_call(VM* vm, Value v, int num_args, const char* slot)
 {
     ASSERT(slot != NULL, "slot may not be NULL");
-
-    if (IS_CLOSURE(v) || IS_NATIVE(v)) return true;
-    if (num_args == 0) return true;
-
-    vm_runtime_error(vm, "Called a non-activatable slot '%s' with %d args.", slot, num_args);
+    if (is_callable(v) || num_args == 0)
+        return true;
+    vm_runtime_error(vm, "Called a non-callable slot '%s' with %d args.", slot, num_args);
     return false;
 }
 
@@ -300,8 +304,7 @@ vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
 
 typedef bool (*CompleteCallFn)(VM* vm, Value slot, int num_args);
 
-static
-bool
+static bool
 generic_invoke(VM* vm, Value obj, ObjString* slot_name, int num_args,
                CompleteCallFn complete_call)
 {
@@ -312,6 +315,10 @@ generic_invoke(VM* vm, Value obj, ObjString* slot_name, int num_args,
 
     // Has a 'perform' slot.
     if (vm_get_slot(vm, obj, OBJ_TO_VAL(vm->perform_string), &callee)) {
+        if (!is_callable(callee)) {
+            vm_runtime_error(vm, "Object has no callable 'perform' slot.");
+            return false;
+        }
         // Allocate an ObjMessage, massage the stack.
         Value* args = &vm->fiber->stack_top[-num_args];
         ObjMessage* msg = objmessage_new(vm, slot_name, args, num_args);
