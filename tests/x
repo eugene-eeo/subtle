@@ -45,5 +45,12 @@ u println
 assert (Fiber new {
     let obj = {}
     # this used to crash the vm.
-    obj rawPerform("x", 1)
+    obj rawPerform(Message new("x", 1))
+}) try != nil
+
+# similar bug in generic_invoke :)
+assert (Fiber new {
+    let obj = {}
+    obj perform = nil
+    obj x(1) # used to crash here
 }) try != nil

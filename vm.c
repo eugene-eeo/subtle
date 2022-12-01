@@ -314,7 +314,11 @@ generic_invoke(VM* vm, Value obj, ObjString* slot_name, int num_args,
             return false;
         return complete_call(vm, NIL_VAL, 0);
     }
-    // More expensive message alloc.
+    // Do the perform(msg) call.
+    // First check if perform is callable.
+    if (!vm_ensure_callable(vm, callee, 1, vm->perform_string->chars))
+        return false;
+    // Allocate an ObjMessage, massage the stack.
     Value* args = &vm->fiber->stack_top[-num_args];
     ObjMessage* msg = objmessage_new(vm, slot_name, args, num_args);
     vm_drop(vm, num_args);

@@ -113,6 +113,7 @@ vm_ensure_stack(VM* vm, int n)
 void vm_push_frame(VM* vm, ObjClosure* closure, int num_args);
 
 // Run the given callable, returning true if the call succeeded.
+// `callable` MUST be a closure or native, or num_args MUST be 0.
 // This should only be called if it's the last thing you do before
 // returning from a native function, as it uses vm_push_frame to
 // do the work.
