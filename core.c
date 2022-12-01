@@ -198,7 +198,7 @@ DEFINE_NATIVE(Object_perform) {
     // perform a call. we always check that the call is
     // valid.
     bool do_call = vm_get_slot(vm, self, OBJ_TO_VAL(msg->slot_name), &slot);
-    if (!vm_ensure_callable(vm, slot, msg->args->size, msg->slot_name->chars))
+    if (!vm_check_call(vm, slot, msg->args->size, msg->slot_name->chars))
         return false;
 
     if (do_call) {

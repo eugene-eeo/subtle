@@ -181,7 +181,7 @@ vm_push_frame(VM* vm, ObjClosure* closure, int num_args)
 }
 
 bool
-vm_ensure_callable(VM* vm, Value v, int num_args, const char* slot)
+vm_check_call(VM* vm, Value v, int num_args, const char* slot)
 {
     ASSERT(slot != NULL, "slot may not be NULL");
 
@@ -306,30 +306,29 @@ generic_invoke(VM* vm, Value obj, ObjString* slot_name, int num_args,
                CompleteCallFn complete_call)
 {
     // Try to search on the protos.
-    Value callee;
-    if (vm_get_slot(vm, obj, OBJ_TO_VAL(slot_name), &callee)) {
-        if (!vm_ensure_callable(vm, callee, num_args, slot_name->chars))
-            return false;
-        return complete_call(vm, callee, num_args);
+    Value callee = NIL_VAL;
+    if (vm_get_slot(vm, obj, OBJ_TO_VAL(slot_name), &callee))
+        goto call;
+
+    // Has a 'perform' slot.
+    if (vm_get_slot(vm, obj, OBJ_TO_VAL(vm->perform_string), &callee)) {
+        // Allocate an ObjMessage, massage the stack.
+        Value* args = &vm->fiber->stack_top[-num_args];
+        ObjMessage* msg = objmessage_new(vm, slot_name, args, num_args);
+        vm_drop(vm, num_args);
+        vm_push_root(vm, OBJ_TO_VAL(msg));
+        vm_ensure_stack(vm, 1);
+        vm_push(vm, OBJ_TO_VAL(msg));
+        vm_pop_root(vm); // msg
+        num_args = 1;
     }
-    if (!vm_get_slot(vm, obj, OBJ_TO_VAL(vm->perform_string), &callee)) {
-        if (!vm_ensure_callable(vm, NIL_VAL, num_args, slot_name->chars))
-            return false;
-        return complete_call(vm, NIL_VAL, 0);
-    }
-    // Do the perform(msg) call.
-    // First check if perform is callable.
-    if (!vm_ensure_callable(vm, callee, 1, vm->perform_string->chars))
+
+    // If we have no perform slot, and it's not found in the protos,
+    // then callee would be NIL at this point.
+call:
+    if (!vm_check_call(vm, callee, num_args, slot_name->chars))
         return false;
-    // Allocate an ObjMessage, massage the stack.
-    Value* args = &vm->fiber->stack_top[-num_args];
-    ObjMessage* msg = objmessage_new(vm, slot_name, args, num_args);
-    vm_drop(vm, num_args);
-    vm_push_root(vm, OBJ_TO_VAL(msg));
-    vm_ensure_stack(vm, 1);
-    vm_push(vm, OBJ_TO_VAL(msg));
-    vm_pop_root(vm); // msg
-    return complete_call(vm, callee, 1);
+    return complete_call(vm, callee, num_args);
 }
 
 bool
