@@ -40,7 +40,7 @@ static void objfiber_free(VM*, Obj*);
 static void objrange_free(VM*, Obj*);
 static void objlist_free(VM*, Obj*);
 static void objmap_free(VM*, Obj*);
-static void objmessage_free(VM*, Obj*);
+static void objmsg_free(VM*, Obj*);
 
 void
 object_free(Obj* obj, VM* vm)
@@ -59,7 +59,7 @@ object_free(Obj* obj, VM* vm)
     case OBJ_RANGE: objrange_free(vm, obj); break;
     case OBJ_LIST: objlist_free(vm, obj); break;
     case OBJ_MAP: objmap_free(vm, obj); break;
-    case OBJ_MESSAGE: objmessage_free(vm, obj); break;
+    case OBJ_MSG: objmsg_free(vm, obj); break;
     }
 }
 
@@ -517,32 +517,32 @@ objmap_free(VM* vm, Obj* obj)
     FREE(vm, ObjMap, map);
 }
 
-// ObjMessage
+// ObjMsg
 // ==========
 
-ObjMessage*
-objmessage_new(VM* vm, ObjString* slot_name, Value* args, uint32_t num_args)
+ObjMsg*
+objmsg_new(VM* vm, ObjString* slot_name, Value* args, uint32_t num_args)
 {
     ObjList* list = objlist_new(vm, num_args);
     for (uint32_t i = 0; i < num_args; i++)
         list->values[i] = args[i];
 
     vm_push_root(vm, OBJ_TO_VAL(list));
-    ObjMessage* msg = objmessage_from_list(vm, slot_name, list);
+    ObjMsg* msg = objmsg_from_list(vm, slot_name, list);
     vm_pop_root(vm); // list
     return msg;
 }
 
 void
-objmessage_free(VM* vm, Obj* obj)
+objmsg_free(VM* vm, Obj* obj)
 {
-    FREE(vm, ObjMessage, (ObjMessage*)obj);
+    FREE(vm, ObjMsg, (ObjMsg*)obj);
 }
 
-ObjMessage*
-objmessage_from_list(VM* vm, ObjString* slot_name, ObjList* list)
+ObjMsg*
+objmsg_from_list(VM* vm, ObjString* slot_name, ObjList* list)
 {
-    ObjMessage* msg = ALLOCATE_OBJECT(vm, OBJ_MESSAGE, ObjMessage);
+    ObjMsg* msg = ALLOCATE_OBJECT(vm, OBJ_MSG, ObjMsg);
     msg->slot_name = slot_name;
     msg->args = list;
     return msg;

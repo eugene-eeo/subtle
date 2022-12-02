@@ -32,7 +32,7 @@ void vm_init(VM* vm) {
     vm->RangeProto = NULL;
     vm->ListProto = NULL;
     vm->MapProto = NULL;
-    vm->MessageProto = NULL;
+    vm->MsgProto = NULL;
 
     vm->objects = NULL;
     vm->bytes_allocated = 0;
@@ -272,7 +272,7 @@ vm_get_prototype(VM* vm, Value value)
                 case OBJ_RANGE:   return OBJ_TO_VAL(vm->RangeProto);
                 case OBJ_LIST:    return OBJ_TO_VAL(vm->ListProto);
                 case OBJ_MAP:     return OBJ_TO_VAL(vm->MapProto);
-                case OBJ_MESSAGE: return OBJ_TO_VAL(vm->MessageProto);
+                case OBJ_MSG:     return OBJ_TO_VAL(vm->MsgProto);
                 default: UNREACHABLE();
             }
         }
@@ -310,7 +310,7 @@ typedef bool (*CompleteCallFn)(VM* vm, Value slot, int num_args);
 // 1. try to find the `slot_name` on the protos. if found, then
 //    complete the call using `complete_call`.
 // 2. try to find a "perform" slot on the protos. convert the call
-//    into an equivalent ObjMessage and call the perform slot with
+//    into an equivalent ObjMsg and call the perform slot with
 //    that instead.
 // 3. if both lookups fail, try calling with NIL_VAL.
 //
@@ -331,9 +331,9 @@ generic_invoke(VM* vm, Value obj, ObjString* slot_name, int num_args,
             vm_runtime_error(vm, "Object has no callable 'perform' slot.");
             return false;
         }
-        // Allocate an ObjMessage, massage the stack.
+        // Allocate an ObjMsg, massage the stack.
         Value* args = &vm->fiber->stack_top[-num_args];
-        ObjMessage* msg = objmessage_new(vm, slot_name, args, num_args);
+        ObjMsg* msg = objmsg_new(vm, slot_name, args, num_args);
         vm_drop(vm, num_args);
         vm_push_root(vm, OBJ_TO_VAL(msg));
         vm_ensure_stack(vm, 1);

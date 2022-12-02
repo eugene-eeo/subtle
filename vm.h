@@ -42,7 +42,7 @@ typedef struct VM {
     ObjObject* RangeProto;
     ObjObject* ListProto;
     ObjObject* MapProto;
-    ObjObject* MessageProto;
+    ObjObject* MsgProto;
     // -------------------------
 
     // ---- GC ----

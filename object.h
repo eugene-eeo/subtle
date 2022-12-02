@@ -22,7 +22,7 @@ typedef struct VM VM;
 #define IS_RANGE(value)        (is_object_type(value, OBJ_RANGE))
 #define IS_LIST(value)         (is_object_type(value, OBJ_LIST))
 #define IS_MAP(value)          (is_object_type(value, OBJ_MAP))
-#define IS_MESSAGE(value)      (is_object_type(value, OBJ_MESSAGE))
+#define IS_MSG(value)          (is_object_type(value, OBJ_MSG))
 
 #define VAL_TO_STRING(value)   ((ObjString*)VAL_TO_OBJ(value))
 #define VAL_TO_FN(value)       ((ObjFn*)VAL_TO_OBJ(value))
@@ -34,7 +34,7 @@ typedef struct VM VM;
 #define VAL_TO_RANGE(value)    ((ObjRange*)VAL_TO_OBJ(value))
 #define VAL_TO_LIST(value)     ((ObjList*)VAL_TO_OBJ(value))
 #define VAL_TO_MAP(value)      ((ObjMap*)VAL_TO_OBJ(value))
-#define VAL_TO_MESSAGE(value)  ((ObjMessage*)VAL_TO_OBJ(value))
+#define VAL_TO_MESSAGE(value)  ((ObjMsg*)VAL_TO_OBJ(value))
 
 typedef enum {
     OBJ_STRING,
@@ -47,7 +47,7 @@ typedef enum {
     OBJ_RANGE,
     OBJ_LIST,
     OBJ_MAP,
-    OBJ_MESSAGE,
+    OBJ_MSG,
 } ObjType;
 
 typedef struct Obj {
@@ -165,13 +165,13 @@ typedef struct ObjMap {
     Table tbl;
 } ObjMap;
 
-// ObjMessage represents a (mutable) "call", for example
-// a.b(c,d,e) <-> ObjMessage{slot_name=b, args=[c,d,e]}
-typedef struct ObjMessage {
+// ObjMsg represents a (mutable) "call", for example
+// a.b(c,d,e) <-> ObjMsg{slot_name=b, args=[c,d,e]}
+typedef struct {
     Obj obj;
     ObjString* slot_name;
     ObjList* args;
-} ObjMessage;
+} ObjMsg;
 
 // Object memory management
 // ========================
@@ -249,10 +249,10 @@ bool objmap_get(ObjMap* map, Value key, Value* value);
 bool objmap_set(ObjMap* map, VM* vm, Value key, Value value);
 bool objmap_delete(ObjMap* map, VM* vm, Value key);
 
-// ObjMessage
-// ==========
+// ObjMsg
+// ======
 
-ObjMessage* objmessage_new(VM* vm, ObjString* slot_name, Value* args, uint32_t num_args);
-ObjMessage* objmessage_from_list(VM* vm, ObjString* slot_name, ObjList* list);
+ObjMsg* objmsg_new(VM* vm, ObjString* slot_name, Value* args, uint32_t num_args);
+ObjMsg* objmsg_from_list(VM* vm, ObjString* slot_name, ObjList* list);
 
 #endif

@@ -1,5 +1,5 @@
 # For an object [obj] without slot [x],
-# obj.x(1,2) <-> obj.perform(Message{x, 1, 2})
+# obj.x(1,2) <-> obj.perform(Msg{x, 1, 2})
 let obj = {}
 obj perform = Fn new {|msg|
     assert msg slotName == "x"

@@ -96,7 +96,7 @@ static void mark_roots(VM* vm) {
     mark_object(vm, (Obj*)vm->RangeProto);
     mark_object(vm, (Obj*)vm->ListProto);
     mark_object(vm, (Obj*)vm->MapProto);
-    mark_object(vm, (Obj*)vm->MessageProto);
+    mark_object(vm, (Obj*)vm->MsgProto);
 
     table_mark(&vm->globals, vm);
     compiler_mark(vm->compiler, vm);
@@ -151,8 +151,8 @@ static void blacken_object(VM* vm, Obj* obj) {
             table_mark(&map->tbl, vm);
             break;
         }
-        case OBJ_MESSAGE: {
-            ObjMessage* msg = (ObjMessage*)obj;
+        case OBJ_MSG: {
+            ObjMsg* msg = (ObjMsg*)obj;
             mark_object(vm, (Obj*)msg->slot_name);
             mark_object(vm, (Obj*)msg->args);
             break;
