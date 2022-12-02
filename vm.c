@@ -304,6 +304,18 @@ vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
 
 typedef bool (*CompleteCallFn)(VM* vm, Value slot, int num_args);
 
+// generic method for invoking a message on an object, doing the
+// work using the given `complete_call` callback. The steps are:
+//
+// 1. try to find the `slot_name` on the protos. if found, then
+//    complete the call using `complete_call`.
+// 2. try to find a "perform" slot on the protos. convert the call
+//    into an equivalent ObjMessage and call the perform slot with
+//    that instead.
+// 3. if both lookups fail, try calling with NIL_VAL.
+//
+// this function will check if the call is valid before calling
+// the given complete_call callback.
 static bool
 generic_invoke(VM* vm, Value obj, ObjString* slot_name, int num_args,
                CompleteCallFn complete_call)
@@ -327,7 +339,7 @@ generic_invoke(VM* vm, Value obj, ObjString* slot_name, int num_args,
         vm_ensure_stack(vm, 1);
         vm_push(vm, OBJ_TO_VAL(msg));
         vm_pop_root(vm); // msg
-        num_args = 1;
+        return complete_call(vm, callee, 1);
     }
 
     // If we have no perform slot, and it's not found in the protos,
