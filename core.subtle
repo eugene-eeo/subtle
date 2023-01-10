@@ -32,23 +32,23 @@ let fromSlot = Fn.new{|slot|
 
 Object.rawEntryFromIndex = Fn.new{|i|
     return Entry new(
-        self rawIterSlotsNext(i),
-        self rawIterValueNext(i)
+        self rawSlotAt(i),
+        self rawValueAt(i)
     )
 }
 
 Map.rawEntryFromIndex = Fn.new{|i|
     return Entry new(
-        self rawIterKeyNext(i),
-        self rawIterValueNext(i)
+        self rawKeyAt(i),
+        self rawValueAt(i)
     )
 }
 
-Object.keys    = fromSlot.call("rawIterSlotsNext")
-Object.values  = fromSlot.call("rawIterValueNext")
+Object.keys    = fromSlot.call("rawSlotAt")
+Object.values  = fromSlot.call("rawValueAt")
 Object.entries = fromSlot.call("rawEntryFromIndex")
-Map.keys       = fromSlot.call("rawIterKeyNext")
-Map.values     = fromSlot.call("rawIterValueNext")
+Map.keys       = fromSlot.call("rawSlotAt")
+Map.values     = fromSlot.call("rawValueAt")
 Map.entries    = fromSlot.call("rawEntryFromIndex")
 
 List.fromIterator = Fn.new{|it|

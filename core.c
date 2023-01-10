@@ -379,7 +379,7 @@ DEFINE_NATIVE(Object_rawIterMore) {
     RETURN(rv);
 }
 
-DEFINE_NATIVE(Object_rawIterSlotsNext) {
+DEFINE_NATIVE(Object_rawSlotAt) {
     ARGSPEC("ON");
     ObjObject* obj = VAL_TO_OBJECT(args[0]);
     Entry entry;
@@ -388,7 +388,7 @@ DEFINE_NATIVE(Object_rawIterSlotsNext) {
     RETURN(NIL_VAL);
 }
 
-DEFINE_NATIVE(Object_rawIterValueNext) {
+DEFINE_NATIVE(Object_rawValueAt) {
     ARGSPEC("ON");
     ObjObject* obj = VAL_TO_OBJECT(args[0]);
     Entry entry;
@@ -828,7 +828,7 @@ DEFINE_NATIVE(Map_rawIterMore) {
     RETURN(rv);
 }
 
-DEFINE_NATIVE(Map_rawIterKeyNext) {
+DEFINE_NATIVE(Map_rawKeyAt) {
     ARGSPEC("MN");
     ObjMap* map = VAL_TO_MAP(args[0]);
     Entry entry;
@@ -837,7 +837,7 @@ DEFINE_NATIVE(Map_rawIterKeyNext) {
     RETURN(NIL_VAL);
 }
 
-DEFINE_NATIVE(Map_rawIterValueNext) {
+DEFINE_NATIVE(Map_rawValueAt) {
     ARGSPEC("MN");
     ObjMap* map = VAL_TO_MAP(args[0]);
     Entry entry;
@@ -928,8 +928,8 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "print",       Object_print);
     ADD_METHOD(ObjectProto, "new",         Object_new);
     ADD_METHOD(ObjectProto, "rawIterMore", Object_rawIterMore);
-    ADD_METHOD(ObjectProto, "rawIterSlotsNext", Object_rawIterSlotsNext);
-    ADD_METHOD(ObjectProto, "rawIterValueNext", Object_rawIterValueNext);
+    ADD_METHOD(ObjectProto, "rawSlotAt",   Object_rawSlotAt);
+    ADD_METHOD(ObjectProto, "rawValueAt",  Object_rawValueAt);
 
     vm->FnProto = objobject_new(vm);
     vm->FnProto->proto = OBJ_TO_VAL(vm->ObjectProto);
@@ -1014,8 +1014,8 @@ void core_init_vm(VM* vm)
     ADD_METHOD(MapProto, "delete", Map_delete);
     ADD_METHOD(MapProto, "length", Map_length);
     ADD_METHOD(MapProto, "rawIterMore", Map_rawIterMore);
-    ADD_METHOD(MapProto, "rawIterKeyNext", Map_rawIterKeyNext);
-    ADD_METHOD(MapProto, "rawIterValueNext", Map_rawIterValueNext);
+    ADD_METHOD(MapProto, "rawKeyAt",    Map_rawKeyAt);
+    ADD_METHOD(MapProto, "rawValueAt",  Map_rawValueAt);
 
     vm->MsgProto = objobject_new(vm);
     vm->MsgProto->proto = OBJ_TO_VAL(vm->ObjectProto);
