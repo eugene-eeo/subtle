@@ -42,7 +42,7 @@ x = {a=1, b=2, c=3};
 
 # keys
 seen = {};
-for (key = x.keys)
+for (key = x.slots)
     seen.setSlot(key, 1);
 assert seen.a == 1;
 assert seen.b == 1;

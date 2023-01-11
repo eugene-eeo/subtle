@@ -48,7 +48,7 @@ const char* CORE_SOURCE =
 "    )\n"
 "}\n"
 "\n"
-"Object.keys    = fromSlot.call(\"rawSlotAt\")\n"
+"Object.slots   = fromSlot.call(\"rawSlotAt\")\n"
 "Object.values  = fromSlot.call(\"rawValueAt\")\n"
 "Object.entries = fromSlot.call(\"rawEntryFromIndex\")\n"
 "Map.keys       = fromSlot.call(\"rawSlotAt\")\n"

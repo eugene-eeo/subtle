@@ -44,7 +44,7 @@ Map.rawEntryFromIndex = Fn.new{|i|
     )
 }
 
-Object.keys    = fromSlot.call("rawSlotAt")
+Object.slots   = fromSlot.call("rawSlotAt")
 Object.values  = fromSlot.call("rawValueAt")
 Object.entries = fromSlot.call("rawEntryFromIndex")
 Map.keys       = fromSlot.call("rawSlotAt")
