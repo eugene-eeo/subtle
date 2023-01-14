@@ -29,12 +29,6 @@ stress: core.subtle.inc
 		-DSUBTLE_DEBUG_STRESS_GC \
 		-g -Og $(MAIN) -o subtle
 
-benchmark:
-	mkdir -p build
-	$(CC) $(CCFLAGS) -O3 $(DEPS) \
-		bench/benchmark_table.c -o build/table_benchmark
-	./build/table_benchmark
-
 profile: core.subtle.inc
 	$(CC) $(CCFLAGS) -Og $(MAIN) -pg -o subtle
 
