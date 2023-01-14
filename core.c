@@ -197,22 +197,20 @@ DEFINE_NATIVE(Object_perform) {
     // search on protos. if we find it, then we need to
     // perform a call. we always check that the call is
     // valid.
-    bool do_call = vm_get_slot(vm, self, OBJ_TO_VAL(msg->slot_name), &slot);
+    bool exists = vm_get_slot(vm, self, OBJ_TO_VAL(msg->slot_name), &slot);
     if (!vm_check_call(vm, slot, msg->args->size, msg->slot_name->chars))
         return false;
-
-    if (do_call) {
-        // copy args onto stack.
-        vm_push_root(vm, args[1]);
-        vm_drop(vm, num_args); // pop all args, incl. msg
-        vm_ensure_stack(vm, msg->args->size);
-        vm_pop_root(vm); // msg
-        for (uint32_t i = 0; i < msg->args->size; i++)
-            vm_push(vm, msg->args->values[i]);
-        return vm_complete_call(vm, slot, msg->args->size);
-    } else {
+    if (!exists)
         RETURN(slot);
-    }
+
+    // copy args onto stack.
+    vm_push_root(vm, args[1]);
+    vm_drop(vm, num_args); // pop all args, incl. msg
+    vm_ensure_stack(vm, msg->args->size);
+    vm_pop_root(vm); // msg
+    for (uint32_t i = 0; i < msg->args->size; i++)
+        vm_push(vm, msg->args->values[i]);
+    return vm_complete_call(vm, slot, msg->args->size);
 }
 
 DEFINE_NATIVE(Object_getOwnSlot) {
