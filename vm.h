@@ -110,7 +110,7 @@ vm_ensure_stack(VM* vm, int n)
 //   | ... | self |   ...    |
 //   +-----+------+----------+
 //                           ^-- stack_top
-void vm_push_frame(VM* vm, ObjClosure* closure, int num_args);
+bool vm_push_frame(VM* vm, ObjClosure* closure, int num_args);
 
 // Run the given callable, returning true if the call succeeded.
 // `callable` MUST be a closure or native, or num_args MUST be 0.

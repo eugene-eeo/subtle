@@ -423,8 +423,7 @@ DEFINE_NATIVE(Fn_new) {
 
 DEFINE_NATIVE(Fn_call) {
     ARGSPEC("F");
-    vm_push_frame(vm, VAL_TO_CLOSURE(args[0]), num_args);
-    return true;
+    return vm_push_frame(vm, VAL_TO_CLOSURE(args[0]), num_args);
 }
 
 DEFINE_NATIVE(Fn_callWith) {
@@ -438,8 +437,7 @@ DEFINE_NATIVE(Fn_callWith) {
     for (int i = 0; i < num_args; i++)
         args[i] = args[i + 1];
     vm_pop(vm); // this will be a duplicate
-    vm_push_frame(vm, closure, num_args - 1);
-    return true;
+    return vm_push_frame(vm, closure, num_args - 1);
 }
 
 // ============================= Native =============================

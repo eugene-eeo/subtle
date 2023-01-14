@@ -154,14 +154,12 @@ runtime_error(VM* vm)
     vm->fiber = NULL;
 }
 
-void
+bool
 vm_push_frame(VM* vm, ObjClosure* closure, int num_args)
 {
     if (vm->fiber->frames_count > SUBTLE_MAX_FRAMES) {
-        // TODO: vm_push_frame should _probably_ return an error.
-        // this is recoverable in general, if we don't run out of memory.
-        fprintf(stderr, "hit max frame count: %d\n", SUBTLE_MAX_FRAMES);
-        exit(1);
+        vm_runtime_error(vm, "Hit max frame count: %d", SUBTLE_MAX_FRAMES);
+        return false;
     }
     Value* stack_start = vm->fiber->stack_top - num_args - 1;
 
@@ -178,6 +176,7 @@ vm_push_frame(VM* vm, ObjClosure* closure, int num_args)
         if (num_args > fn->arity)
             vm_drop(vm, num_args - fn->arity);
     }
+    return true;
 }
 
 static inline bool
@@ -200,8 +199,7 @@ bool
 vm_complete_call(VM* vm, Value callee, int num_args)
 {
     if (IS_CLOSURE(callee)) {
-        vm_push_frame(vm, VAL_TO_CLOSURE(callee), num_args);
-        return true;
+        return vm_push_frame(vm, VAL_TO_CLOSURE(callee), num_args);
     }
     if (IS_NATIVE(callee)) {
         ObjNative* native = VAL_TO_NATIVE(callee);
@@ -579,8 +577,8 @@ vm_call(VM* vm, Value slot, int num_args)
     vm->can_yield = false;
     if (IS_CLOSURE(slot)) {
         ObjClosure* closure = VAL_TO_CLOSURE(slot);
-        vm_push_frame(vm, closure, num_args);
-        rv = run(vm, vm->fiber, vm->fiber->frames_count - 1) == INTERPRET_OK;
+        if ((rv = vm_push_frame(vm, closure, num_args)))
+            rv = run(vm, vm->fiber, vm->fiber->frames_count - 1) == INTERPRET_OK;
     } else if (IS_NATIVE(slot)) {
         ObjNative* native = VAL_TO_NATIVE(slot);
         rv = native->fn(vm, &vm->fiber->stack_top[-num_args - 1], num_args);
