@@ -1106,9 +1106,6 @@ static void break_stmt(Compiler* compiler) {
 }
 
 static void return_stmt(Compiler* compiler) {
-    if (compiler->type == FUNCTION_TYPE_SCRIPT)
-        error(compiler, "Cannot return from top-level code.");
-
     if (check(compiler, TOKEN_NEWLINE) || check(compiler, TOKEN_SEMICOLON)) {
         emit_return(compiler);
     } else {
