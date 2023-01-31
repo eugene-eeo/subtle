@@ -1,0 +1,17 @@
+let f = Fn new {|a, b, c|
+    assert a == 1
+    assert b == 2
+    if (c != nil) {
+        assert self == 1
+    }
+    return "hi"
+}
+
+assert f call(1, 2) == "hi"
+assert f apply(List new(1, 2)) == "hi"
+
+assert f callWith(1, 1, 2) == "hi"
+assert f applyWith(1, List new(1, 2)) == "hi"
+
+assert Number.getSlot("+").callWith(1, 1) == 2
+assert Number.getSlot("+").applyWith(1, List new(2)) == 3

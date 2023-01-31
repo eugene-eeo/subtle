@@ -54,6 +54,7 @@ run_test:
 	$(RUNNER) ./subtle ./tests/list
 	$(RUNNER) ./subtle ./tests/newlines
 	$(RUNNER) ./subtle ./tests/perform
+	$(RUNNER) ./subtle ./tests/fn
 
 test:
 	make stress

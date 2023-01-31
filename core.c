@@ -440,6 +440,36 @@ DEFINE_NATIVE(Fn_callWith) {
     return vm_push_frame(vm, closure, num_args - 1);
 }
 
+DEFINE_NATIVE(Fn_apply) {
+    ARGSPEC("FL");
+    ObjClosure* fn = VAL_TO_CLOSURE(args[0]);
+    ObjList* arg_list = VAL_TO_LIST(args[1]);
+
+    vm_ensure_stack(vm, arg_list->size - 1);
+    vm_pop(vm); // list
+    for (uint32_t i = 0; i < arg_list->size; i++)
+        vm_push(vm, arg_list->values[i]);
+
+    return vm_push_frame(vm, fn, arg_list->size);
+}
+
+DEFINE_NATIVE(Fn_applyWith) {
+    ARGSPEC("F*L");
+    ObjClosure* fn = VAL_TO_CLOSURE(args[0]);
+    Value self = args[1];
+    ObjList* arg_list = VAL_TO_LIST(args[2]);
+
+    vm_ensure_stack(vm, arg_list->size - 2);
+    vm_pop(vm); // list
+    vm_pop(vm); // new_self
+    vm_pop(vm); // fn
+    vm_push(vm, self);
+    for (uint32_t i = 0; i < arg_list->size; i++)
+        vm_push(vm, arg_list->values[i]);
+
+    return vm_push_frame(vm, fn, arg_list->size);
+}
+
 // ============================= Native =============================
 
 DEFINE_NATIVE(Native_call) {
@@ -455,6 +485,38 @@ DEFINE_NATIVE(Native_callWith) {
         args[i] = args[i + 1];
     vm_pop(vm);
     return native->fn(vm, args, num_args - 1);
+}
+
+DEFINE_NATIVE(Native_apply) {
+    ARGSPEC("nL");
+    ObjNative* native = VAL_TO_NATIVE(args[0]);
+    ObjList* arg_list = VAL_TO_LIST(args[1]);
+
+    vm_ensure_stack(vm, arg_list->size - 1);
+    vm_pop(vm); // list
+    Value* args_start = &vm->fiber->stack_top[-1];
+    for (uint32_t i = 0; i < arg_list->size; i++)
+        vm_push(vm, arg_list->values[i]);
+
+    return native->fn(vm, args_start, arg_list->size);
+}
+
+DEFINE_NATIVE(Native_applyWith) {
+    ARGSPEC("n*L");
+    ObjNative* native = VAL_TO_NATIVE(args[0]);
+    Value self = args[1];
+    ObjList* arg_list = VAL_TO_LIST(args[2]);
+
+    vm_ensure_stack(vm, arg_list->size - 2);
+    vm_pop(vm); // list
+    vm_pop(vm); // new_self
+    vm_pop(vm); // fn
+    vm_push(vm, self);
+    Value* args_start = &vm->fiber->stack_top[-1];
+    for (uint32_t i = 0; i < arg_list->size; i++)
+        vm_push(vm, arg_list->values[i]);
+
+    return native->fn(vm, args_start, arg_list->size);
 }
 
 // ============================= Number =============================
@@ -929,14 +991,18 @@ void core_init_vm(VM* vm)
 
     vm->FnProto = objobject_new(vm);
     vm->FnProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    ADD_METHOD(FnProto, "new",      Fn_new);
-    ADD_METHOD(FnProto, "call",     Fn_call);
-    ADD_METHOD(FnProto, "callWith", Fn_callWith);
+    ADD_METHOD(FnProto, "new",       Fn_new);
+    ADD_METHOD(FnProto, "call",      Fn_call);
+    ADD_METHOD(FnProto, "callWith",  Fn_callWith);
+    ADD_METHOD(FnProto, "apply",     Fn_apply);
+    ADD_METHOD(FnProto, "applyWith", Fn_applyWith);
 
     vm->NativeProto = objobject_new(vm);
     vm->NativeProto->proto = OBJ_TO_VAL(vm->ObjectProto);
-    ADD_METHOD(NativeProto, "call",     Native_call);
-    ADD_METHOD(NativeProto, "callWith", Native_callWith);
+    ADD_METHOD(NativeProto, "call",      Native_call);
+    ADD_METHOD(NativeProto, "callWith",  Native_callWith);
+    ADD_METHOD(NativeProto, "apply",     Native_apply);
+    ADD_METHOD(NativeProto, "applyWith", Native_applyWith);
 
     vm->NumberProto = objobject_new(vm);
     vm->NumberProto->proto = OBJ_TO_VAL(vm->ObjectProto);
