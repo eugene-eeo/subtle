@@ -12,24 +12,6 @@ let Entry = {
     }
 }
 
-let MethodIterator = {
-    init = Fn.new{|obj, slot|
-        self._obj = obj
-        self._slot = slot
-        return self
-    },
-    iterMore = Fn.new{|v| return self._obj.rawIterMore(v) },
-    iterNext = Fn.new{|v|
-        return self._obj.
-            getSlot(self._slot).
-            callWith(self._obj, v)
-    }
-}
-
-let fromSlot = Fn.new{|slot|
-    return Fn.new{ return MethodIterator.new(self, slot) }
-}
-
 Object.rawEntryFromIndex = Fn.new{|i|
     return Entry new(
         self rawSlotAt(i),
@@ -42,6 +24,23 @@ Map.rawEntryFromIndex = Fn.new{|i|
         self rawKeyAt(i),
         self rawValueAt(i)
     )
+}
+
+let MethodIterator = {
+    init = Fn.new{|obj, slot|
+        self._obj = obj
+        self._slot = slot
+    },
+    iterMore = Fn.new{|v| return self._obj.rawIterMore(v) },
+    iterNext = Fn.new{|v|
+        return self._obj.
+            getSlot(self._slot).
+            callWith(self._obj, v)
+    }
+}
+
+let fromSlot = Fn.new{|slot|
+    return Fn.new{ return MethodIterator.new(self, slot) }
 }
 
 Object.slots   = fromSlot.call("rawSlotAt")
