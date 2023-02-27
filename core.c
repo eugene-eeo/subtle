@@ -75,8 +75,8 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
 
 #define CONST_STRING(vm, s) objstring_copy(vm, (s), strlen(s))
 
-static bool
-num_is_integer(double f)
+static inline bool
+is_integer(double f)
 {
     return trunc(f) == f;
 }
@@ -84,7 +84,7 @@ num_is_integer(double f)
 static bool
 value_to_index(double v, uint32_t length, uint32_t* idx)
 {
-    if (!num_is_integer(v)) return false;
+    if (!is_integer(v)) return false;
     if (v < 0) v += length;
     if (v < 0 || v >= length)
         return false;
@@ -93,19 +93,19 @@ value_to_index(double v, uint32_t length, uint32_t* idx)
 }
 
 static bool
-init_index(Value arg, uint32_t length, int32_t* rv)
+next_index(Value arg, uint32_t length, uint32_t* rv)
 {
-    int32_t idx = -1;
+    double idx = -1;
     if (IS_NIL(arg)) {
         idx = 0;
     } else if (IS_NUMBER(arg)) {
-        idx = (int32_t) VAL_TO_NUMBER(arg);
-        if (VAL_TO_NUMBER(arg) != idx) return false;
+        idx = VAL_TO_NUMBER(arg);
         idx++;
+        if (!is_integer(idx)) return false;
     }
     if (idx < 0 || idx >= length)
         return false;
-    *rv = idx;
+    *rv = (uint32_t) idx;
     return true;
 }
 
@@ -113,8 +113,8 @@ init_index(Value arg, uint32_t length, int32_t* rv)
 static Value
 generic_iterMore(Value arg, uint32_t length)
 {
-    int32_t idx;
-    if (!init_index(arg, length, &idx))
+    uint32_t idx;
+    if (!next_index(arg, length, &idx))
         return FALSE_VAL;
     return NUMBER_TO_VAL(idx);
 }
@@ -124,8 +124,8 @@ generic_iterMore(Value arg, uint32_t length)
 static Value
 generic_tableIterMore(Table* table, Value value)
 {
-    int32_t idx;
-    if (!init_index(value, table->capacity, &idx))
+    uint32_t idx;
+    if (!next_index(value, table->capacity, &idx))
         return FALSE_VAL;
     // Find a valid entry that is >= the given index.
     for (; idx < table->capacity; idx++)
