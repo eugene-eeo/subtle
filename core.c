@@ -76,15 +76,19 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
 #define CONST_STRING(vm, s) objstring_copy(vm, (s), strlen(s))
 
 static bool
-value_to_index(Value num, uint32_t length, uint32_t* idx)
+num_is_integer(double f)
 {
-    ASSERT(IS_NUMBER(num), "!IS_NUMBER(num)");
-    int32_t i = (int32_t) VAL_TO_NUMBER(num);
-    if (VAL_TO_NUMBER(num) != i) return false;
-    if (i < 0) i += length;
-    if (i < 0 || i >= length)
+    return trunc(f) == f;
+}
+
+static bool
+value_to_index(double v, uint32_t length, uint32_t* idx)
+{
+    if (!num_is_integer(v)) return false;
+    if (v < 0) v += length;
+    if (v < 0 || v >= length)
         return false;
-    *idx = (uint32_t)i;
+    *idx = (uint32_t)v;
     return true;
 }
 
@@ -136,7 +140,7 @@ static bool
 generic_tableIterEntry(Table* table, Value value, Entry* entry)
 {
     uint32_t idx;
-    if (!value_to_index(value, table->capacity, &idx))
+    if (!value_to_index(VAL_TO_NUMBER(value), table->capacity, &idx))
         return false;
     if (IS_UNDEFINED(table->entries[idx].key))
         return false;
@@ -560,6 +564,12 @@ DEFINE_NATIVE(Number_exclusiveRange) {
     RETURN(OBJ_TO_VAL(objrange_new(vm, start, end, false)));
 }
 
+DEFINE_NATIVE(Number_truncate) {
+    ARGSPEC("N");
+    double n = VAL_TO_NUMBER(args[0]);
+    RETURN(NUMBER_TO_VAL(trunc(n)));
+}
+
 // ============================= String =============================
 
 #define DEFINE_STRING_METHOD(name, op) \
@@ -593,7 +603,7 @@ DEFINE_NATIVE(String_get) {
     ARGSPEC("SN");
     ObjString* s = VAL_TO_STRING(args[0]);
     uint32_t idx;
-    if (value_to_index(args[1], s->length, &idx))
+    if (value_to_index(VAL_TO_NUMBER(args[1]), s->length, &idx))
         RETURN(OBJ_TO_VAL(objstring_copy(vm, s->chars + idx, 1)));
     RETURN(NIL_VAL);
 }
@@ -797,7 +807,7 @@ DEFINE_NATIVE(List_get) {
     ARGSPEC("LN");
     ObjList* list = VAL_TO_LIST(args[0]);
     uint32_t idx;
-    if (value_to_index(args[1], list->size, &idx))
+    if (value_to_index(VAL_TO_NUMBER(args[1]), list->size, &idx))
         RETURN(objlist_get(list, idx));
     RETURN(NIL_VAL);
 }
@@ -806,7 +816,7 @@ DEFINE_NATIVE(List_set) {
     ARGSPEC("LN*");
     ObjList* list = VAL_TO_LIST(args[0]);
     uint32_t idx;
-    if (value_to_index(args[1], list->size, &idx))
+    if (value_to_index(VAL_TO_NUMBER(args[1]), list->size, &idx))
         objlist_set(list, idx, args[2]);
     RETURN(OBJ_TO_VAL(list));
 }
@@ -815,7 +825,7 @@ DEFINE_NATIVE(List_delete) {
     ARGSPEC("LN");
     ObjList* list = VAL_TO_LIST(args[0]);
     uint32_t idx;
-    if (value_to_index(args[1], list->size, &idx))
+    if (value_to_index(VAL_TO_NUMBER(args[1]), list->size, &idx))
         objlist_del(list, vm, idx);
     RETURN(OBJ_TO_VAL(list));
 }
@@ -824,7 +834,7 @@ DEFINE_NATIVE(List_insert) {
     ARGSPEC("LN*");
     ObjList* list = VAL_TO_LIST(args[0]);
     uint32_t idx;
-    if (value_to_index(args[1], list->size + 1, &idx))
+    if (value_to_index(VAL_TO_NUMBER(args[1]), list->size + 1, &idx))
         objlist_insert(list, vm, idx, args[2]);
     RETURN(OBJ_TO_VAL(list));
 }
@@ -1019,6 +1029,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(NumberProto, "&",   Number_land);
     ADD_METHOD(NumberProto, "..",  Number_inclusiveRange);
     ADD_METHOD(NumberProto, "...", Number_exclusiveRange);
+    ADD_METHOD(NumberProto, "truncate", Number_truncate);
     ADD_VALUE(NumberProto, "inf",  NUMBER_TO_VAL(INFINITY));
     ADD_VALUE(NumberProto, "nan",  NUMBER_TO_VAL(NAN));
     ADD_VALUE(NumberProto, "largest",  NUMBER_TO_VAL(DBL_MAX));
