@@ -82,13 +82,19 @@ is_integer(double f)
 }
 
 static bool
-value_to_index(double v, uint32_t length, uint32_t* idx)
+value_to_index(Value v, uint32_t length, uint32_t* idx)
 {
-    if (!is_integer(v)) return false;
-    if (v < 0) v += length;
-    if (v < 0 || v >= length)
+    ASSERT(IS_NUMBER(v), "!IS_NUMBER(v)");
+    double i = VAL_TO_NUMBER(v);
+    if (!is_integer(i)) return false;
+    if (i < 0) i += length;
+    if (i < 0 || i >= length)
         return false;
-    *idx = (uint32_t)v;
+    // at this point we know:
+    //  1) i is integral
+    //  2) i >= 0 and i < UINT32_MAX
+    // so i must be a valid uint32_t
+    *idx = (uint32_t) i;
     return true;
 }
 
@@ -140,7 +146,7 @@ static bool
 generic_tableIterEntry(Table* table, Value value, Entry* entry)
 {
     uint32_t idx;
-    if (!value_to_index(VAL_TO_NUMBER(value), table->capacity, &idx))
+    if (!value_to_index(value, table->capacity, &idx))
         return false;
     if (IS_UNDEFINED(table->entries[idx].key))
         return false;
@@ -603,7 +609,7 @@ DEFINE_NATIVE(String_get) {
     ARGSPEC("SN");
     ObjString* s = VAL_TO_STRING(args[0]);
     uint32_t idx;
-    if (value_to_index(VAL_TO_NUMBER(args[1]), s->length, &idx))
+    if (value_to_index(args[1], s->length, &idx))
         RETURN(OBJ_TO_VAL(objstring_copy(vm, s->chars + idx, 1)));
     RETURN(NIL_VAL);
 }
@@ -807,7 +813,7 @@ DEFINE_NATIVE(List_get) {
     ARGSPEC("LN");
     ObjList* list = VAL_TO_LIST(args[0]);
     uint32_t idx;
-    if (value_to_index(VAL_TO_NUMBER(args[1]), list->size, &idx))
+    if (value_to_index(args[1], list->size, &idx))
         RETURN(objlist_get(list, idx));
     RETURN(NIL_VAL);
 }
@@ -816,7 +822,7 @@ DEFINE_NATIVE(List_set) {
     ARGSPEC("LN*");
     ObjList* list = VAL_TO_LIST(args[0]);
     uint32_t idx;
-    if (value_to_index(VAL_TO_NUMBER(args[1]), list->size, &idx))
+    if (value_to_index(args[1], list->size, &idx))
         objlist_set(list, idx, args[2]);
     RETURN(OBJ_TO_VAL(list));
 }
@@ -825,7 +831,7 @@ DEFINE_NATIVE(List_delete) {
     ARGSPEC("LN");
     ObjList* list = VAL_TO_LIST(args[0]);
     uint32_t idx;
-    if (value_to_index(VAL_TO_NUMBER(args[1]), list->size, &idx))
+    if (value_to_index(args[1], list->size, &idx))
         objlist_del(list, vm, idx);
     RETURN(OBJ_TO_VAL(list));
 }
@@ -834,7 +840,7 @@ DEFINE_NATIVE(List_insert) {
     ARGSPEC("LN*");
     ObjList* list = VAL_TO_LIST(args[0]);
     uint32_t idx;
-    if (value_to_index(VAL_TO_NUMBER(args[1]), list->size + 1, &idx))
+    if (value_to_index(args[1], list->size + 1, &idx))
         objlist_insert(list, vm, idx, args[2]);
     RETURN(OBJ_TO_VAL(list));
 }
