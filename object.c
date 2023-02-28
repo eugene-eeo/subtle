@@ -281,7 +281,7 @@ ObjFiber*
 objfiber_new(VM* vm, ObjClosure* closure)
 {
     // Allocate arrays first in case of GC
-    int stack_capacity = next_power_of_two(closure->fn->max_slots);
+    int stack_capacity = closure->fn->max_slots;
     Value* stack = ALLOCATE_ARRAY(vm, Value, stack_capacity);
 
     int frames_capacity = 1;
