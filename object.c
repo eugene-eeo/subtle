@@ -251,7 +251,7 @@ objobject_insert_proto(ObjObject* obj, VM* vm, uint32_t idx, Value proto)
 void
 objobject_del_proto(ObjObject* obj, Value proto)
 {
-    for (int i = obj->protos_count; i >= 0; i--) {
+    for (int i = 0; i < obj->protos_count; i++) {
         if (value_equal(obj->protos[i], proto)) {
             obj->protos_count--;
             for (int j = i; j < obj->protos_count; j++)

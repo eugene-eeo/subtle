@@ -1,0 +1,34 @@
+let x = {}
+let y = {}
+let z = {}
+let q = {}
+x addProto(y)
+x addProto(z)
+
+z a = 1
+assert x a == 1
+
+y a = 2
+assert x a == 2
+
+q a = 3
+x prependProto(q)
+assert x a == 3
+assert x protos length == 4
+assert x protos get(0) == q
+assert x protos get(1) == Object
+assert x protos get(2) == y
+assert x protos get(3) == z
+
+x removeProto(q)
+assert x a == 2
+
+x removeProto(y)
+assert x a == 1
+
+x removeProto(z)
+assert ! x hasSlot("a")
+
+x setProtos(List new())
+assert Object getSlot("protos") callWith(x) length == 0
+assert ! Object getSlot("hasOwnSlot") callWith(x, "protos")

@@ -55,6 +55,7 @@ run_test:
 	$(RUNNER) ./subtle ./tests/newlines
 	$(RUNNER) ./subtle ./tests/perform
 	$(RUNNER) ./subtle ./tests/fn
+	$(RUNNER) ./subtle ./tests/multiple-inheritance
 
 test:
 	make stress
