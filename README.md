@@ -4,7 +4,8 @@ Tiny OO, prototype-based language inspired by
 [Wren](https://github.com/wren-lang/wren) and
 [IO](https://iolanguage.org/).
 Features prototypal inheritance, fibers, operator overloading,
-and recursive inheritance (cycles in the prototype chain are allowed).
+recursive inheritance (cycles in the prototype chain are allowed),
+and multiple inheritance.
 
     # Comments start with '#'
     let Point = {}; # semicolons are optional
