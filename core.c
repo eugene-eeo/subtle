@@ -40,37 +40,41 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
         return false; \
     } while (false)
 
-#define ARG_ERROR(arg_idx, msg) \
+#define ARGSPEC(spec) \
     do { \
-        if ((arg_idx) == 0) \
-            ERROR("%s expected 'self' to be %s.", __func__, msg); \
-        else \
-            ERROR("%s expected arg %d to be %s.", __func__, (arg_idx)-1, msg); \
-    } while (false)
-
-#define ARGSPEC(spec) do { \
         for (int i=0; i < strlen(spec); i++) \
             ARG_CHECK_SINGLE(vm, (spec)[i], i); \
     } while(false)
 
-#define ARG_CHECK_SINGLE(vm, ch, idx) do { \
-    if (num_args < (idx)) \
-        ERROR("%s expected %d args, got %d instead.", __func__, idx, num_args); \
-    Value arg = args[idx]; \
-    switch (ch) { \
-        case 'O': if (!IS_OBJECT(arg))  ARG_ERROR(idx, "an Object"); break; \
-        case 'S': if (!IS_STRING(arg))  ARG_ERROR(idx, "a String"); break; \
-        case 'N': if (!IS_NUMBER(arg))  ARG_ERROR(idx, "a Number"); break; \
-        case 'n': if (!IS_NATIVE(arg))  ARG_ERROR(idx, "a Native"); break; \
-        case 'F': if (!IS_CLOSURE(arg)) ARG_ERROR(idx, "an Fn"); break; \
-        case 'f': if (!IS_FIBER(arg))   ARG_ERROR(idx, "a Fiber"); break; \
-        case 'r': if (!IS_RANGE(arg))   ARG_ERROR(idx, "a Range"); break; \
-        case 'L': if (!IS_LIST(arg))    ARG_ERROR(idx, "a List"); break; \
-        case 'M': if (!IS_MAP(arg))     ARG_ERROR(idx, "a Map"); break; \
-        case 'm': if (!IS_MSG(arg))     ARG_ERROR(idx, "a Msg"); break; \
+#define CHECK_TYPE(idx, val, check, msg) \
+    do { \
+        if (!check(val)) { \
+            if ((idx) == 0) \
+                ERROR("%s expected 'self' to be %s.", __func__, msg); \
+            else \
+                ERROR("%s expected arg %d to be %s.", __func__, (idx)-1, msg); \
+        } \
+    } while(false)
+
+#define ARG_CHECK_SINGLE(vm, ch, idx) \
+    do { \
+        if (num_args < (idx)) \
+            ERROR("%s expected %d args, got %d instead.", __func__, idx, num_args); \
+        Value arg = args[idx]; \
+        switch (ch) { \
+        case 'O': CHECK_TYPE(idx, arg, IS_OBJECT, "an Object"); break; \
+        case 'S': CHECK_TYPE(idx, arg, IS_STRING, "a String"); break; \
+        case 'N': CHECK_TYPE(idx, arg, IS_NUMBER, "a Number"); break; \
+        case 'n': CHECK_TYPE(idx, arg, IS_NATIVE, "a Native"); break; \
+        case 'F': CHECK_TYPE(idx, arg, IS_CLOSURE, "an Fn"); break; \
+        case 'f': CHECK_TYPE(idx, arg, IS_FIBER, "a Fiber"); break; \
+        case 'r': CHECK_TYPE(idx, arg, IS_RANGE, "a Range"); break; \
+        case 'L': CHECK_TYPE(idx, arg, IS_LIST, "a List"); break; \
+        case 'M': CHECK_TYPE(idx, arg, IS_MAP, "a Map"); break; \
+        case 'm': CHECK_TYPE(idx, arg, IS_MSG, "a Msg"); break; \
         case '*': break; \
         default: UNREACHABLE(); \
-    } \
+        } \
     } while(false)
 
 #define CONST_STRING(vm, s) objstring_copy(vm, (s), strlen(s))
