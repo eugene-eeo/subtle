@@ -161,6 +161,12 @@ generic_tableIterEntry(Table* table, Value value, Entry* entry)
 // ============================= Object =============================
 
 DEFINE_NATIVE(Object_proto) {
+    if (IS_OBJECT(args[0])) {
+        ObjObject* obj = VAL_TO_OBJECT(args[0]);
+        if (obj->protos_count > 0)
+            RETURN(obj->protos[0]);
+        RETURN(NIL_VAL);
+    }
     Value proto = vm_get_prototype(vm, args[0]);
     RETURN(proto);
 }
@@ -168,8 +174,52 @@ DEFINE_NATIVE(Object_proto) {
 DEFINE_NATIVE(Object_setProto) {
     ARGSPEC("O*");
     ObjObject* object = VAL_TO_OBJECT(args[0]);
-    object->proto = args[1];
+    objobject_set_proto(object, vm, args[1]);
     RETURN(NIL_VAL);
+}
+
+DEFINE_NATIVE(Object_setProtos) {
+    ARGSPEC("OL");
+    ObjObject* object = VAL_TO_OBJECT(args[0]);
+    ObjList* protos = VAL_TO_LIST(args[1]);
+    objobject_copy_protos(object, vm, protos->values, protos->size);
+    RETURN(NIL_VAL);
+}
+
+DEFINE_NATIVE(Object_addProto) {
+    ARGSPEC("O*");
+    ObjObject* object = VAL_TO_OBJECT(args[0]);
+    objobject_insert_proto(object, vm, object->protos_count, args[1]);
+    RETURN(NIL_VAL);
+}
+
+DEFINE_NATIVE(Object_prependProto) {
+    ARGSPEC("O*");
+    ObjObject* object = VAL_TO_OBJECT(args[0]);
+    objobject_insert_proto(object, vm, 0, args[1]);
+    RETURN(NIL_VAL);
+}
+
+DEFINE_NATIVE(Object_removeProto) {
+    ARGSPEC("O*");
+    ObjObject* object = VAL_TO_OBJECT(args[0]);
+    objobject_del_proto(object, args[1]);
+    RETURN(NIL_VAL);
+}
+
+DEFINE_NATIVE(Object_protos) {
+    ARGSPEC("*");
+    ObjList* list;
+    if (IS_OBJECT(args[0])) {
+        ObjObject* object = VAL_TO_OBJECT(args[0]);
+        list = objlist_new(vm, object->protos_count);
+        for (int i = 0; i < object->protos_count; i++)
+            list->values[i] = object->protos[i];
+    } else {
+        list = objlist_new(vm, 1);
+        list->values[0] = vm_get_prototype(vm, args[0]);
+    }
+    RETURN(OBJ_TO_VAL(list));
 }
 
 DEFINE_NATIVE(Object_hash) {
@@ -264,7 +314,7 @@ DEFINE_NATIVE(Object_not) {
 
 DEFINE_NATIVE(Object_clone) {
     ObjObject* obj = objobject_new(vm);
-    obj->proto = args[0];
+    objobject_set_proto(obj, vm, args[0]);
     RETURN(OBJ_TO_VAL(obj));
 }
 
@@ -275,6 +325,19 @@ has_ancestor(VM* vm, Value src, Value target)
     if (IS_OBJ(src)) {
         Obj* obj = VAL_TO_OBJ(src);
         if (obj->visited) return false;
+        if (obj->type == OBJ_OBJECT) {
+            obj->visited = true;
+            ObjObject* object = (ObjObject*)obj;
+            // Do the multiple lookup.
+            for (int i = 0; i < object->protos_count; i++) {
+                if (has_ancestor(vm, object->protos[i], target)) {
+                    obj->visited = false;
+                    return true;
+                }
+            }
+            obj->visited = false;
+            return false;
+        }
         obj->visited = true;
     }
     bool rv = has_ancestor(vm, vm_get_prototype(vm, src), target);
@@ -411,7 +474,9 @@ DEFINE_NATIVE(Object_rawValueAt) {
 
 DEFINE_NATIVE(Object_new) {
     ObjObject* obj = objobject_new(vm);
-    obj->proto = args[0];
+    vm_push_root(vm, OBJ_TO_VAL(obj));
+    objobject_set_proto(obj, vm, args[0]);
+    vm_pop_root(vm);
     Value rv = OBJ_TO_VAL(obj);
     // setup a call for obj.init(...).
     // rather than copy the receiver and arguments we "replace"
@@ -984,9 +1049,14 @@ void core_init_vm(VM* vm)
     vm->init_string = CONST_STRING(vm, "init");
 
     vm->ObjectProto = objobject_new(vm);
-    vm->ObjectProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    objobject_set_proto(vm->ObjectProto, vm, OBJ_TO_VAL(vm->ObjectProto));
     ADD_METHOD(ObjectProto, "proto",       Object_proto);
     ADD_METHOD(ObjectProto, "setProto",    Object_setProto);
+    ADD_METHOD(ObjectProto, "setProtos",   Object_setProtos);
+    ADD_METHOD(ObjectProto, "addProto",    Object_addProto);
+    ADD_METHOD(ObjectProto, "prependProto",Object_prependProto);
+    ADD_METHOD(ObjectProto, "removeProto", Object_removeProto);
+    ADD_METHOD(ObjectProto, "protos",      Object_protos);
     ADD_METHOD(ObjectProto, "hash",        Object_hash);
     ADD_METHOD(ObjectProto, "hasSlot",     Object_hasSlot);
     ADD_METHOD(ObjectProto, "getSlot",     Object_getSlot);
@@ -1010,7 +1080,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "rawValueAt",  Object_rawValueAt);
 
     vm->FnProto = objobject_new(vm);
-    vm->FnProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    objobject_set_proto(vm->FnProto, vm, OBJ_TO_VAL(vm->ObjectProto));
     ADD_METHOD(FnProto, "new",       Fn_new);
     ADD_METHOD(FnProto, "call",      Fn_call);
     ADD_METHOD(FnProto, "callWith",  Fn_callWith);
@@ -1018,14 +1088,14 @@ void core_init_vm(VM* vm)
     ADD_METHOD(FnProto, "applyWith", Fn_applyWith);
 
     vm->NativeProto = objobject_new(vm);
-    vm->NativeProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    objobject_set_proto(vm->NativeProto, vm, OBJ_TO_VAL(vm->ObjectProto));
     ADD_METHOD(NativeProto, "call",      Native_call);
     ADD_METHOD(NativeProto, "callWith",  Native_callWith);
     ADD_METHOD(NativeProto, "apply",     Native_apply);
     ADD_METHOD(NativeProto, "applyWith", Native_applyWith);
 
     vm->NumberProto = objobject_new(vm);
-    vm->NumberProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    objobject_set_proto(vm->NumberProto, vm, OBJ_TO_VAL(vm->ObjectProto));
     ADD_METHOD(NumberProto, "+",   Number_add);
     ADD_METHOD(NumberProto, "-",   Number_sub);
     ADD_METHOD(NumberProto, "*",   Number_mul);
@@ -1046,7 +1116,7 @@ void core_init_vm(VM* vm)
     ADD_VALUE(NumberProto, "smallest", NUMBER_TO_VAL(DBL_MIN));
 
     vm->StringProto = objobject_new(vm);
-    vm->StringProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    objobject_set_proto(vm->StringProto, vm, OBJ_TO_VAL(vm->ObjectProto));
     ADD_METHOD(StringProto, "+",      String_add);
     ADD_METHOD(StringProto, "length", String_length);
     ADD_METHOD(StringProto, "<",      String_lt);
@@ -1058,7 +1128,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(StringProto, "iterMore", String_iterMore);
 
     vm->FiberProto = objobject_new(vm);
-    vm->FiberProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    objobject_set_proto(vm->FiberProto, vm, OBJ_TO_VAL(vm->ObjectProto));
     ADD_METHOD(FiberProto, "current", Fiber_current);
     ADD_METHOD(FiberProto, "yield",   Fiber_yield);
     ADD_METHOD(FiberProto, "abort",   Fiber_abort);
@@ -1070,14 +1140,14 @@ void core_init_vm(VM* vm)
     ADD_METHOD(FiberProto, "error",   Fiber_error);
 
     vm->RangeProto = objobject_new(vm);
-    vm->RangeProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    objobject_set_proto(vm->RangeProto, vm, OBJ_TO_VAL(vm->ObjectProto));
     ADD_METHOD(RangeProto, "start",    Range_start);
     ADD_METHOD(RangeProto, "end",      Range_end);
     ADD_METHOD(RangeProto, "iterNext", Range_iterNext);
     ADD_METHOD(RangeProto, "iterMore", Range_iterMore);
 
     vm->ListProto = objobject_new(vm);
-    vm->ListProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    objobject_set_proto(vm->ListProto, vm, OBJ_TO_VAL(vm->ObjectProto));
     ADD_METHOD(ListProto, "new", List_new);
     ADD_METHOD(ListProto, "add", List_add);
     ADD_METHOD(ListProto, "get", List_get);
@@ -1089,7 +1159,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ListProto, "iterMore", List_iterMore);
 
     vm->MapProto = objobject_new(vm);
-    vm->MapProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    objobject_set_proto(vm->MapProto, vm, OBJ_TO_VAL(vm->ObjectProto));
     ADD_METHOD(MapProto, "new", Map_new);
     ADD_METHOD(MapProto, "has", Map_has);
     ADD_METHOD(MapProto, "get", Map_get);
@@ -1101,7 +1171,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(MapProto, "rawValueAt",  Map_rawValueAt);
 
     vm->MsgProto = objobject_new(vm);
-    vm->MsgProto->proto = OBJ_TO_VAL(vm->ObjectProto);
+    objobject_set_proto(vm->MsgProto, vm, OBJ_TO_VAL(vm->ObjectProto));
     ADD_METHOD(MsgProto, "new",         Msg_new);
     ADD_METHOD(MsgProto, "newFromList", Msg_newFromList);
     ADD_METHOD(MsgProto, "slotName",    Msg_slotName);

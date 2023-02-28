@@ -10,9 +10,9 @@
 #include <stdlib.h> // free
 #include <string.h> // strlen
 
-#ifdef SUBTLE_DEBUG_TRACE_EXECUTION
+/* #ifdef SUBTLE_DEBUG_TRACE_EXECUTION */
 #include "debug.h"
-#endif
+/* #endif */
 
 #define SUBTLE_MAX_FRAMES 1024
 
@@ -264,7 +264,6 @@ vm_get_prototype(VM* vm, Value value)
             switch (object->type) {
                 case OBJ_STRING:  return OBJ_TO_VAL(vm->StringProto);
                 case OBJ_CLOSURE: return OBJ_TO_VAL(vm->FnProto);
-                case OBJ_OBJECT:  return ((ObjObject*)object)->proto;
                 case OBJ_NATIVE:  return OBJ_TO_VAL(vm->NativeProto);
                 case OBJ_FIBER:   return OBJ_TO_VAL(vm->FiberProto);
                 case OBJ_RANGE:   return OBJ_TO_VAL(vm->RangeProto);
@@ -288,9 +287,20 @@ vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
         Obj* obj = VAL_TO_OBJ(src);
         if (obj->visited) return false;
         if (obj->type == OBJ_OBJECT) {
-            // Try to do a dictionary lookup
-            if (objobject_get((ObjObject*)obj, slot_name, slot_value))
+            // First do a lookup on the object itself.
+            ObjObject* object = (ObjObject*)obj;
+            if (objobject_get(object, slot_name, slot_value))
                 return true;
+
+            // Then do the multiple inheritance.
+            bool found = false;
+            obj->visited = true;
+            for (int i = 0; i < object->protos_count; i++) {
+                if ((found = vm_get_slot(vm, object->protos[i], slot_name, slot_value)))
+                    break;
+            }
+            obj->visited = false;
+            return found;
         }
         obj->visited = true;
     }
@@ -524,8 +534,8 @@ run(VM* vm, ObjFiber* fiber, int top_level)
             }
             case OP_OBJECT: {
                 ObjObject* object = objobject_new(vm);
-                object->proto = OBJ_TO_VAL(vm->ObjectProto);
                 vm_push(vm, OBJ_TO_VAL(object));
+                objobject_set_proto(object, vm, OBJ_TO_VAL(vm->ObjectProto));
                 break;
             }
             case OP_OBJLIT_SET: {
