@@ -1061,7 +1061,6 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "rawPerform",  Object_perform);
     ADD_METHOD(ObjectProto, "hasOwnSlot",  Object_hasOwnSlot);
     ADD_METHOD(ObjectProto, "getOwnSlot",  Object_getOwnSlot);
-    ADD_METHOD(ObjectProto, "setOwnSlot",  Object_setSlot);
     ADD_METHOD(ObjectProto, "deleteSlot",  Object_deleteSlot);
     ADD_METHOD(ObjectProto, "same",        Object_same);
     ADD_METHOD(ObjectProto, "rawType",     Object_rawType);

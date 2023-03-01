@@ -16,7 +16,7 @@ let x = {};
 for (i = 1..5) {
     if (i == 2) continue;
     if (i == 5) break;
-    x.setOwnSlot(i, Fn.new{ return i; });
+    x.setSlot(i, Fn.new{ return i; });
 }
 
 assert x.getOwnSlot(1).call == 1;

@@ -1,7 +1,7 @@
 let get_fiber = Fn.new{
     return Fiber.new{|v|
         while (true) {
-            v println;
+            # v println;
             let s = Fiber.yield(v);
             if (!s) break;
             v = v + 1;
@@ -18,7 +18,7 @@ let x = {};
 let f = Fiber.new{
     x.setSlot = Fn.new{|k, v|
         let rv = Fiber.yield;
-        x.setOwnSlot(k, v);
+        Object.getSlot("setSlot").callWith(x, k, v);
         return rv;
     };
     assert (x.b = 1) == 2;
