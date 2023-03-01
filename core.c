@@ -203,7 +203,7 @@ DEFINE_NATIVE(Object_prependProto) {
 DEFINE_NATIVE(Object_removeProto) {
     ARGSPEC("O*");
     ObjObject* object = VAL_TO_OBJECT(args[0]);
-    objobject_del_proto(object, args[1]);
+    objobject_delete_proto(object, args[1]);
     RETURN(NIL_VAL);
 }
 
@@ -326,17 +326,14 @@ has_ancestor(VM* vm, Value src, Value target)
         Obj* obj = VAL_TO_OBJ(src);
         if (obj->visited) return false;
         if (obj->type == OBJ_OBJECT) {
-            obj->visited = true;
             ObjObject* object = (ObjObject*)obj;
-            // Do the multiple lookup.
-            for (int i = 0; i < object->protos_count; i++) {
-                if (has_ancestor(vm, object->protos[i], target)) {
-                    obj->visited = false;
-                    return true;
-                }
-            }
+            bool found = false;
+            obj->visited = true;
+            for (int i = 0; i < object->protos_count; i++)
+                if ((found = has_ancestor(vm, object->protos[i], target)))
+                    break;
             obj->visited = false;
-            return false;
+            return found;
         }
         obj->visited = true;
     }

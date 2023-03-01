@@ -295,10 +295,9 @@ vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
             // Then do the multiple inheritance.
             bool found = false;
             obj->visited = true;
-            for (int i = 0; i < object->protos_count; i++) {
+            for (int i = 0; i < object->protos_count; i++)
                 if ((found = vm_get_slot(vm, object->protos[i], slot_name, slot_value)))
                     break;
-            }
             obj->visited = false;
             return found;
         }

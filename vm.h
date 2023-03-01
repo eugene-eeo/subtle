@@ -87,6 +87,8 @@ InterpretResult vm_interpret(VM* vm, const char* source);
 
 // Object system
 // =============
+
+// Returns the prototype of a non-ObjObject value.
 Value vm_get_prototype(VM* vm, Value value);
 bool vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value);
 
