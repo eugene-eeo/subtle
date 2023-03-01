@@ -1041,12 +1041,12 @@ void core_init_vm(VM* vm)
 #define ADD_NATIVE(table, name, fn)  (ADD_OBJECT(table, name, objnative_new(vm, fn)))
 #define ADD_METHOD(PROTO, name, fn)  (ADD_NATIVE(&vm->PROTO->slots, name, fn))
 #define ADD_VALUE(PROTO, name, v)    (define_on_table(vm, &vm->PROTO->slots, name, v))
+#define SET_PROTO(TARGET, PROTO)     (objobject_set_proto(vm->TARGET, vm, OBJ_TO_VAL(vm->PROTO)))
 
     vm->perform_string = CONST_STRING(vm, "perform");
     vm->init_string = CONST_STRING(vm, "init");
 
     vm->ObjectProto = objobject_new(vm);
-    objobject_set_proto(vm->ObjectProto, vm, OBJ_TO_VAL(vm->ObjectProto));
     ADD_METHOD(ObjectProto, "proto",       Object_proto);
     ADD_METHOD(ObjectProto, "setProto",    Object_setProto);
     ADD_METHOD(ObjectProto, "setProtos",   Object_setProtos);
@@ -1077,7 +1077,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "rawValueAt",  Object_rawValueAt);
 
     vm->FnProto = objobject_new(vm);
-    objobject_set_proto(vm->FnProto, vm, OBJ_TO_VAL(vm->ObjectProto));
+    SET_PROTO(FnProto, ObjectProto);
     ADD_METHOD(FnProto, "new",       Fn_new);
     ADD_METHOD(FnProto, "call",      Fn_call);
     ADD_METHOD(FnProto, "callWith",  Fn_callWith);
@@ -1085,14 +1085,14 @@ void core_init_vm(VM* vm)
     ADD_METHOD(FnProto, "applyWith", Fn_applyWith);
 
     vm->NativeProto = objobject_new(vm);
-    objobject_set_proto(vm->NativeProto, vm, OBJ_TO_VAL(vm->ObjectProto));
+    SET_PROTO(NativeProto, ObjectProto);
     ADD_METHOD(NativeProto, "call",      Native_call);
     ADD_METHOD(NativeProto, "callWith",  Native_callWith);
     ADD_METHOD(NativeProto, "apply",     Native_apply);
     ADD_METHOD(NativeProto, "applyWith", Native_applyWith);
 
     vm->NumberProto = objobject_new(vm);
-    objobject_set_proto(vm->NumberProto, vm, OBJ_TO_VAL(vm->ObjectProto));
+    SET_PROTO(NumberProto, ObjectProto);
     ADD_METHOD(NumberProto, "+",   Number_add);
     ADD_METHOD(NumberProto, "-",   Number_sub);
     ADD_METHOD(NumberProto, "*",   Number_mul);
@@ -1113,7 +1113,7 @@ void core_init_vm(VM* vm)
     ADD_VALUE(NumberProto, "smallest", NUMBER_TO_VAL(DBL_MIN));
 
     vm->StringProto = objobject_new(vm);
-    objobject_set_proto(vm->StringProto, vm, OBJ_TO_VAL(vm->ObjectProto));
+    SET_PROTO(StringProto, ObjectProto);
     ADD_METHOD(StringProto, "+",      String_add);
     ADD_METHOD(StringProto, "length", String_length);
     ADD_METHOD(StringProto, "<",      String_lt);
@@ -1125,7 +1125,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(StringProto, "iterMore", String_iterMore);
 
     vm->FiberProto = objobject_new(vm);
-    objobject_set_proto(vm->FiberProto, vm, OBJ_TO_VAL(vm->ObjectProto));
+    SET_PROTO(FiberProto, ObjectProto);
     ADD_METHOD(FiberProto, "current", Fiber_current);
     ADD_METHOD(FiberProto, "yield",   Fiber_yield);
     ADD_METHOD(FiberProto, "abort",   Fiber_abort);
@@ -1137,14 +1137,14 @@ void core_init_vm(VM* vm)
     ADD_METHOD(FiberProto, "error",   Fiber_error);
 
     vm->RangeProto = objobject_new(vm);
-    objobject_set_proto(vm->RangeProto, vm, OBJ_TO_VAL(vm->ObjectProto));
+    SET_PROTO(RangeProto, ObjectProto);
     ADD_METHOD(RangeProto, "start",    Range_start);
     ADD_METHOD(RangeProto, "end",      Range_end);
     ADD_METHOD(RangeProto, "iterNext", Range_iterNext);
     ADD_METHOD(RangeProto, "iterMore", Range_iterMore);
 
     vm->ListProto = objobject_new(vm);
-    objobject_set_proto(vm->ListProto, vm, OBJ_TO_VAL(vm->ObjectProto));
+    SET_PROTO(ListProto, ObjectProto);
     ADD_METHOD(ListProto, "new", List_new);
     ADD_METHOD(ListProto, "add", List_add);
     ADD_METHOD(ListProto, "get", List_get);
@@ -1156,7 +1156,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ListProto, "iterMore", List_iterMore);
 
     vm->MapProto = objobject_new(vm);
-    objobject_set_proto(vm->MapProto, vm, OBJ_TO_VAL(vm->ObjectProto));
+    SET_PROTO(MapProto, ObjectProto);
     ADD_METHOD(MapProto, "new", Map_new);
     ADD_METHOD(MapProto, "has", Map_has);
     ADD_METHOD(MapProto, "get", Map_get);
@@ -1168,7 +1168,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(MapProto, "rawValueAt",  Map_rawValueAt);
 
     vm->MsgProto = objobject_new(vm);
-    objobject_set_proto(vm->MsgProto, vm, OBJ_TO_VAL(vm->ObjectProto));
+    SET_PROTO(MsgProto, ObjectProto);
     ADD_METHOD(MsgProto, "new",         Msg_new);
     ADD_METHOD(MsgProto, "newFromList", Msg_newFromList);
     ADD_METHOD(MsgProto, "slotName",    Msg_slotName);
@@ -1196,4 +1196,5 @@ void core_init_vm(VM* vm)
 #undef ADD_NATIVE
 #undef ADD_METHOD
 #undef ADD_VALUE
+#undef SET_PROTO
 }

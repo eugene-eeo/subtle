@@ -41,16 +41,18 @@ let a
     2
 )
 
-assert Object.
-    proto. # Object
-    proto. # Object
-    proto == Object
+let O = {}
+O proto = O
+assert O.
+    proto.
+    proto.
+    proto == O
 
 # mix and match dot/space-style access
-assert (Object
-    proto # Object
-    .proto # Object
-    proto) == Object
+assert (O
+    proto # O
+    .proto # O
+    proto) == O
 
 let x = {}
 assert (x
