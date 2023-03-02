@@ -280,33 +280,27 @@ vm_get_prototype(VM* vm, Value value)
 bool
 vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
 {
-    // We don't mark non-Obj values as visited. This is because
-    // their prototypes are well-known, and can only be given
-    // by vm_get_prototype.
-    if (IS_OBJ(src)) {
+    // We don't mark non-ObjObject values as their prototypes
+    // are well-known and can only be given by vm_get_prototype.
+    if (IS_OBJECT(src)) {
         Obj* obj = VAL_TO_OBJ(src);
         if (obj->visited) return false;
-        if (obj->type == OBJ_OBJECT) {
-            // First do a lookup on the object itself.
-            ObjObject* object = (ObjObject*)obj;
-            if (objobject_get(object, slot_name, slot_value))
-                return true;
 
-            // Then do the multiple inheritance.
-            bool found = false;
-            obj->visited = true;
-            for (int i = 0; i < object->protos_count; i++)
-                if ((found = vm_get_slot(vm, object->protos[i], slot_name, slot_value)))
-                    break;
-            obj->visited = false;
-            return found;
-        }
+        // First do a lookup on the object itself.
+        ObjObject* object = (ObjObject*)obj;
+        if (objobject_get(object, slot_name, slot_value))
+            return true;
+
+        // Then do the multiple inheritance.
+        bool found = false;
         obj->visited = true;
+        for (int i = 0; i < object->protos_count; i++)
+            if ((found = vm_get_slot(vm, object->protos[i], slot_name, slot_value)))
+                break;
+        obj->visited = false;
+        return found;
     }
-    bool rv = vm_get_slot(vm, vm_get_prototype(vm, src), slot_name, slot_value);
-    if (IS_OBJ(src))
-        VAL_TO_OBJ(src)->visited = false;
-    return rv;
+    return vm_get_slot(vm, vm_get_prototype(vm, src), slot_name, slot_value);
 }
 
 typedef bool (*CompleteCallFn)(VM* vm, Value slot, int num_args);

@@ -322,25 +322,20 @@ static bool
 has_ancestor(VM* vm, Value src, Value target)
 {
     if (value_equal(src, target)) return true;
-    if (IS_OBJ(src)) {
+    if (IS_OBJECT(src)) {
         Obj* obj = VAL_TO_OBJ(src);
         if (obj->visited) return false;
-        if (obj->type == OBJ_OBJECT) {
-            ObjObject* object = (ObjObject*)obj;
-            bool found = false;
-            obj->visited = true;
-            for (int i = 0; i < object->protos_count; i++)
-                if ((found = has_ancestor(vm, object->protos[i], target)))
-                    break;
-            obj->visited = false;
-            return found;
-        }
+
+        ObjObject* object = (ObjObject*)obj;
+        bool found = false;
         obj->visited = true;
+        for (int i = 0; i < object->protos_count; i++)
+            if ((found = has_ancestor(vm, object->protos[i], target)))
+                break;
+        obj->visited = false;
+        return found;
     }
-    bool rv = has_ancestor(vm, vm_get_prototype(vm, src), target);
-    if (IS_OBJ(src))
-        VAL_TO_OBJ(src)->visited = false;
-    return rv;
+    return has_ancestor(vm, vm_get_prototype(vm, src), target);
 }
 
 // obj.hasAncestor(x) returns true if the obj has x anywhere
