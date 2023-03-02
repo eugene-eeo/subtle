@@ -203,7 +203,7 @@ DEFINE_NATIVE(Object_prependProto) {
 DEFINE_NATIVE(Object_removeProto) {
     ARGSPEC("O*");
     ObjObject* object = VAL_TO_OBJECT(args[0]);
-    objobject_delete_proto(object, args[1]);
+    objobject_delete_proto(object, vm, args[1]);
     RETURN(NIL_VAL);
 }
 

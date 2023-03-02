@@ -335,7 +335,7 @@ generic_invoke(VM* vm, Value obj, ObjString* slot_name, int num_args,
     // Has a 'perform' slot.
     if (vm_get_slot(vm, obj, OBJ_TO_VAL(vm->perform_string), &callee)) {
         if (!is_callable(callee)) {
-            vm_runtime_error(vm, "Object has no callable 'perform' slot.");
+            vm_runtime_error(vm, "Object does not respond to message '%s'.", slot_name);
             return false;
         }
         // Allocate an ObjMsg, massage the stack.

@@ -213,7 +213,6 @@ objobject_new(VM* vm)
     table_init(&object->slots);
     object->protos = NULL;
     object->protos_count = 0;
-    object->protos_capacity = 0;
     return object;
 }
 
@@ -227,21 +226,11 @@ objobject_set_proto(ObjObject* obj, VM* vm, Value proto)
     obj->protos[0] = proto;
 }
 
-static inline int
-max(int a, int b)
-{
-    return a > b ? a : b;
-}
-
 void
 objobject_insert_proto(ObjObject* obj, VM* vm, uint32_t idx, Value proto)
 {
     ASSERT(obj->protos_count >= idx, "obj->protos_count < idx");
-    if (obj->protos_count + 1 > obj->protos_capacity) {
-        uint32_t old_cap = obj->protos_capacity;
-        obj->protos_capacity = max(2 * obj->protos_capacity, 1);
-        obj->protos = GROW_ARRAY(vm, obj->protos, Value, old_cap, obj->protos_capacity);
-    }
+    obj->protos = GROW_ARRAY(vm, obj->protos, Value, obj->protos_count, obj->protos_count + 1);
     obj->protos_count++;
     for (uint32_t i = obj->protos_count - 1; i > idx; i--)
         obj->protos[i] = obj->protos[i-1];
@@ -249,26 +238,27 @@ objobject_insert_proto(ObjObject* obj, VM* vm, uint32_t idx, Value proto)
 }
 
 void
-objobject_delete_proto(ObjObject* obj, Value proto)
+objobject_delete_proto(ObjObject* obj, VM* vm, Value proto)
 {
-    for (int i = 0; i < obj->protos_count; i++) {
+    uint32_t old_size = obj->protos_count;
+    for (int i = 0; i < obj->protos_count;) {
         if (value_equal(obj->protos[i], proto)) {
             obj->protos_count--;
             for (int j = i; j < obj->protos_count; j++)
                 obj->protos[j] = obj->protos[j + 1];
-            i--; // counteract i++
+        } else {
+            i++;
         }
     }
+    if (obj->protos_count != old_size)
+        obj->protos = GROW_ARRAY(vm, obj->protos, Value, old_size, obj->protos_count);
 }
 
 void
 objobject_copy_protos(ObjObject* obj, VM* vm, Value* protos, uint32_t length)
 {
-    if (length > obj->protos_capacity) {
-        uint32_t old_cap = obj->protos_capacity;
-        obj->protos_capacity = length;
-        obj->protos = GROW_ARRAY(vm, obj->protos, Value, old_cap, obj->protos_capacity);
-    }
+    if (length != obj->protos_count)
+        obj->protos = GROW_ARRAY(vm, obj->protos, Value, obj->protos_count, length);
     obj->protos_count = length;
     for (uint32_t i = 0; i < length; i++)
         obj->protos[i] = protos[i];
@@ -304,7 +294,7 @@ objobject_free(VM* vm, Obj* obj)
 {
     ObjObject* object = (ObjObject*)obj;
     table_free(&object->slots, vm);
-    FREE_ARRAY(vm, object->protos, Value, object->protos_capacity);
+    FREE_ARRAY(vm, object->protos, Value, object->protos_count);
     FREE(vm, ObjObject, object);
 }
 

@@ -102,7 +102,6 @@ typedef struct {
     Obj obj;
     Value* protos;
     uint32_t protos_count;
-    uint32_t protos_capacity;
     Table slots;
 } ObjObject;
 
@@ -211,7 +210,7 @@ ObjClosure* objclosure_new(VM* vm, ObjFn* fn);
 ObjObject* objobject_new(VM* vm);
 void objobject_set_proto(ObjObject* obj, VM* vm, Value proto);
 void objobject_insert_proto(ObjObject* obj, VM* vm, uint32_t idx, Value proto);
-void objobject_delete_proto(ObjObject* obj, Value proto);
+void objobject_delete_proto(ObjObject* obj, VM* vm, Value proto);
 void objobject_copy_protos(ObjObject* obj, VM* vm, Value* protos, uint32_t length);
 bool objobject_has(ObjObject* obj, Value key);
 bool objobject_get(ObjObject* obj, Value key, Value* result);
