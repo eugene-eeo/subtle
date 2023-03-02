@@ -19,12 +19,11 @@ typedef enum {
 typedef struct VM {
     ObjFiber* fiber;
     // Whether we allow the currently running fiber to yield.
-    // At present, fibers cannot yield when they trigger a vm_call.
-    // This is because we often assume that we stay in the same
-    // fiber _after_ vm_call returns, and the only way to switch
-    // _out_ of the currently executing fiber is via Fiber.yield();
-    // as Fiber.call() or Fiber.try() check if the current fiber has
-    // type FIBER_ROOT, or has another fiber as its parent.
+    // At present, fibers cannot yield when they trigger a vm_call,
+    // since we assume that we stay in the same fiber after vm_call
+    // returns, and the only way to switch _out_ of the current fiber
+    // is via Fiber.yield(); since Fiber.call() or Fiber.try() has
+    // "stack" semantics.
     bool can_yield;
 
     // ---- init'ed by core ----
