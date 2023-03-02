@@ -314,36 +314,15 @@ DEFINE_NATIVE(Object_not) {
 
 DEFINE_NATIVE(Object_clone) {
     ObjObject* obj = objobject_new(vm);
+    vm_push_root(vm, OBJ_TO_VAL(obj));
     objobject_set_proto(obj, vm, args[0]);
+    vm_pop_root(vm);
     RETURN(OBJ_TO_VAL(obj));
 }
 
-static bool
-has_ancestor(VM* vm, Value src, Value target)
-{
-    if (value_equal(src, target)) return true;
-    if (IS_OBJECT(src)) {
-        Obj* obj = VAL_TO_OBJ(src);
-        if (obj->visited) return false;
-
-        ObjObject* object = (ObjObject*)obj;
-        bool found = false;
-        obj->visited = true;
-        for (int i = 0; i < object->protos_count; i++)
-            if ((found = has_ancestor(vm, object->protos[i], target)))
-                break;
-        obj->visited = false;
-        return found;
-    }
-    return has_ancestor(vm, vm_get_prototype(vm, src), target);
-}
-
-// obj.hasAncestor(x) returns true if the obj has x anywhere
-// on obj's prototype chain (including obj itself, i.e.
-// obj.hasAncestor(obj) is always true).
 DEFINE_NATIVE(Object_hasAncestor) {
     ARGSPEC("**");
-    RETURN(BOOL_TO_VAL(has_ancestor(vm, args[0], args[1])));
+    RETURN(BOOL_TO_VAL(vm_has_ancestor(vm, args[0], args[1])));
 }
 
 DEFINE_NATIVE(Object_rawType) {

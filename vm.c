@@ -303,6 +303,26 @@ vm_get_slot(VM* vm, Value src, Value slot_name, Value* slot_value)
     return vm_get_slot(vm, vm_get_prototype(vm, src), slot_name, slot_value);
 }
 
+bool
+vm_has_ancestor(VM* vm, Value src, Value ancestor)
+{
+    if (value_equal(src, ancestor)) return true;
+    if (IS_OBJECT(src)) {
+        Obj* obj = VAL_TO_OBJ(src);
+        if (obj->visited) return false;
+
+        ObjObject* object = (ObjObject*)obj;
+        bool found = false;
+        obj->visited = true;
+        for (int i = 0; i < object->protos_count; i++)
+            if ((found = vm_has_ancestor(vm, object->protos[i], ancestor)))
+                break;
+        obj->visited = false;
+        return found;
+    }
+    return vm_has_ancestor(vm, vm_get_prototype(vm, src), ancestor);
+}
+
 typedef bool (*CompleteCallFn)(VM* vm, Value slot, int num_args);
 
 // generic method for invoking a message on an object, doing the
