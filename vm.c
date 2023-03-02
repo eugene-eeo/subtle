@@ -10,9 +10,9 @@
 #include <stdlib.h> // free
 #include <string.h> // strlen
 
-/* #ifdef SUBTLE_DEBUG_TRACE_EXECUTION */
+#ifdef SUBTLE_DEBUG_TRACE_EXECUTION
 #include "debug.h"
-/* #endif */
+#endif
 
 #define SUBTLE_MAX_FRAMES 1024
 
