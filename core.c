@@ -200,7 +200,7 @@ DEFINE_NATIVE(Object_prependProto) {
     RETURN(NIL_VAL);
 }
 
-DEFINE_NATIVE(Object_removeProto) {
+DEFINE_NATIVE(Object_deleteProto) {
     ARGSPEC("O*");
     ObjObject* object = VAL_TO_OBJECT(args[0]);
     objobject_delete_proto(object, vm, args[1]);
@@ -1026,7 +1026,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "setProtos",   Object_setProtos);
     ADD_METHOD(ObjectProto, "addProto",    Object_addProto);
     ADD_METHOD(ObjectProto, "prependProto",Object_prependProto);
-    ADD_METHOD(ObjectProto, "removeProto", Object_removeProto);
+    ADD_METHOD(ObjectProto, "deleteProto", Object_deleteProto);
     ADD_METHOD(ObjectProto, "protos",      Object_protos);
     ADD_METHOD(ObjectProto, "hash",        Object_hash);
     ADD_METHOD(ObjectProto, "hasSlot",     Object_hasSlot);

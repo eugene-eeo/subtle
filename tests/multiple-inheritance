@@ -20,13 +20,13 @@ assert x protos get(1) == Object
 assert x protos get(2) == y
 assert x protos get(3) == z
 
-x removeProto(q)
+x deleteProto(q)
 assert x a == 2
 
-x removeProto(y)
+x deleteProto(y)
 assert x a == 1
 
-x removeProto(z)
+x deleteProto(z)
 assert ! x hasSlot("a")
 
 x setProtos(List new())
