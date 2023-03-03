@@ -1017,7 +1017,7 @@ void core_init_vm(VM* vm)
 #define ADD_VALUE(PROTO, name, v)    (define_on_table(vm, &vm->PROTO->slots, name, v))
 #define SET_PROTO(TARGET, PROTO)     (objobject_set_proto(vm->TARGET, vm, OBJ_TO_VAL(vm->PROTO)))
 
-    vm->perform_string = CONST_STRING(vm, "perform");
+    vm->forward_string = CONST_STRING(vm, "forward");
     vm->init_string = CONST_STRING(vm, "init");
 
     vm->ObjectProto = objobject_new(vm);
@@ -1032,7 +1032,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "hasSlot",     Object_hasSlot);
     ADD_METHOD(ObjectProto, "getSlot",     Object_getSlot);
     ADD_METHOD(ObjectProto, "setSlot",     Object_setSlot);
-    ADD_METHOD(ObjectProto, "rawPerform",  Object_perform);
+    ADD_METHOD(ObjectProto, "perform",     Object_perform);
     ADD_METHOD(ObjectProto, "hasOwnSlot",  Object_hasOwnSlot);
     ADD_METHOD(ObjectProto, "getOwnSlot",  Object_getOwnSlot);
     ADD_METHOD(ObjectProto, "deleteSlot",  Object_deleteSlot);

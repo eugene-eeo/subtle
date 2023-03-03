@@ -9,8 +9,9 @@ assert x.def == 2;
 
 assert x.deleteSlot("ab") == x;
 assert x.deleteSlot("abc") == x;
-assert x.ab == nil;
-assert x.abc == nil;
+# assert x.ab == nil;
+# assert x.abc == nil;
+assert !x.hasOwnSlot("ab");
 assert !x.hasOwnSlot("abc");
 
 x.ghi = 3;

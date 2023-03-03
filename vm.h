@@ -28,7 +28,7 @@ typedef struct VM {
 
     // ---- init'ed by core ----
     // Constants needed by the VM or core
-    ObjString* perform_string;
+    ObjString* forward_string;
     ObjString* init_string;
 
     // Core Protos

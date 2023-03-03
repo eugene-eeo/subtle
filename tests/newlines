@@ -75,11 +75,11 @@ let x = {
     u
     =
     Object
-    .b.c,
-    d = Object.b.c
+    .proto.proto,
+    d = Object.proto.proto
 }
-assert x.u == nil
-assert x.d == nil
+assert x.u == Object.proto.proto
+assert x.d == Object.proto.proto
 
 let f = Fn new{|a, b, c|
     assert a == 1

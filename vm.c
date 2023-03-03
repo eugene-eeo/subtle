@@ -20,7 +20,7 @@ void vm_init(VM* vm) {
     vm->fiber = NULL;
     vm->can_yield = true;
 
-    vm->perform_string = NULL;
+    vm->forward_string = NULL;
     vm->init_string = NULL;
 
     vm->ObjectProto = NULL;
@@ -108,7 +108,7 @@ void vm_runtime_error(VM* vm, const char* format, ...) {
 static void
 print_stack_trace(VM* vm)
 {
-    fprintf(stderr, "Uncaught Error: %s\n", vm->fiber->error->chars);
+    fprintf(stderr, "Error: %s\n", vm->fiber->error->chars);
     for (ObjFiber* fiber = vm->fiber;
          fiber != NULL;
          fiber = fiber->parent) {
@@ -330,10 +330,10 @@ typedef bool (*CompleteCallFn)(VM* vm, Value slot, int num_args);
 //
 // 1. try to find the `slot_name` on the protos. if found, then
 //    complete the call using `complete_call`.
-// 2. try to find a "perform" slot on the protos. convert the call
-//    into an equivalent ObjMsg and call the perform slot with
+// 2. try to find a "forward" slot on the protos. convert the call
+//    into an equivalent ObjMsg and call the forward slot with
 //    that instead.
-// 3. if both lookups fail, try calling with NIL_VAL.
+// 3. if both lookups fail, error out.
 //
 // this function will check if the call is valid before calling
 // the given complete_call callback.
@@ -342,17 +342,15 @@ generic_invoke(VM* vm, Value obj, ObjString* slot_name, int num_args,
                CompleteCallFn complete_call)
 {
     // Try to search on the protos.
-    Value callee = NIL_VAL;
-    if (vm_get_slot(vm, obj, OBJ_TO_VAL(slot_name), &callee))
-        goto call;
-
-    // Has a 'perform' slot.
-    if (vm_get_slot(vm, obj, OBJ_TO_VAL(vm->perform_string), &callee)) {
-        if (!is_callable(callee)) {
-            vm_runtime_error(vm, "Object does not respond to message '%s'.", slot_name);
+    Value callee;
+    if (vm_get_slot(vm, obj, OBJ_TO_VAL(slot_name), &callee)) {
+        if (!vm_check_call(vm, callee, num_args, slot_name->chars))
             return false;
-        }
-        // Allocate an ObjMsg, massage the stack.
+        return complete_call(vm, callee, num_args);
+    }
+
+    // Try to call the 'forward' slot with an ObjMsg.
+    if (vm_get_slot(vm, obj, OBJ_TO_VAL(vm->forward_string), &callee) && is_callable(callee)) {
         Value* args = &vm->fiber->stack_top[-num_args];
         ObjMsg* msg = objmsg_new(vm, slot_name, args, num_args);
         vm_drop(vm, num_args);
@@ -363,12 +361,8 @@ generic_invoke(VM* vm, Value obj, ObjString* slot_name, int num_args,
         return complete_call(vm, callee, 1);
     }
 
-    // If we have no perform slot, and it's not found in the protos,
-    // then callee would be NIL at this point.
-call:
-    if (!vm_check_call(vm, callee, num_args, slot_name->chars))
-        return false;
-    return complete_call(vm, callee, num_args);
+    vm_runtime_error(vm, "Object does not respond to '%s'.", slot_name->chars);
+    return false;
 }
 
 bool

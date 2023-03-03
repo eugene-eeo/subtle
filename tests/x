@@ -3,7 +3,7 @@
 
 # 93de905 stress test vm_push_frame
 let x = {
-    perform = Fn.new{|msg|
+    forward = Fn.new{|msg|
         if (msg.slotName == "mySlot") {
             assert msg.args.length == 0
         } else if (msg.slotName == "mySlot2") {
@@ -14,7 +14,7 @@ let x = {
         return 1;
     }
 }
-# x getSlot("perform") println
+# x getSlot("forward") println
 assert x.mySlot     == 1
 assert x.mySlot2(2) == 1
 
@@ -40,18 +40,18 @@ u toString = Fn.new{
 }
 u println
 
-# fixed a bug in Object.rawPerform that did not check if the
+# fixed a bug in Object.perform that did not check if the
 # values were callable.
 assert (Fiber new {
     let obj = {}
     # this used to crash the vm.
-    obj rawPerform(Msg new("x", 1))
+    obj perform(Msg new("x", 1))
 }) try != nil
 
 # similar bug in generic_invoke :)
 assert (Fiber new {
     let obj = {}
-    obj perform = nil
+    obj forward = nil
     obj x(1) # used to crash here
 }) try != nil
 

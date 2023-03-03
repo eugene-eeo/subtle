@@ -83,7 +83,7 @@ static void mark_roots(VM* vm) {
         mark_value(vm, vm->roots[i]);
 
     // Mark the constants
-    mark_object(vm, (Obj*)vm->perform_string);
+    mark_object(vm, (Obj*)vm->forward_string);
     mark_object(vm, (Obj*)vm->init_string);
 
     // Mark the *Protos
