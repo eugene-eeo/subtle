@@ -61,3 +61,28 @@ assert (Fiber new {
     obj x = nil
     obj x(1) # used to crash here
 }) try != nil
+
+# stress test the stack-sematics for run()
+let o = {}
+o init = Fn new { |x|
+    assert x == 2
+    let f
+    f = Fiber new {
+        let obj = {}
+        obj init = Fn new {
+            assert Fiber new {
+                Object x
+            } try != nil
+        }
+        let g = Fiber new {
+            obj new
+        }
+        assert g try == nil
+    }
+    let obj_outer = {}
+    obj_outer init = Fn new {
+        assert f try == nil
+    }
+    obj_outer new
+}
+o new(2)

@@ -19,7 +19,6 @@
 void vm_init(VM* vm) {
     vm->fiber = NULL;
     vm->can_yield = true;
-    vm->did_error = false;
 
     vm->forward_string = NULL;
     vm->init_string = NULL;
@@ -128,7 +127,7 @@ print_stack_trace(VM* vm)
 }
 
 static bool
-handle_error(VM* vm)
+handle_error(VM* vm, ObjFiber* until, int level)
 {
     ASSERT(vm->fiber->error != NULL, "Should only be called after an error.");
     ObjFiber* fiber = vm->fiber;
@@ -139,7 +138,7 @@ handle_error(VM* vm)
     // error value to the parent.
     while (fiber != NULL) {
         fiber->error = error;
-
+        if (fiber == until && level != -1) return false;
         if (fiber->state == FIBER_TRY) {
             fiber->parent->stack_top[-1] = OBJ_TO_VAL(error);
             vm->fiber = fiber->parent;
@@ -151,9 +150,10 @@ handle_error(VM* vm)
         fiber = parent;
     }
 
-    print_stack_trace(vm);
-    vm->fiber = NULL;
-    vm->did_error = true;
+    if (level == -1) {
+        print_stack_trace(vm);
+        vm->fiber = NULL;
+    }
     return false;
 }
 
@@ -404,7 +404,6 @@ run(VM* vm, ObjFiber* fiber, int top_level)
         debug_print_instruction(&frame->closure->fn->chunk,
                                 frame->ip - frame->closure->fn->chunk.code);
 #endif
-        ASSERT(!vm->did_error, "vm->error is true but still running");
         switch (READ_BYTE()) {
             case OP_RETURN: {
                 Value result = vm_pop(vm);
@@ -568,12 +567,9 @@ run(VM* vm, ObjFiber* fiber, int top_level)
                                vm_complete_call);
 handle_fibers:
                 fiber = vm->fiber;
-                // we might've errored out on an earlier run() call;
-                // propagate the error here.
-                if (vm->did_error) return INTERPRET_RUNTIME_ERROR;
                 if (fiber == NULL) return INTERPRET_OK;
                 if (fiber->error != NULL) {
-                    if (!handle_error(vm))
+                    if (!handle_error(vm, original_fiber, top_level))
                         return INTERPRET_RUNTIME_ERROR;
                     fiber = vm->fiber;
                 }
@@ -623,10 +619,10 @@ vm_interpret(VM* vm, const char* source)
     vm_push_root(vm, OBJ_TO_VAL(closure));
     vm->fiber = objfiber_new(vm, closure);
     vm->fiber->state = FIBER_ROOT;
-    vm_pop_root(vm);
-    vm_pop_root(vm);
+    vm_pop_root(vm); // closure
+    vm_pop_root(vm); // fn
 
-    InterpretResult result = run(vm, vm->fiber, 0);
+    InterpretResult result = run(vm, vm->fiber, -1);
     vm->fiber = NULL;
     return result;
 }
