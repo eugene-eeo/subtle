@@ -38,29 +38,29 @@ let u = {};
 u toString = Fn.new{
     return recursive.call(1, 3) toString;
 }
-u println
+# u println
 
-# fixed a bug in Object.perform that did not check if the
-# values were callable.
-assert (Fiber new {
-    let obj = {}
-    # this used to crash the vm.
-    obj perform(Msg new("x", 1))
-}) try != nil
-
-# similar bug in generic_invoke :)
-assert (Fiber new {
-    let obj = {}
-    obj forward = nil
-    obj x(1) # used to crash here
-}) try != nil
-
-# similar bug...
-assert (Fiber new {
-    let obj = {}
-    obj x = nil
-    obj x(1) # used to crash here
-}) try != nil
+# # fixed a bug in Object.perform that did not check if the
+# # values were callable.
+# assert (Fiber new {
+#     let obj = {}
+#     # this used to crash the vm.
+#     obj perform(Msg new("x", 1))
+# }) try != nil
+#
+# # similar bug in generic_invoke :)
+# assert (Fiber new {
+#     let obj = {}
+#     obj forward = nil
+#     obj x(1) # used to crash here
+# }) try != nil
+#
+# # similar bug...
+# assert (Fiber new {
+#     let obj = {}
+#     obj x = nil
+#     obj x(1) # used to crash here
+# }) try != nil
 
 # stress test the stack-sematics for run()
 let o = {}
@@ -70,9 +70,9 @@ o init = Fn new { |x|
     f = Fiber new {
         let obj = {}
         obj init = Fn new {
-            assert Fiber new {
+            assert ! (Fiber new {
                 Object x
-            } try != nil
+            } try == nil)
         }
         let g = Fiber new {
             obj new

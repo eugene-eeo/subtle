@@ -384,7 +384,8 @@ objfiber_ensure_stack(ObjFiber* fiber, VM* vm, int n)
         // Callframes
         for (int i = 0; i < fiber->frames_count; i++) {
             CallFrame* frame = &fiber->frames[i];
-            frame->slots = fiber->stack + (frame->slots - old_stack);
+            if (frame->type == CALL_USER_CODE)
+                frame->as.u.slots = fiber->stack + (frame->as.u.slots - old_stack);
         }
 
         // Upvalues
@@ -399,7 +400,7 @@ objfiber_ensure_stack(ObjFiber* fiber, VM* vm, int n)
     }
 }
 
-CallFrame*
+void
 objfiber_push_frame(ObjFiber* fiber, VM* vm,
                     ObjClosure* closure, Value* stack_start)
 {
@@ -409,10 +410,30 @@ objfiber_push_frame(ObjFiber* fiber, VM* vm,
         fiber->frames_capacity = new_capacity;
     }
     CallFrame* frame = &fiber->frames[fiber->frames_count++];
-    frame->closure = closure;
-    frame->ip = closure->fn->chunk.code;
-    frame->slots = stack_start;
-    return frame;
+    frame->type = CALL_USER_CODE;
+    frame->as.u.closure = closure;
+    frame->as.u.ip = closure->fn->chunk.code;
+    frame->as.u.slots = stack_start;
+}
+
+void
+objfiber_push_cframe(ObjFiber* fiber, VM* vm,
+                     ObjString* name, CCodeFn fn, Value data)
+{
+    if (fiber->frames_count + 1 > fiber->frames_capacity) {
+        vm_push_root(vm, OBJ_TO_VAL(name));
+        vm_push_root(vm, data);
+        int new_capacity = GROW_CAPACITY(fiber->frames_capacity);
+        fiber->frames = GROW_ARRAY(vm, fiber->frames, CallFrame, fiber->frames_capacity, new_capacity);
+        fiber->frames_capacity = new_capacity;
+        vm_pop_root(vm); // data
+        vm_pop_root(vm); // name
+    }
+    CallFrame* frame = &fiber->frames[fiber->frames_count++];
+    frame->type = CALL_C_CODE;
+    frame->as.c.name = name;
+    frame->as.c.fn = fn;
+    frame->as.c.data = data;
 }
 
 bool

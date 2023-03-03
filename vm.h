@@ -18,13 +18,6 @@ typedef enum {
 
 typedef struct VM {
     ObjFiber* fiber;
-    // Whether we allow the currently running fiber to yield.
-    // At present, fibers cannot yield when they trigger a vm_call,
-    // since we assume that we stay in the same fiber after vm_call
-    // returns, and the only way to switch _out_ of the current fiber
-    // is via Fiber.yield(); since Fiber.call() or Fiber.try() has
-    // "stack" semantics.
-    bool can_yield;
 
     // ---- init'ed by core ----
     // Constants needed by the VM or core
@@ -121,13 +114,7 @@ bool vm_push_frame(VM* vm, ObjClosure* closure, int num_args);
 // do the work.
 bool vm_complete_call(VM* vm, Value callable, int num_args);
 
-// Similar to vm_complete_call, but runs the slot until completion.
-// Upon return, if the return value is true, the top of the stack
-// will contain the callable's return value. Use this if you need
-// to do some work with the return value.
-bool vm_call(VM* vm, Value callable, int num_args);
-
-// Runs the usual invoke path. This uses vm_call internally.
+// Runs the usual invoke path. This uses vm_complete_call internally.
 bool vm_invoke(VM* vm,
                Value obj, ObjString* slot_name, int num_args);
 

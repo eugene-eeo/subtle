@@ -18,7 +18,6 @@
 
 void vm_init(VM* vm) {
     vm->fiber = NULL;
-    vm->can_yield = true;
 
     vm->forward_string = NULL;
     vm->init_string = NULL;
@@ -115,19 +114,23 @@ print_stack_trace(VM* vm)
         fprintf(stderr, "[Fiber %p]\n", (void*) fiber);
         for (int i = fiber->frames_count - 1; i >= 0; i--) {
             CallFrame* frame = &fiber->frames[i];
-            ObjFn* fn = frame->closure->fn;
-            // -1 as we increment frame->ip on each loop.
-            int instruction = frame->ip - fn->chunk.code - 1;
-            fprintf(stderr, "\t[line %u] in %s\n",
-                    chunk_get_line(&fn->chunk, instruction),
-                    fn->arity == -1 ? "script" :
-                    fn->name == NULL ? "fn" : fn->name->chars);
+            if (frame->type == CALL_USER_CODE) {
+                ObjFn* fn = frame->as.u.closure->fn;
+                // -1 as we increment frame->ip on each loop.
+                int instruction = frame->as.u.ip - fn->chunk.code - 1;
+                fprintf(stderr, "\t[line %u] in %s\n",
+                        chunk_get_line(&fn->chunk, instruction),
+                        fn->arity == -1 ? "script" :
+                        fn->name == NULL ? "fn" : fn->name->chars);
+            } else {
+                fprintf(stderr, "\t[C] in %s\n", frame->as.c.name->chars);
+            }
         }
     }
 }
 
 static bool
-handle_error(VM* vm, ObjFiber* until, int level)
+handle_error(VM* vm)
 {
     ASSERT(vm->fiber->error != NULL, "Should only be called after an error.");
     ObjFiber* fiber = vm->fiber;
@@ -138,7 +141,6 @@ handle_error(VM* vm, ObjFiber* until, int level)
     // error value to the parent.
     while (fiber != NULL) {
         fiber->error = error;
-        if (fiber == until && level != -1) return false;
         if (fiber->state == FIBER_TRY) {
             fiber->parent->stack_top[-1] = OBJ_TO_VAL(error);
             vm->fiber = fiber->parent;
@@ -150,10 +152,8 @@ handle_error(VM* vm, ObjFiber* until, int level)
         fiber = parent;
     }
 
-    if (level == -1) {
-        print_stack_trace(vm);
-        vm->fiber = NULL;
-    }
+    print_stack_trace(vm);
+    vm->fiber = NULL;
     return false;
 }
 
@@ -374,22 +374,32 @@ generic_invoke(VM* vm, Value obj, ObjString* slot_name, int num_args,
 bool
 vm_invoke(VM* vm, Value obj, ObjString* slot_name, int num_args)
 {
-    return generic_invoke(vm, obj, slot_name, num_args, vm_call);
+    return generic_invoke(vm, obj, slot_name, num_args, vm_complete_call);
 }
 
 // Run the given fiber until fiber->frames_count == top_level.
 static InterpretResult
-run(VM* vm, ObjFiber* fiber, int top_level)
+run(VM* vm)
 {
-    ObjFiber* original_fiber = fiber;
+    ObjFiber* fiber = vm->fiber;
     CallFrame* frame;
+    Value* constants;
 
-#define REFRESH_FRAME() (frame = &vm->fiber->frames[vm->fiber->frames_count - 1])
-#define READ_BYTE() (*frame->ip++)
+#define REFRESH_FRAME() \
+    do { \
+        frame = &vm->fiber->frames[vm->fiber->frames_count - 1]; \
+        if (frame->type == CALL_USER_CODE) { \
+            constants = frame->as.u.closure->fn->chunk.constants.values; \
+        } else { \
+            frame->as.c.fn(vm); \
+            goto handle_fibers; \
+        } \
+    } while (false)
+#define READ_BYTE() (*(frame->as.u.ip)++)
 #define READ_SHORT() \
-    (frame->ip += 2, \
-     (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
-#define READ_CONSTANT() (frame->closure->fn->chunk.constants.values[READ_SHORT()])
+    (frame->as.u.ip += 2, \
+     (uint16_t)((frame->as.u.ip[-2] << 8) | frame->as.u.ip[-1]))
+#define READ_CONSTANT() (constants[READ_SHORT()])
 
     // Actually start running the code here.
     REFRESH_FRAME();
@@ -404,19 +414,16 @@ run(VM* vm, ObjFiber* fiber, int top_level)
         }
         printf("\n");
         // Trace the about-to-be-executed instruction.
-        debug_print_instruction(&frame->closure->fn->chunk,
-                                frame->ip - frame->closure->fn->chunk.code);
+        debug_print_instruction(
+                &frame->as.u.closure->fn->chunk,
+                frame->as.u.ip - frame->as.u.closure->fn->chunk.code);
 #endif
         switch (READ_BYTE()) {
             case OP_RETURN: {
                 Value result = vm_pop(vm);
-                close_upvalues(fiber, frame->slots);
+                close_upvalues(fiber, frame->as.u.slots);
                 fiber->frames_count--;
-                fiber->stack_top = frame->slots;
-                if (fiber == original_fiber && fiber->frames_count == top_level) {
-                    vm_push(vm, result);
-                    return INTERPRET_OK;
-                }
+                fiber->stack_top = frame->as.u.slots;
                 if (objfiber_is_done(fiber)) {
                     // Transfer control to the parent fiber.
                     fiber = fiber->parent;
@@ -470,34 +477,34 @@ run(VM* vm, ObjFiber* fiber, int top_level)
             }
             case OP_GET_LOCAL: {
                 uint8_t slot = READ_BYTE();
-                vm_push(vm, frame->slots[slot]);
+                vm_push(vm, frame->as.u.slots[slot]);
                 break;
             }
             case OP_SET_LOCAL: {
                 uint8_t slot = READ_BYTE();
-                frame->slots[slot] = vm_peek(vm, 0);
+                frame->as.u.slots[slot] = vm_peek(vm, 0);
                 break;
             }
             case OP_LOOP: {
                 uint16_t offset = READ_SHORT();
-                frame->ip -= offset;
+                frame->as.u.ip -= offset;
                 break;
             }
             case OP_JUMP: {
                 uint16_t offset = READ_SHORT();
-                frame->ip += offset;
+                frame->as.u.ip += offset;
                 break;
             }
             case OP_JUMP_IF_FALSE: {
                 uint16_t offset = READ_SHORT();
                 if (!value_truthy(vm_pop(vm)))
-                    frame->ip += offset;
+                    frame->as.u.ip += offset;
                 break;
             }
             case OP_OR: {
                 uint16_t offset = READ_SHORT();
                 if (value_truthy(vm_peek(vm, 0)))
-                    frame->ip += offset;
+                    frame->as.u.ip += offset;
                 else
                     vm_pop(vm);
                 break;
@@ -505,7 +512,7 @@ run(VM* vm, ObjFiber* fiber, int top_level)
             case OP_AND: {
                 uint16_t offset = READ_SHORT();
                 if (!value_truthy(vm_peek(vm, 0)))
-                    frame->ip += offset;
+                    frame->as.u.ip += offset;
                 else
                     vm_pop(vm);
                 break;
@@ -520,24 +527,24 @@ run(VM* vm, ObjFiber* fiber, int top_level)
                     if (is_local) {
                         // If it's a local upvalue, then the captured value
                         // can be found in the current frame.
-                        closure->upvalues[i] = capture_upvalue(vm, frame->slots + index);
+                        closure->upvalues[i] = capture_upvalue(vm, frame->as.u.slots + index);
                     } else {
                         // Otherwise, the non-local upvalue should be
                         // captured by this frame's upvalues (the compiler
                         // should add one upvalue to this function).
-                        closure->upvalues[i] = frame->closure->upvalues[index];
+                        closure->upvalues[i] = frame->as.u.closure->upvalues[index];
                     }
                 }
                 break;
             }
             case OP_GET_UPVALUE: {
                 uint8_t slot = READ_BYTE();
-                vm_push(vm, *frame->closure->upvalues[slot]->location);
+                vm_push(vm, *frame->as.u.closure->upvalues[slot]->location);
                 break;
             }
             case OP_SET_UPVALUE: {
                 uint8_t slot = READ_BYTE();
-                *frame->closure->upvalues[slot]->location = vm_peek(vm, 0);
+                *frame->as.u.closure->upvalues[slot]->location = vm_peek(vm, 0);
                 break;
             }
             case OP_CLOSE_UPVALUE: {
@@ -572,7 +579,7 @@ handle_fibers:
                 fiber = vm->fiber;
                 if (fiber == NULL) return INTERPRET_OK;
                 if (fiber->error != NULL) {
-                    if (!handle_error(vm, original_fiber, top_level))
+                    if (!handle_error(vm))
                         return INTERPRET_RUNTIME_ERROR;
                     fiber = vm->fiber;
                 }
@@ -589,28 +596,6 @@ handle_fibers:
 #undef READ_CONSTANT
 }
 
-bool
-vm_call(VM* vm, Value slot, int num_args)
-{
-    bool rv;
-    bool can_yield = vm->can_yield;
-    vm->can_yield = false;
-    if (IS_CLOSURE(slot)) {
-        ObjClosure* closure = VAL_TO_CLOSURE(slot);
-        if ((rv = vm_push_frame(vm, closure, num_args)))
-            rv = run(vm, vm->fiber, vm->fiber->frames_count - 1) == INTERPRET_OK;
-    } else if (IS_NATIVE(slot)) {
-        ObjNative* native = VAL_TO_NATIVE(slot);
-        rv = native->fn(vm, &vm->fiber->stack_top[-num_args - 1], num_args);
-    } else {
-        ASSERT(num_args == 0, "num_args != 0");
-        vm->fiber->stack_top[-1] = slot;
-        rv = true;
-    }
-    vm->can_yield = can_yield;
-    return rv;
-}
-
 InterpretResult
 vm_interpret(VM* vm, const char* source)
 {
@@ -625,7 +610,7 @@ vm_interpret(VM* vm, const char* source)
     vm_pop_root(vm); // closure
     vm_pop_root(vm); // fn
 
-    InterpretResult result = run(vm, vm->fiber, -1);
+    InterpretResult result = run(vm);
     vm->fiber = NULL;
     return result;
 }

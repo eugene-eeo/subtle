@@ -1,5 +1,5 @@
 let x = Map.new()
-let MAX = 2048
+let MAX = 2048 * 2
 
 for (i = 0...MAX) {
     x.set(i toString, i)

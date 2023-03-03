@@ -402,20 +402,23 @@ DEFINE_NATIVE(Object_toString) {
     }
 }
 
-DEFINE_NATIVE(Object_print) {
-    Value self = args[0];
-    vm_ensure_stack(vm, 1);
-    vm_push(vm, self);
-    if (!vm_invoke(vm, self, CONST_STRING(vm, "toString"), 0))
-        return false;
-
+void Object_print_post(VM* vm) {
     Value slot = vm_pop(vm);
     char* str = IS_STRING(slot)
         ? VAL_TO_STRING(slot)->chars
         : "[invalid toString]";
     fputs(str, stdout);
     fflush(stdout);
-    RETURN(NIL_VAL);
+    vm_push(vm, NIL_VAL);
+    vm->fiber->frames_count--;
+}
+
+DEFINE_NATIVE(Object_print) {
+    objfiber_push_cframe(vm->fiber, vm,
+                         CONST_STRING(vm, __func__),
+                         Object_print_post, NIL_VAL);
+    Value self = args[0];
+    return vm_invoke(vm, self, CONST_STRING(vm, "toString"), num_args);
 }
 
 DEFINE_NATIVE(Object_rawIterMore) {
@@ -443,25 +446,25 @@ DEFINE_NATIVE(Object_rawValueAt) {
     RETURN(NIL_VAL);
 }
 
+void Object_new_post(VM* vm) {
+    vm_pop(vm);
+    CallFrame frame = vm->fiber->frames[vm->fiber->frames_count - 1];
+    vm_push(vm, frame.as.c.data);
+    vm->fiber->frames_count--;
+}
+
 DEFINE_NATIVE(Object_new) {
     ObjObject* obj = objobject_new(vm);
     vm_push_root(vm, OBJ_TO_VAL(obj));
     objobject_set_proto(obj, vm, args[0]);
-    vm_pop_root(vm);
-    Value rv = OBJ_TO_VAL(obj);
-    // setup a call for obj.init(...).
-    // rather than copy the receiver and arguments we "replace"
-    // the current call.
-    // we have: | proto | arg1 | ... | argn |
-    // we need: |  rv   | arg1 | ... | argn |
-    args[0] = rv;
-    if (!vm_invoke(vm, rv, vm->init_string, num_args))
-        return false;
-    // at this point, rv is guaranteed to not be GCed as it was
-    // called as the receiver for the init slot.
-    vm_pop(vm);
-    vm_push(vm, rv);
-    return true;
+    vm_pop_root(vm); // obj
+
+    Value self = OBJ_TO_VAL(obj);
+    args[0] = self;
+    objfiber_push_cframe(vm->fiber, vm,
+                         CONST_STRING(vm, __func__),
+                         Object_new_post, self);
+    return vm_invoke(vm, self, vm->init_string, num_args);
 }
 
 // ============================= Fn =============================
@@ -674,8 +677,8 @@ run_fiber(VM* vm, ObjFiber* fiber,
     if (fiber->state == FIBER_ROOT) ERROR("Cannot '%s' a root fiber.", verb);
 
     if (fiber->frames_count == 1
-        && fiber->frames[0].ip == fiber->frames[0].closure->fn->chunk.code) {
-        if (fiber->frames[0].closure->fn->arity == 1) {
+        && fiber->frames[0].as.u.ip == fiber->frames[0].as.u.closure->fn->chunk.code) {
+        if (fiber->frames[0].as.u.closure->fn->arity == 1) {
             // The fiber has not ran yet, and is expecting some
             // data to be sent.
             *fiber->stack_top = value;
@@ -703,8 +706,6 @@ DEFINE_NATIVE(Fiber_current) {
 }
 
 DEFINE_NATIVE(Fiber_yield) {
-    if (!vm->can_yield)
-        ERROR("Cannot yield from a VM call.");
     Value v = NIL_VAL;
     if (num_args >= 1) {
         vm_drop(vm, num_args - 1);

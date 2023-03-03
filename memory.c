@@ -169,8 +169,14 @@ blacken_fiber(VM* vm, ObjFiber* fiber)
         mark_value(vm, *slot);
 
     // Mark each closure on the call stack.
-    for (int i = 0; i < fiber->frames_count; i++)
-        mark_object(vm, (Obj*)fiber->frames[i].closure);
+    for (int i = 0; i < fiber->frames_count; i++) {
+        if (fiber->frames[i].type == CALL_USER_CODE)
+            mark_object(vm, (Obj*)fiber->frames[i].as.u.closure);
+        else {
+            mark_object(vm, (Obj*)fiber->frames[i].as.c.name);
+            mark_value(vm, fiber->frames[i].as.c.data);
+        }
+    }
 
     // Mark the list of open upvalues.
     for (ObjUpvalue* upvalue = fiber->open_upvalues;

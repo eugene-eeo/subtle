@@ -112,10 +112,28 @@ typedef struct {
     NativeFn fn;
 } ObjNative;
 
+typedef void (*CCodeFn)(VM* vm);
+
+typedef enum {
+    CALL_USER_CODE,
+    CALL_C_CODE,
+} CALL_TYPE;
+
 typedef struct {
-    ObjClosure* closure;
-    uint8_t* ip;
-    Value* slots;
+    CALL_TYPE type;
+    union {
+        struct {
+            ObjClosure* closure;
+            uint8_t* ip;
+            Value* slots;
+        } u; // user code
+        struct {
+            // used for debugging info
+            ObjString* name;
+            CCodeFn fn;
+            Value data;
+        } c; // c code
+    } as;
 } CallFrame;
 
 typedef enum {
@@ -227,8 +245,10 @@ ObjNative* objnative_new(VM* vm, NativeFn fn);
 
 ObjFiber* objfiber_new(VM* vm, ObjClosure* closure);
 void objfiber_ensure_stack(ObjFiber* fiber, VM* vm, int n);
-CallFrame* objfiber_push_frame(ObjFiber* fiber, VM* vm,
-                               ObjClosure* closure, Value* stack_start);
+void objfiber_push_frame(ObjFiber* fiber, VM* vm,
+                         ObjClosure* closure, Value* stack_start);
+void objfiber_push_cframe(ObjFiber* fiber, VM* vm,
+                          ObjString* name, CCodeFn fn, Value data);
 bool objfiber_is_done(ObjFiber* fiber);
 
 // ObjRange
