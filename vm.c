@@ -19,6 +19,7 @@
 void vm_init(VM* vm) {
     vm->fiber = NULL;
     vm->can_yield = true;
+    vm->did_error = false;
 
     vm->forward_string = NULL;
     vm->init_string = NULL;
@@ -126,8 +127,8 @@ print_stack_trace(VM* vm)
     }
 }
 
-static void
-runtime_error(VM* vm)
+static bool
+handle_error(VM* vm)
 {
     ASSERT(vm->fiber->error != NULL, "Should only be called after an error.");
     ObjFiber* fiber = vm->fiber;
@@ -142,7 +143,7 @@ runtime_error(VM* vm)
         if (fiber->state == FIBER_TRY) {
             fiber->parent->stack_top[-1] = OBJ_TO_VAL(error);
             vm->fiber = fiber->parent;
-            return;
+            return true;
         }
 
         ObjFiber* parent = fiber->parent;
@@ -152,6 +153,8 @@ runtime_error(VM* vm)
 
     print_stack_trace(vm);
     vm->fiber = NULL;
+    vm->did_error = true;
+    return false;
 }
 
 bool
@@ -401,6 +404,7 @@ run(VM* vm, ObjFiber* fiber, int top_level)
         debug_print_instruction(&frame->closure->fn->chunk,
                                 frame->ip - frame->closure->fn->chunk.code);
 #endif
+        ASSERT(!vm->did_error, "vm->error is true but still running");
         switch (READ_BYTE()) {
             case OP_RETURN: {
                 Value result = vm_pop(vm);
@@ -564,14 +568,14 @@ run(VM* vm, ObjFiber* fiber, int top_level)
                                vm_complete_call);
 handle_fibers:
                 fiber = vm->fiber;
+                // we might've errored out on an earlier run() call;
+                // propagate the error here.
+                if (vm->did_error) return INTERPRET_RUNTIME_ERROR;
                 if (fiber == NULL) return INTERPRET_OK;
                 if (fiber->error != NULL) {
-                    runtime_error(vm);
-                    fiber = vm->fiber;
-                    // give up: there's no parent fiber to handle
-                    // the current error.
-                    if (fiber == NULL)
+                    if (!handle_error(vm))
                         return INTERPRET_RUNTIME_ERROR;
+                    fiber = vm->fiber;
                 }
                 REFRESH_FRAME();
                 break;

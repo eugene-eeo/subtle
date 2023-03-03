@@ -22,8 +22,17 @@ assert obj y == "hi"
 # Same, for vm_call.
 # We use Object_init here.
 let vmCall = {}
+let i = 0
 vmCall forward = Fn new {|msg|
     assert msg slotName == "init"
+    if (i == 0) {
+        assert msg args length == 0
+    } else {
+        assert msg args length == 1
+        assert msg args get(0) == i
+    }
+    i = i + 1
 }
-assert vmCall new(1) hasAncestor(vmCall)
-assert vmCall new hasAncestor(vmCall)
+assert vmCall new is(vmCall)
+assert vmCall new(1) is(vmCall)
+assert vmCall new(2) is(vmCall)

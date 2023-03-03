@@ -25,6 +25,7 @@ typedef struct VM {
     // is via Fiber.yield(); since Fiber.call() or Fiber.try() has
     // "stack" semantics.
     bool can_yield;
+    bool did_error;
 
     // ---- init'ed by core ----
     // Constants needed by the VM or core

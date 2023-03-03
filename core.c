@@ -320,7 +320,7 @@ DEFINE_NATIVE(Object_clone) {
     RETURN(OBJ_TO_VAL(obj));
 }
 
-DEFINE_NATIVE(Object_hasAncestor) {
+DEFINE_NATIVE(Object_is) {
     ARGSPEC("**");
     RETURN(BOOL_TO_VAL(vm_has_ancestor(vm, args[0], args[1])));
 }
@@ -1041,7 +1041,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "==",          Object_eq);
     ADD_METHOD(ObjectProto, "!",           Object_not);
     ADD_METHOD(ObjectProto, "clone",       Object_clone);
-    ADD_METHOD(ObjectProto, "hasAncestor", Object_hasAncestor);
+    ADD_METHOD(ObjectProto, "is",          Object_is);
     ADD_METHOD(ObjectProto, "toString",    Object_toString);
     ADD_METHOD(ObjectProto, "print",       Object_print);
     ADD_METHOD(ObjectProto, "new",         Object_new);
