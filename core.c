@@ -325,7 +325,7 @@ DEFINE_NATIVE(Object_hasAncestor) {
     RETURN(BOOL_TO_VAL(vm_has_ancestor(vm, args[0], args[1])));
 }
 
-DEFINE_NATIVE(Object_rawType) {
+DEFINE_NATIVE(Object_typeOf) {
     ARGSPEC("**");
     Value v = args[1];
     switch (v.type) {
@@ -1037,7 +1037,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "getOwnSlot",  Object_getOwnSlot);
     ADD_METHOD(ObjectProto, "deleteSlot",  Object_deleteSlot);
     ADD_METHOD(ObjectProto, "same",        Object_same);
-    ADD_METHOD(ObjectProto, "rawType",     Object_rawType);
+    ADD_METHOD(ObjectProto, "typeOf",      Object_typeOf);
     ADD_METHOD(ObjectProto, "==",          Object_eq);
     ADD_METHOD(ObjectProto, "!",           Object_not);
     ADD_METHOD(ObjectProto, "clone",       Object_clone);
