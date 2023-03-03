@@ -353,7 +353,9 @@ generic_invoke(VM* vm, Value obj, ObjString* slot_name, int num_args,
     }
 
     // Try to call the 'forward' slot with an ObjMsg.
-    if (vm_get_slot(vm, obj, OBJ_TO_VAL(vm->forward_string), &callee) && is_callable(callee)) {
+    if (vm_get_slot(vm, obj, OBJ_TO_VAL(vm->forward_string), &callee)
+            && is_callable(callee)) {
+        vm_push_root(vm, OBJ_TO_VAL(slot_name));
         Value* args = &vm->fiber->stack_top[-num_args];
         ObjMsg* msg = objmsg_new(vm, slot_name, args, num_args);
         vm_drop(vm, num_args);
@@ -361,6 +363,7 @@ generic_invoke(VM* vm, Value obj, ObjString* slot_name, int num_args,
         vm_ensure_stack(vm, 1);
         vm_push(vm, OBJ_TO_VAL(msg));
         vm_pop_root(vm); // msg
+        vm_pop_root(vm); // str
         return complete_call(vm, callee, 1);
     }
 
