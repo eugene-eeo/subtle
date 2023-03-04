@@ -17,7 +17,6 @@ typedef struct Obj Obj;
 #define IS_NUMBER(value)     ((value).type == VALUE_NUMBER)
 #define IS_OBJ(value)        ((value).type == VALUE_OBJ)
 
-#define VAL_TO_BOOL(value)   ((value).type == VALUE_TRUE)
 #define VAL_TO_NUMBER(value) ((value).as.number)
 #define VAL_TO_OBJ(value)    ((value).as.obj)
 

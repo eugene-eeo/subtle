@@ -3,7 +3,6 @@
 #include "value.h"
 #include "vm.h"
 
-#include <stdio.h>
 #include <string.h>  // memcmp
 
 void table_init(Table* table) {
