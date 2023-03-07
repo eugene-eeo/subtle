@@ -256,7 +256,7 @@ DEFINE_NATIVE(Object_perform) {
     ARGSPEC("*m");
     Value slot = NIL_VAL;
     Value self = args[0];
-    ObjMsg* msg = VAL_TO_MESSAGE(args[1]);
+    ObjMsg* msg = VAL_TO_MSG(args[1]);
 
     // search on protos. if we find it, then we need to
     // perform a call. we always check that the call is
@@ -984,26 +984,26 @@ DEFINE_NATIVE(Msg_newFromList) {
 
 DEFINE_NATIVE(Msg_slotName) {
     ARGSPEC("m");
-    ObjMsg* msg = VAL_TO_MESSAGE(args[0]);
+    ObjMsg* msg = VAL_TO_MSG(args[0]);
     RETURN(OBJ_TO_VAL(msg->slot_name));
 }
 
 DEFINE_NATIVE(Msg_setSlotName) {
     ARGSPEC("mS");
-    ObjMsg* msg = VAL_TO_MESSAGE(args[0]);
+    ObjMsg* msg = VAL_TO_MSG(args[0]);
     msg->slot_name = VAL_TO_STRING(args[1]);
     RETURN(OBJ_TO_VAL(msg));
 }
 
 DEFINE_NATIVE(Msg_args) {
     ARGSPEC("m");
-    ObjMsg* msg = VAL_TO_MESSAGE(args[0]);
+    ObjMsg* msg = VAL_TO_MSG(args[0]);
     RETURN(OBJ_TO_VAL(msg->args));
 }
 
 DEFINE_NATIVE(Msg_setArgs) {
     ARGSPEC("mL");
-    ObjMsg* msg = VAL_TO_MESSAGE(args[0]);
+    ObjMsg* msg = VAL_TO_MSG(args[0]);
     msg->args = VAL_TO_LIST(args[1]);
     RETURN(OBJ_TO_VAL(msg));
 }
