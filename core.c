@@ -308,6 +308,11 @@ DEFINE_NATIVE(Object_eq) {
     RETURN(BOOL_TO_VAL(value_equal(args[0], args[1])));
 }
 
+DEFINE_NATIVE(Object_neq) {
+    ARGSPEC("**");
+    RETURN(BOOL_TO_VAL(!value_equal(args[0], args[1])));
+}
+
 DEFINE_NATIVE(Object_not) {
     RETURN(BOOL_TO_VAL(!value_truthy(args[0])));
 }
@@ -1038,6 +1043,7 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "same",        Object_same);
     ADD_METHOD(ObjectProto, "type",        Object_type);
     ADD_METHOD(ObjectProto, "==",          Object_eq);
+    ADD_METHOD(ObjectProto, "!=",          Object_neq);
     ADD_METHOD(ObjectProto, "!",           Object_not);
     ADD_METHOD(ObjectProto, "clone",       Object_clone);
     ADD_METHOD(ObjectProto, "is",          Object_is);

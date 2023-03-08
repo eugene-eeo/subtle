@@ -1,5 +1,4 @@
 Fn.new{
-Object.!= = Fn.new{|o| return ! (self == o) }
 Object.println = Fn.new{
     self.print
     "\n".print
