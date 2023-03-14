@@ -34,7 +34,7 @@ typedef struct VM VM;
 #define VAL_TO_RANGE(value)   ((ObjRange*)VAL_TO_OBJ(value))
 #define VAL_TO_LIST(value)    ((ObjList*)VAL_TO_OBJ(value))
 #define VAL_TO_MAP(value)     ((ObjMap*)VAL_TO_OBJ(value))
-#define VAL_TO_MESSAGE(value) ((ObjMsg*)VAL_TO_OBJ(value))
+#define VAL_TO_MSG(value)     ((ObjMsg*)VAL_TO_OBJ(value))
 
 typedef enum {
     OBJ_STRING,

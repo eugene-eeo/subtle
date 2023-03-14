@@ -21,10 +21,6 @@ void* memory_realloc(VM* vm, void* ptr, size_t old_size, size_t new_size) {
 #ifdef SUBTLE_DEBUG_STRESS_GC
         memory_collect(vm);
 #endif
-        // only trigger a GC when:
-        //  1. we've allocated beyond the next_gc threshold
-        //  2. we're not freeing any objects (since we use memory_realloc
-        //     to free objects during GC).
         if (vm->bytes_allocated > vm->next_gc)
             memory_collect(vm);
     }
@@ -234,8 +230,7 @@ void memory_collect(VM* vm) {
 #endif
 
 #ifdef SUBTLE_DEBUG_TRACE_ALLOC
-    printf("-- gc end\n");
-    printf("   collected %zu bytes (from %zu to %zu) next at %zu\n",
+    printf("-- gc end collected=%zu from=%zu to=%zu next=%zu\n",
            before - vm->bytes_allocated,
            before,
            vm->bytes_allocated,

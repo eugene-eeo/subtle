@@ -256,7 +256,7 @@ DEFINE_NATIVE(Object_perform) {
     ARGSPEC("*m");
     Value slot = NIL_VAL;
     Value self = args[0];
-    ObjMsg* msg = VAL_TO_MESSAGE(args[1]);
+    ObjMsg* msg = VAL_TO_MSG(args[1]);
 
     // search on protos. if we find it, then we need to
     // perform a call. we always check that the call is
@@ -308,6 +308,11 @@ DEFINE_NATIVE(Object_eq) {
     RETURN(BOOL_TO_VAL(value_equal(args[0], args[1])));
 }
 
+DEFINE_NATIVE(Object_neq) {
+    ARGSPEC("**");
+    RETURN(BOOL_TO_VAL(!value_equal(args[0], args[1])));
+}
+
 DEFINE_NATIVE(Object_not) {
     RETURN(BOOL_TO_VAL(!value_truthy(args[0])));
 }
@@ -325,9 +330,8 @@ DEFINE_NATIVE(Object_is) {
     RETURN(BOOL_TO_VAL(vm_has_ancestor(vm, args[0], args[1])));
 }
 
-DEFINE_NATIVE(Object_typeOf) {
-    ARGSPEC("**");
-    Value v = args[1];
+DEFINE_NATIVE(Object_type) {
+    Value v = args[0];
     switch (v.type) {
     case VALUE_NIL:    RETURN(OBJ_TO_VAL(CONST_STRING(vm, "nil")));
     case VALUE_TRUE:   RETURN(OBJ_TO_VAL(CONST_STRING(vm, "true")));
@@ -986,26 +990,26 @@ DEFINE_NATIVE(Msg_newFromList) {
 
 DEFINE_NATIVE(Msg_slotName) {
     ARGSPEC("m");
-    ObjMsg* msg = VAL_TO_MESSAGE(args[0]);
+    ObjMsg* msg = VAL_TO_MSG(args[0]);
     RETURN(OBJ_TO_VAL(msg->slot_name));
 }
 
 DEFINE_NATIVE(Msg_setSlotName) {
     ARGSPEC("mS");
-    ObjMsg* msg = VAL_TO_MESSAGE(args[0]);
+    ObjMsg* msg = VAL_TO_MSG(args[0]);
     msg->slot_name = VAL_TO_STRING(args[1]);
     RETURN(OBJ_TO_VAL(msg));
 }
 
 DEFINE_NATIVE(Msg_args) {
     ARGSPEC("m");
-    ObjMsg* msg = VAL_TO_MESSAGE(args[0]);
+    ObjMsg* msg = VAL_TO_MSG(args[0]);
     RETURN(OBJ_TO_VAL(msg->args));
 }
 
 DEFINE_NATIVE(Msg_setArgs) {
     ARGSPEC("mL");
-    ObjMsg* msg = VAL_TO_MESSAGE(args[0]);
+    ObjMsg* msg = VAL_TO_MSG(args[0]);
     msg->args = VAL_TO_LIST(args[1]);
     RETURN(OBJ_TO_VAL(msg));
 }
@@ -1038,8 +1042,9 @@ void core_init_vm(VM* vm)
     ADD_METHOD(ObjectProto, "getOwnSlot",  Object_getOwnSlot);
     ADD_METHOD(ObjectProto, "deleteSlot",  Object_deleteSlot);
     ADD_METHOD(ObjectProto, "same",        Object_same);
-    ADD_METHOD(ObjectProto, "typeOf",      Object_typeOf);
+    ADD_METHOD(ObjectProto, "type",        Object_type);
     ADD_METHOD(ObjectProto, "==",          Object_eq);
+    ADD_METHOD(ObjectProto, "!=",          Object_neq);
     ADD_METHOD(ObjectProto, "!",           Object_not);
     ADD_METHOD(ObjectProto, "clone",       Object_clone);
     ADD_METHOD(ObjectProto, "is",          Object_is);

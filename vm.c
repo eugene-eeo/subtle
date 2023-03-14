@@ -407,7 +407,7 @@ run(VM* vm)
     for (;;) {
 #ifdef SUBTLE_DEBUG_TRACE_EXECUTION
         // Trace the stack.
-        for (Value* vptr = fiber->stack; vptr != fiber->stack_top; vptr++) {
+        for (Value* vptr = vm->fiber->stack; vptr != vm->fiber->stack_top; vptr++) {
             printf("[ ");
             debug_print_value(*vptr);
             printf(" ]");

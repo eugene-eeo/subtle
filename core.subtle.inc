@@ -3,7 +3,6 @@
 #define SUBTLE_CORE_INC_H
 const char* CORE_SOURCE =
 "Fn.new{\n"
-"Object.!= = Fn.new{|o| return ! (self == o) }\n"
 "Object.println = Fn.new{\n"
 "    self.print\n"
 "    \"\n\".print\n"
