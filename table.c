@@ -90,21 +90,6 @@ bool table_set(Table* table, VM* vm, Value key, Value value) {
     return is_new_key;
 }
 
-// Just deletes a key from the table, without compaction
-static
-bool table_delete_key(Table* table, VM* vm, Value key) {
-    if (table->count == 0) return false;
-
-    Entry* entry = table_find_entry(table->entries, table->capacity, key);
-    if (IS_UNDEFINED(entry->key)) return false;
-
-    // Leave a tombstone.
-    entry->key = UNDEFINED_VAL;
-    entry->value = UNDEFINED_VAL;
-    table->count--;
-    return true;
-}
-
 static
 void table_compact(Table* table, VM* vm) {
     // Compact the table if necessary.
@@ -121,9 +106,17 @@ void table_compact(Table* table, VM* vm) {
 }
 
 bool table_delete(Table* table, VM* vm, Value key) {
-    bool rv = table_delete_key(table, vm, key);
+    if (table->count == 0) return false;
+
+    Entry* entry = table_find_entry(table->entries, table->capacity, key);
+    if (IS_UNDEFINED(entry->key)) return false;
+
+    // Leave a tombstone.
+    entry->key = UNDEFINED_VAL;
+    entry->value = UNDEFINED_VAL;
+    table->count--;
     table_compact(table, vm);
-    return rv;
+    return true;
 }
 
 ObjString*
