@@ -16,6 +16,21 @@ typedef enum {
     INTERPRET_RUNTIME_ERROR,
 } InterpretResult;
 
+// A handle to a value, meant for use by external code to make
+// sure a value doesn't get GC'd.
+typedef struct Handle {
+    Value value;
+    struct Handle* prev;
+    struct Handle* next;
+} Handle;
+
+typedef struct ExtContext {
+    // Opaque data that the extension owns.
+    void* ctx;
+    GCFn free;
+    struct ExtContext* next;
+} ExtContext;
+
 typedef struct VM {
     ObjFiber* fiber;
     // Whether we allow the currently running fiber to yield.
@@ -44,7 +59,13 @@ typedef struct VM {
     ObjObject* MsgProto;
     // -------------------------
 
+    // ---- Extensions ----
+    uid_t uid;
+    ExtContext* extensions;
+    // -------------------------
+
     // ---- GC ----
+    Handle* handles;
     Obj* objects;
     size_t bytes_allocated;
     size_t next_gc;
@@ -133,4 +154,23 @@ bool vm_invoke(VM* vm,
 
 // Return true if the object `v` is callable.
 bool vm_check_call(VM* vm, Value v, int num_args, const char* slot);
+
+// Extension API
+// =============
+//
+// 1. We need some machinery to determine the type of an opaque
+//    ObjForeign pointer -- use vm_get_uid() to get a UID that we
+//    tag the foreign with.
+//
+// 2. Use vm_add_extension() to add a struct that is shared between
+//    all your extension objects, e.g. it keeps track of the UID
+//    you got from vm_get_uid().
+
+uid_t vm_get_uid(VM* vm);
+void vm_add_extension(VM* vm, void* p, GCFn free);
+void vm_add_global(VM* vm, char* name, Value v);
+
+Handle* handle_new(VM* vm, Value v);
+void handle_release(VM* vm, Handle* h);
+
 #endif

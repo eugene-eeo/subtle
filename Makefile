@@ -2,7 +2,7 @@ ci: lint test
 
 CCFLAGS=-Wall -pedantic
 CC=gcc
-DEPS=$(shell ls *.c vendor/*.c | grep -v main.c)
+DEPS=$(shell ls *.c vendor/*.c ext/*.c | grep -v main.c)
 MAIN=$(DEPS) main.c
 
 core.subtle.inc: core.subtle gen.py

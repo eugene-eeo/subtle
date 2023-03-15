@@ -34,6 +34,9 @@ void vm_init(VM* vm) {
     vm->MapProto = NULL;
     vm->MsgProto = NULL;
 
+    vm->uid = 0;
+    vm->handles = NULL;
+    vm->extensions = NULL;
     vm->objects = NULL;
     vm->bytes_allocated = 0;
     vm->next_gc = 1024 * 1024;
@@ -59,6 +62,15 @@ void vm_free(VM* vm) {
     table_free(&vm->strings, vm);
     table_free(&vm->globals, vm);
     free(vm->gray_stack);
+
+    ExtContext* ext = vm->extensions;
+    while (ext != NULL) {
+        ExtContext* next = ext->next;
+        ext->free(vm, ext->ctx);
+        FREE(vm, ExtContext, ext);
+        ext = next;
+    }
+
     // Check that our memory accounting is correct.
     ASSERT(vm->bytes_allocated == 0, "bytes_allocated != 0");
     vm_init(vm);
@@ -207,7 +219,7 @@ vm_complete_call(VM* vm, Value callee, int num_args)
     if (IS_NATIVE(callee)) {
         ObjNative* native = VAL_TO_NATIVE(callee);
         Value* args_start = &vm->fiber->stack_top[-num_args - 1];
-        return native->fn(vm, args_start, num_args);
+        return native->fn(vm, native->ctx, args_start, num_args);
     }
     ASSERT(num_args == 0, "num_args != 0");
     vm->fiber->stack_top[-1] = callee;
@@ -273,6 +285,7 @@ vm_get_prototype(VM* vm, Value value)
                 case OBJ_LIST:    return OBJ_TO_VAL(vm->ListProto);
                 case OBJ_MAP:     return OBJ_TO_VAL(vm->MapProto);
                 case OBJ_MSG:     return OBJ_TO_VAL(vm->MsgProto);
+                case OBJ_FOREIGN: return VAL_TO_FOREIGN(value)->proto;
                 default: UNREACHABLE();
             }
         }
@@ -601,7 +614,7 @@ vm_call(VM* vm, Value slot, int num_args)
             rv = run(vm, vm->fiber, vm->fiber->frames_count - 1) == INTERPRET_OK;
     } else if (IS_NATIVE(slot)) {
         ObjNative* native = VAL_TO_NATIVE(slot);
-        rv = native->fn(vm, &vm->fiber->stack_top[-num_args - 1], num_args);
+        rv = native->fn(vm, native->ctx, &vm->fiber->stack_top[-num_args - 1], num_args);
     } else {
         ASSERT(num_args == 0, "num_args != 0");
         vm->fiber->stack_top[-1] = slot;
@@ -628,4 +641,61 @@ vm_interpret(VM* vm, const char* source)
     InterpretResult result = run(vm, vm->fiber, -1);
     vm->fiber = NULL;
     return result;
+}
+
+// Extension API
+// =============
+
+uid_t
+vm_get_uid(VM* vm)
+{
+    return ++vm->uid;
+}
+
+void
+vm_add_global(VM* vm, char* name, Value v)
+{
+    vm_push_root(vm, v);
+    ObjString* s = objstring_copy(vm, name, strlen(name));
+    vm_push_root(vm, OBJ_TO_VAL(s));
+    table_set(&vm->globals, vm, OBJ_TO_VAL(s), v);
+    vm_pop_root(vm); // name
+    vm_pop_root(vm); // v
+}
+
+void
+vm_add_extension(VM *vm, void *p, GCFn free)
+{
+    ExtContext* ctx = ALLOCATE(vm, ExtContext);
+    ctx->ctx = p;
+    ctx->free = free;
+    ctx->next = vm->extensions;
+    vm->extensions = ctx;
+}
+
+Handle*
+handle_new(VM* vm, Value v) {
+    vm_push_root(vm, v);
+    Handle* h = ALLOCATE(vm, Handle);
+    vm_pop_root(vm); // v
+    h->value = v;
+    h->prev = vm->handles;
+    if (vm->handles != NULL)
+        vm->handles->next = h;
+    h->next = NULL;
+    vm->handles = h;
+    return h;
+}
+
+void
+handle_release(VM* vm, Handle* h)
+{
+    // head of the linked list?
+    if (vm->handles == h) vm->handles = h->next;
+
+    // unlink from the linked list
+    if (h->prev != NULL) h->prev->next = h->next;
+    if (h->next != NULL) h->next->prev = h->prev;
+
+    FREE(vm, Handle, h);
 }

@@ -1,5 +1,6 @@
 #include "core.h"
 #include "vm.h"
+#include "ext/io.h"
 #include "vendor/linenoise.h"
 
 #include <stdlib.h>
@@ -72,6 +73,7 @@ int main(int argc, const char* argv[]) {
     VM vm;
     vm_init(&vm);
     core_init_vm(&vm);
+    ext_io_init_vm(&vm);
 
     if (argc == 1) {
         repl(&vm);

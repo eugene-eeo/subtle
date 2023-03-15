@@ -96,6 +96,10 @@ static void mark_roots(VM* vm) {
 
     table_mark(&vm->globals, vm);
     compiler_mark(vm->compiler, vm);
+
+    // Mark the handles
+    for (Handle* h = vm->handles; h != NULL; h = h->next)
+        mark_value(vm, h->value);
 }
 
 static void blacken_fiber(VM* vm, ObjFiber* fiber);
@@ -152,6 +156,11 @@ static void blacken_object(VM* vm, Obj* obj) {
             ObjMsg* msg = (ObjMsg*)obj;
             mark_object(vm, (Obj*)msg->slot_name);
             mark_object(vm, (Obj*)msg->args);
+            break;
+        }
+        case OBJ_FOREIGN: {
+            ObjForeign* f = (ObjForeign*)obj;
+            mark_value(vm, f->proto);
             break;
         }
     }

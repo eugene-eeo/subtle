@@ -25,7 +25,7 @@ define_on_table(VM* vm, Table* table, const char* name, Value value) {
 }
 
 #define DEFINE_NATIVE(name) \
-    static bool name(VM* vm, Value* args, int num_args)
+    static bool name(VM* vm, void* ctx, Value* args, int num_args)
 
 #define RETURN(expr) \
     do { \
@@ -529,7 +529,7 @@ DEFINE_NATIVE(Fn_applyWith) {
 DEFINE_NATIVE(Native_call) {
     ARGSPEC("n");
     ObjNative* native = VAL_TO_NATIVE(args[0]);
-    return native->fn(vm, args, num_args);
+    return native->fn(vm, native->ctx, args, num_args);
 }
 
 DEFINE_NATIVE(Native_callWith) {
@@ -538,7 +538,7 @@ DEFINE_NATIVE(Native_callWith) {
     for (int i = 0; i < num_args; i++)
         args[i] = args[i + 1];
     vm_pop(vm);
-    return native->fn(vm, args, num_args - 1);
+    return native->fn(vm, native->ctx, args, num_args - 1);
 }
 
 DEFINE_NATIVE(Native_apply) {
@@ -552,7 +552,7 @@ DEFINE_NATIVE(Native_apply) {
     for (uint32_t i = 0; i < arg_list->size; i++)
         vm_push(vm, arg_list->values[i]);
 
-    return native->fn(vm, args_start, arg_list->size);
+    return native->fn(vm, native->ctx, args_start, arg_list->size);
 }
 
 DEFINE_NATIVE(Native_applyWith) {
@@ -570,7 +570,7 @@ DEFINE_NATIVE(Native_applyWith) {
     for (uint32_t i = 0; i < arg_list->size; i++)
         vm_push(vm, arg_list->values[i]);
 
-    return native->fn(vm, args_start, arg_list->size);
+    return native->fn(vm, native->ctx, args_start, arg_list->size);
 }
 
 // ============================= Number =============================

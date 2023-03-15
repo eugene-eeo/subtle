@@ -23,6 +23,7 @@ typedef struct VM VM;
 #define IS_LIST(value)        (is_object_type(value, OBJ_LIST))
 #define IS_MAP(value)         (is_object_type(value, OBJ_MAP))
 #define IS_MSG(value)         (is_object_type(value, OBJ_MSG))
+#define IS_FOREIGN(value)     (is_object_type(value, OBJ_FOREIGN))
 
 #define VAL_TO_STRING(value)  ((ObjString*)VAL_TO_OBJ(value))
 #define VAL_TO_FN(value)      ((ObjFn*)VAL_TO_OBJ(value))
@@ -35,6 +36,7 @@ typedef struct VM VM;
 #define VAL_TO_LIST(value)    ((ObjList*)VAL_TO_OBJ(value))
 #define VAL_TO_MAP(value)     ((ObjMap*)VAL_TO_OBJ(value))
 #define VAL_TO_MSG(value)     ((ObjMsg*)VAL_TO_OBJ(value))
+#define VAL_TO_FOREIGN(value) ((ObjForeign*)VAL_TO_OBJ(value))
 
 typedef enum {
     OBJ_STRING,
@@ -48,6 +50,7 @@ typedef enum {
     OBJ_LIST,
     OBJ_MAP,
     OBJ_MSG,
+    OBJ_FOREIGN,
 } ObjType;
 
 typedef struct Obj {
@@ -105,10 +108,11 @@ typedef struct {
     Table slots;
 } ObjObject;
 
-typedef bool (*NativeFn)(VM* vm, Value* args, int num_args);
+typedef bool (*NativeFn)(VM* vm, void* ctx, Value* args, int num_args);
 
 typedef struct {
     Obj obj;
+    void* ctx; // this should be owned by an ExtContext
     NativeFn fn;
 } ObjNative;
 
@@ -174,6 +178,16 @@ typedef struct {
     ObjList* args;
 } ObjMsg;
 
+typedef void (*GCFn)(VM* vm, void* p);
+
+typedef struct {
+    Obj obj;
+    uid_t uid;   // Type tag (this combined with p is the minimal object).
+    void* p;     // Pointer to externally-managed data.
+    Value proto; // Prototype.
+    GCFn gc;     // Function called when the Foreign is GC'd.
+} ObjForeign;
+
 // Object memory management
 // ========================
 
@@ -221,6 +235,7 @@ bool objobject_delete(ObjObject* obj, VM* vm, Value key);
 // =========
 
 ObjNative* objnative_new(VM* vm, NativeFn fn);
+ObjNative* objnative_new_with_context(VM* vm, NativeFn fn, void* ctx);
 
 // ObjFiber
 // ========
@@ -259,5 +274,11 @@ bool objmap_delete(ObjMap* map, VM* vm, Value key);
 
 ObjMsg* objmsg_new(VM* vm, ObjString* slot_name, Value* args, uint32_t num_args);
 ObjMsg* objmsg_from_list(VM* vm, ObjString* slot_name, ObjList* list);
+
+// ObjForeign
+// ==========
+
+ObjForeign* objforeign_new(VM* vm, uid_t uid, void* p, Value proto, GCFn gc);
+bool value_has_uid(Value v, uid_t uid);
 
 #endif

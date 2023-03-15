@@ -41,6 +41,7 @@ static void objrange_free(VM*, Obj*);
 static void objlist_free(VM*, Obj*);
 static void objmap_free(VM*, Obj*);
 static void objmsg_free(VM*, Obj*);
+static void objforeign_free(VM*, Obj*);
 
 void
 object_free(Obj* obj, VM* vm)
@@ -60,6 +61,7 @@ object_free(Obj* obj, VM* vm)
     case OBJ_LIST: objlist_free(vm, obj); break;
     case OBJ_MAP: objmap_free(vm, obj); break;
     case OBJ_MSG: objmsg_free(vm, obj); break;
+    case OBJ_FOREIGN: objforeign_free(vm, obj); break;
     }
 }
 
@@ -233,7 +235,7 @@ objobject_insert_proto(ObjObject* obj, VM* vm, uint32_t idx, Value proto)
     obj->protos = GROW_ARRAY(vm, obj->protos, Value, obj->protos_count, obj->protos_count + 1);
     obj->protos_count++;
     for (uint32_t i = obj->protos_count - 1; i > idx; i--)
-        obj->protos[i] = obj->protos[i-1];
+        obj->protos[i] = obj->protos[i - 1];
     obj->protos[idx] = proto;
 }
 
@@ -304,8 +306,15 @@ objobject_free(VM* vm, Obj* obj)
 ObjNative*
 objnative_new(VM* vm, NativeFn fn)
 {
+    return objnative_new_with_context(vm, fn, NULL);
+}
+
+ObjNative*
+objnative_new_with_context(VM* vm, NativeFn fn, void* ctx)
+{
     ObjNative* native = ALLOCATE_OBJECT(vm, OBJ_NATIVE, ObjNative);
     native->fn = fn;
+    native->ctx = ctx;
     return native;
 }
 
@@ -596,4 +605,33 @@ objmsg_from_list(VM* vm, ObjString* slot_name, ObjList* list)
     msg->slot_name = slot_name;
     msg->args = list;
     return msg;
+}
+
+// ObjForeign
+// ==========
+
+ObjForeign*
+objforeign_new(VM* vm, uid_t uid, void* p, Value proto, GCFn gc)
+{
+    ObjForeign* handle = ALLOCATE_OBJECT(vm, OBJ_FOREIGN, ObjForeign);
+    handle->uid = uid;
+    handle->p = p;
+    handle->proto = proto;
+    handle->gc = gc;
+    return handle;
+}
+
+bool
+value_has_uid(Value v, uid_t uid)
+{
+    return IS_FOREIGN(v) && VAL_TO_FOREIGN(v)->uid == uid;
+}
+
+void
+objforeign_free(VM* vm, Obj* obj)
+{
+    ObjForeign* handle = (ObjForeign*)obj;
+    if (handle->gc != NULL)
+        handle->gc(vm, handle->p);
+    FREE(vm, ObjForeign, handle);
 }
