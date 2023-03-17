@@ -68,7 +68,7 @@ is_object_type(Value value, ObjType type)
 
 typedef struct ObjString {
     Obj obj;
-    char* chars;
+    char* chars; // NUL-terminated string.
     uint32_t length;
     uint32_t hash;
 } ObjString;
@@ -200,6 +200,10 @@ void object_free(Obj* obj, VM* vm);
 // ObjString
 // =========
 
+// Takes ownership of a NUL-terminated string `chars`.
+// This assumes the memory was _not_ allocated via memory_realloc.
+// If `chars` happens to be interned, `free(chars)` is called.
+ObjString* objstring_take(VM* vm, char* chars, size_t length);
 ObjString* objstring_copy(VM* vm, const char* chars, size_t length);
 ObjString* objstring_concat(VM* vm, ObjString* a, ObjString* b);
 

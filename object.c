@@ -7,6 +7,7 @@
 #include "vm.h"
 
 #include <stdint.h>
+#include <stdlib.h> // free
 #include <string.h> // memcpy
 #ifdef SUBTLE_DEBUG_TRACE_ALLOC
 #include <stdio.h>
@@ -100,6 +101,22 @@ objstring_free(VM* vm, Obj* obj)
     ObjString* str = (ObjString*)obj;
     FREE_ARRAY(vm, str->chars, char, str->length + 1);
     FREE(vm, ObjString, str);
+}
+
+ObjString*
+objstring_take(VM* vm, char* src, size_t length)
+{
+    uint32_t hash = hash_string(src, length);
+    ObjString* interned = table_find_string(&vm->strings, src, length, hash);
+    if (interned != NULL) {
+        free(src);
+        return interned;
+    }
+
+    // we assume this memory was _not_ allocated via memory_realloc
+    // so we need to bump up bytes_allocated since we own it now.
+    vm->bytes_allocated += length + 1;
+    return objstring_new(vm, src, length, hash);
 }
 
 ObjString*
