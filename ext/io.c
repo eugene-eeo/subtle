@@ -142,6 +142,7 @@ File_close(VM* vm, void* ctx, Value* args, int num_args)
             return false;
         }
     }
+    ef->closed = true;
     args[0] = TRUE_VAL;
     return true;
 }
