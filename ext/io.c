@@ -96,15 +96,18 @@ File_read(VM* vm, void* ctx, Value* args, int num_args)
         n += r;
         if (bufsz < n + READ_CHUNK_SIZE) {
             bufsz *= 2;
-            buffer = realloc(buffer, bufsz);
-            if (buffer == NULL) {
+            char* new_buffer = realloc(buffer, bufsz);
+            if (new_buffer == NULL) {
+                free(buffer);
                 vm_runtime_error(vm, "%s: realloc failed.", __func__);
                 return false;
             }
+            buffer = new_buffer;
         }
     }
     n += r;
     if (ferror(ef->f) && !feof(ef->f)) {
+        free(buffer);
         vm_runtime_error(vm, "%s: error reading from file.", __func__);
         return false;
     }

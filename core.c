@@ -348,6 +348,7 @@ DEFINE_NATIVE(Object_type) {
         case OBJ_LIST:    RETURN(OBJ_TO_VAL(CONST_STRING(vm, "List")));
         case OBJ_MAP:     RETURN(OBJ_TO_VAL(CONST_STRING(vm, "Map")));
         case OBJ_MSG:     RETURN(OBJ_TO_VAL(CONST_STRING(vm, "Msg")));
+        case OBJ_FOREIGN: RETURN(OBJ_TO_VAL(CONST_STRING(vm, "Foreign")));
         default: UNREACHABLE();
         }
     default: UNREACHABLE();
@@ -397,6 +398,7 @@ DEFINE_NATIVE(Object_toString) {
         case OBJ_LIST:    prefix = "List"; break;
         case OBJ_MAP:     prefix = "Map"; break;
         case OBJ_MSG:     prefix = "Msg"; break;
+        case OBJ_FOREIGN: prefix = "Foreign"; break;
         default:          UNREACHABLE();
         }
         length = sprintf(buffer, "%s_%p", prefix, (void*) obj);
