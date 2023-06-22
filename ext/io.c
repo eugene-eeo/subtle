@@ -108,7 +108,7 @@ File_read(VM* vm, void* ctx, Value* args, int num_args)
     n += r;
     if (ferror(ef->f) && !feof(ef->f)) {
         free(buffer);
-        vm_runtime_error(vm, "%s: error reading from file.", __func__);
+        vm_runtime_error(vm, "%s: error reading from file: %s", __func__, strerror(errno));
         return false;
     }
 
