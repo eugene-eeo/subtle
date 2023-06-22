@@ -125,9 +125,15 @@ print_stack_trace(VM* vm)
          fiber != NULL;
          fiber = fiber->parent) {
         fprintf(stderr, "[Fiber %p]\n", (void*) fiber);
-        for (int i = fiber->frames_count - 1; i >= 0; i--) {
+        int frames_count = fiber->frames_count;
+        for (int i = frames_count - 1; i >= 0; i--) {
             CallFrame* frame = &fiber->frames[i];
             ObjFn* fn = frame->closure->fn;
+            if (frames_count - i >= 10 && i > 10) {
+                fprintf(stderr, "\t[...]\n");
+                i = 10;
+                continue;
+            }
             // -1 as we increment frame->ip on each loop.
             int instruction = frame->ip - fn->chunk.code - 1;
             fprintf(stderr, "\t[line %u] in %s\n",
@@ -201,12 +207,14 @@ is_callable(Value v)
 }
 
 bool
-vm_check_call(VM* vm, Value v, int num_args, const char* slot)
+vm_check_call(VM* vm, Value v, int num_args, ObjString* slot)
 {
     ASSERT(slot != NULL, "slot may not be NULL");
     if (is_callable(v) || num_args == 0)
         return true;
-    vm_runtime_error(vm, "Called a non-callable slot '%s' with %d args.", slot, num_args);
+    vm_push_root(vm, OBJ_TO_VAL(slot));
+    vm_runtime_error(vm, "Called a non-callable slot '%s' with %d args.", slot->chars, num_args);
+    vm_pop_root(vm);
     return false;
 }
 
@@ -360,7 +368,7 @@ generic_invoke(VM* vm, Value obj, ObjString* slot_name, int num_args,
     // Try to search on the protos.
     Value callee;
     if (vm_get_slot(vm, obj, OBJ_TO_VAL(slot_name), &callee)) {
-        if (!vm_check_call(vm, callee, num_args, slot_name->chars))
+        if (!vm_check_call(vm, callee, num_args, slot_name))
             return false;
         return complete_call(vm, callee, num_args);
     }
@@ -380,7 +388,9 @@ generic_invoke(VM* vm, Value obj, ObjString* slot_name, int num_args,
         return complete_call(vm, callee, 1);
     }
 
+    vm_push_root(vm, OBJ_TO_VAL(slot_name));
     vm_runtime_error(vm, "Object does not respond to '%s'.", slot_name->chars);
+    vm_pop_root(vm);
     return false;
 }
 
