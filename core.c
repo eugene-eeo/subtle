@@ -262,10 +262,14 @@ DEFINE_NATIVE(Object_perform) {
     // perform a call. we always check that the call is
     // valid.
     bool exists = vm_get_slot(vm, self, OBJ_TO_VAL(msg->slot_name), &slot);
-    if (!vm_check_call(vm, slot, msg->args->size, msg->slot_name->chars))
+    if (!vm_check_call(vm, slot, msg->args->size, msg->slot_name))
         return false;
-    if (!exists)
-        RETURN(slot);
+    if (!exists) {
+        vm_push_root(vm, OBJ_TO_VAL(msg->slot_name));
+        vm_runtime_error(vm, "Object does not respond to '%s'", msg->slot_name->chars);
+        vm_pop_root(vm);
+        return false;
+    }
 
     // copy args onto stack.
     vm_push_root(vm, args[1]);

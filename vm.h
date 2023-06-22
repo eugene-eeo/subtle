@@ -119,5 +119,5 @@ bool vm_invoke(VM* vm,
                Value obj, ObjString* slot_name, int num_args);
 
 // Return true if the object `v` is callable.
-bool vm_check_call(VM* vm, Value v, int num_args, const char* slot);
+bool vm_check_call(VM* vm, Value v, int num_args, ObjString* slot);
 #endif
