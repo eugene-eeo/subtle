@@ -456,8 +456,8 @@ run(VM* vm, ObjFiber* fiber, int top_level)
             }
             case OP_CONSTANT: vm_push(vm, READ_CONSTANT()); break;
             case OP_POP:      vm_pop(vm); break;
-            case OP_TRUE:     vm_push(vm, BOOL_TO_VAL(true)); break;
-            case OP_FALSE:    vm_push(vm, BOOL_TO_VAL(false)); break;
+            case OP_TRUE:     vm_push(vm, TRUE_VAL); break;
+            case OP_FALSE:    vm_push(vm, FALSE_VAL); break;
             case OP_NIL:      vm_push(vm, NIL_VAL); break;
             case OP_DEF_GLOBAL: {
                 Value name = READ_CONSTANT();
