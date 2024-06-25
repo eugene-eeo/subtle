@@ -65,6 +65,10 @@ static bool is_alphanumeric(char ch) {
     return is_alpha(ch) || is_numeric(ch);
 }
 
+static bool is_whitespace(char ch) {
+    return ch == '\n' || ch == ' ' || ch == '\t' || ch == '\r';
+}
+
 static bool skip_whitespace(Lexer* lexer) {
     bool seen_newline = false;
     for (;;) {
@@ -93,6 +97,20 @@ static bool skip_whitespace(Lexer* lexer) {
     }
 }
 
+// checks if we are at the end of a literal.
+// this avoids weird syntax like
+// - "a"b
+// - 1b
+// from being parsed as "a".b or 1.b.
+static bool check_terminated_literal(Lexer *lexer) {
+    if (!is_at_end(lexer)) {
+        char ch = peek(lexer);
+        if (!is_whitespace(ch) && ch != '#' && is_alphanumeric(ch))
+            return false;
+    }
+    return true;
+}
+
 static Token string(Lexer* lexer) {
     // we've already consumed the first '"'.
     while (!is_at_end(lexer) && peek(lexer) != '"') {
@@ -103,6 +121,9 @@ static Token string(Lexer* lexer) {
     // consume the '"'
     if (!match(lexer, '"')) {
         return error_token(lexer, "Unterminated string literal.");
+    }
+    if (!check_terminated_literal(lexer)) {
+        return error_token(lexer, "Invalid string literal.");
     }
     return make_token(lexer, TOKEN_STRING);
 }
@@ -119,6 +140,9 @@ static Token number(Lexer* lexer) {
             advance(lexer);
     }
 
+    if (!check_terminated_literal(lexer)) {
+        return error_token(lexer, "Invalid number literal.");
+    }
     return make_token(lexer, TOKEN_NUMBER);
 }
 

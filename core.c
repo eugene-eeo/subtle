@@ -1,7 +1,6 @@
 #include "core.h"
 
 #include "core.subtle.inc"
-#include "memory.h"
 #include "object.h"
 #include "table.h"
 #include "value.h"
